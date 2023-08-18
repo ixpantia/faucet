@@ -9,14 +9,14 @@ use workers::PlumberDispatcher;
 
 async fn redirect(
     req: actix_web::HttpRequest,
+    payload: web::Bytes,
     dispatcher: web::Data<PlumberDispatcher>,
 ) -> impl Responder {
-    dispatcher.send(req).await
+    dispatcher.send(req, payload).await
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
     // Parse command line arguments
     let args = cli::Args::parse();
 

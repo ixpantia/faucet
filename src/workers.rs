@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use tokio::process::Child;
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -79,9 +80,14 @@ impl PlumberWorker {
     /// Converts an actix_web::HttpRequest into a reqwest::Request
     /// This is done by copying the method and uri from the request
     /// and then building a new reqwest::Request.
-    async fn convert_request(&self, req: actix_web::HttpRequest) -> reqwest::Request {
+    async fn convert_request(
+        &self,
+        req: actix_web::HttpRequest,
+        payload: Bytes,
+    ) -> reqwest::Request {
         self.client
             .request(req.method().clone(), self.build_uri(&req))
+            .body(payload)
             .build()
             .expect("failed to build request")
     }
@@ -118,9 +124,9 @@ impl PlumberWorker {
     }
 
     /// Sends a request to the worker and returns the response.
-    async fn send(&self, req: actix_web::HttpRequest) -> actix_web::HttpResponse {
+    async fn send(&self, req: actix_web::HttpRequest, payload: Bytes) -> actix_web::HttpResponse {
         // Convert the request into a reqwest::Request
-        let request = self.convert_request(req).await;
+        let request = self.convert_request(req, payload).await;
         // Execute the request and convert the response into an actix_web::HttpResponse
         let res = self
             .client
@@ -156,7 +162,7 @@ impl PlumberDispatcher {
         // Create a new client that will recycle TCP connections.
         let client = reqwest::Client::new();
         // Create a vector of workers and initialize them.
-        let mut workers = Vec::with_capacity(n_workers as usize);
+        let mut workers = Vec::with_capacity(n_workers);
         for i in 0..n_workers {
             workers.push(Mutex::new(
                 PlumberWorker::new(&dir, i, base_port, client.clone()).await,
@@ -182,8 +188,12 @@ impl PlumberDispatcher {
         }
     }
     /// Acquires a worker and sends the request to it.
-    pub async fn send(&self, req: actix_web::HttpRequest) -> actix_web::HttpResponse {
+    pub async fn send(
+        &self,
+        req: actix_web::HttpRequest,
+        payload: Bytes,
+    ) -> actix_web::HttpResponse {
         let worker = self.acquire_worker().await;
-        worker.send(req).await
+        worker.send(req, payload).await
     }
 }

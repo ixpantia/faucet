@@ -589,6 +589,7 @@ name = "faucet"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "bytes",
  "clap",
  "env_logger",
  "futures",

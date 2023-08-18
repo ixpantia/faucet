@@ -3,13 +3,12 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-
     /// The directory containing the plumber files.
     #[arg(short, long, default_value = ".")]
     pub dir: std::path::PathBuf,
 
     /// The host to bind to.
-    #[arg(short, long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = "127.0.0.1")]
     pub host: String,
 
     /// The port to bind to.
@@ -17,7 +16,7 @@ pub struct Args {
     pub port: u16,
 
     /// The port to start the child processes on.
-    /// 
+    ///
     /// NOTE: The child process will be started on this port and the next n-1 ports.
     #[arg(short, long, default_value_t = 8000)]
     pub child_port: u16,
