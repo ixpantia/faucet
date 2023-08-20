@@ -23,7 +23,7 @@ pub enum Backend {
 }
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(about, long_about = None)]
 pub struct OnPremArgs {
     /// The directory containing the plumber files.
     #[arg(short, long, default_value = ".")]
