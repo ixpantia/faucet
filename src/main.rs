@@ -37,7 +37,7 @@ async fn main() -> std::io::Result<()> {
                 .await
                 .into()
         }
-        Backend::K8(args) => K8PlumberDispatcher::new(args.host).into(),
+        Backend::K8(args) => K8PlumberDispatcher::new(args.service_url).into(),
     };
 
     // Wrap dispatcher in web::Data to allow it to be shared between threads
