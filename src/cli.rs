@@ -11,6 +11,10 @@ pub struct Args {
     #[arg(short, long, default_value_t = 8080)]
     pub port: u16,
 
+    /// The number of threads to use to handle requests.
+    #[arg(short, long, default_value_t = num_cpus::get())]
+    pub threads: usize,
+
     /// To use the on-prem backend or the k8 backend.
     #[command(subcommand)]
     pub backend: Backend,
@@ -19,7 +23,7 @@ pub struct Args {
 #[derive(Subcommand, Debug)]
 pub enum Backend {
     Local(OnPremArgs),
-    K8(K8Args),
+    K8s(K8Args),
 }
 
 #[derive(Parser, Debug)]

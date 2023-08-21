@@ -10,7 +10,7 @@ When building an API with `Plumber` a common pattern is to use [promises](https:
 
 In **local** mode, Faucet uses a lock system (similar to how relational databases handle concurrency) to distribute HTTP requests across multiple `Plumber` workers guaranteeing that a single process only handles one request at a time.
 
-In **K8** mode, Faucet uses the same lock system to distribute load across a Kubernetes service.
+In **K8s** mode, Faucet uses the same lock system to distribute load across a Kubernetes service.
 
 ## What makes it different from other async runtimes?
 
@@ -58,7 +58,7 @@ This is a work in progress. Please check back later.
 For now you can try a little experiment to understand the basic idea:
 
 1. Run a plumber API locally on port 8000
-2. Run `faucet k8 --service-url http://localhost:8000` to start a faucet server
+2. Run `faucet k8s --service-url http://localhost:8000` to start a faucet server
 3. Request any resource to the faucet server and see that it is proxied to the plumber API.
 
 What the faucet server will do is resolve the hostname of the `--service-url` flag and acquire a lock on the specific pod hosting the application. In a Kubernetes environment this hostname would dynamically resolve to different IP addresses according to the number of replicas.
