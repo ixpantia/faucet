@@ -47,7 +47,7 @@ async fn main() {
     // Wrap dispatcher in web::Data to allow it to be shared between threads
     let dispatcher = Arc::new(dispatcher);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], args.port));
+    let addr = args.host.parse::<SocketAddr>().expect("Invalid host");
 
     let make_svc = make_service_fn(move |_conn| {
         let dispatcher = dispatcher.clone();

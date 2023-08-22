@@ -4,12 +4,8 @@ use clap::{Parser, Subcommand};
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// The host to bind to.
-    #[arg(long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = "127.0.0.1:8080")]
     pub host: String,
-
-    /// The port to bind to.
-    #[arg(short, long, default_value_t = 8080)]
-    pub port: u16,
 
     /// The number of threads to use to handle requests.
     #[arg(short, long, default_value_t = num_cpus::get())]
