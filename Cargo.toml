@@ -6,14 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-web = { version = "4.3.1", features = ["rustls"] }
 bytes = "1.4.0"
-chashmap = "2.2.2"
 clap = { version = "4.3.22", features = ["derive"] }
 env_logger = "0.10.0"
 futures = "0.3.28"
+hyper = { version = "0.14.27", features = ["full"] }
 log = "0.4.20"
 num_cpus = "1.16.0"
-reqwest = { version = "0.11.18", default-features = false, features = ["rustls", "hyper-rustls"] }
-tokio = { version = "1.32.0", features = ["process", "test-util", "macros"] }
-url = "2.4.0"
+tokio = { version = "1.32.0", features = ["full"] }

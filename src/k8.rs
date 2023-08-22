@@ -1,23 +1,23 @@
 use crate::map_mutex::{Dispatcher, LockGuard};
-use crate::prelude::{convert_request, convert_response};
-use bytes::Bytes;
-use std::net::SocketAddr;
-use url::Url;
+use crate::prelude::{convert_request};
+
+use std::net::{ SocketAddr, ToSocketAddrs };
+use hyper::{Body, Request, Response, Uri, client::HttpConnector};
 
 pub struct K8PlumberDispatcher {
     /// The URL of the service to be load balanced.
-    url: Url,
+    uri: Uri,
     /// The HTTP client used to send requests to the service.
-    client: reqwest::Client,
+    client: hyper::Client<HttpConnector>,
     /// The dispatcher used to load balance requests.
     dispatcher: Dispatcher<SocketAddr>,
 }
 
 impl K8PlumberDispatcher {
-    pub fn new(url: Url) -> Self {
-        let client = reqwest::Client::new();
+    pub fn new(uri: Uri) -> Self {
+        let client = hyper::Client::new();
         Self {
-            url,
+            uri,
             client,
             dispatcher: Dispatcher::new(),
         }
@@ -26,17 +26,20 @@ impl K8PlumberDispatcher {
     /// Get the socket addresses of the pods backing the service
     /// from the URL.
     fn get_socket_addrs(&self) -> Vec<SocketAddr> {
-        self.url
-            .socket_addrs(|| None)
-            .expect("Failed to resolve hostname")
+        self.uri
+            .authority()
+            .expect("failed to get authority")
+            .as_str()
+            .to_socket_addrs()
+            .expect("failed to get socket addresses")
+            .collect()
     }
 
     /// Convert a socket address to a URL.
-    fn socket_to_url(&self, socket: SocketAddr) -> Url {
-        let mut url = self.url.clone();
-        // Replace the host with the IP address of the pod.
-        url.set_ip_host(socket.ip()).unwrap();
-        url
+    fn socket_to_uri(&self, socket: SocketAddr) -> Uri {
+        let mut uri = self.uri.clone().into_parts();
+        uri.authority = Some(socket.to_string().try_into().expect("failed to convert socket to authority"));
+        Uri::from_parts(uri).expect("failed to convert socket to url")
     }
 
     /// Acquire a lock on a socket address.
@@ -51,31 +54,24 @@ impl K8PlumberDispatcher {
         }
     }
 
-    /// Send a request to a pod.
+    /// Send a request to a worker.
     pub async fn send(
         &self,
-        req: actix_web::HttpRequest,
-        payload: Bytes,
-    ) -> actix_web::HttpResponse {
+        req: Request<Body>,
+    ) -> Response<Body> {
         // Acquire a lock on any available pod.
         let lock = self.acquire().await;
         // Get the socket address of the pod from the lock.
         let socket = lock.key();
         // Convert the socket address to a URL.
-        let pod_url = self.socket_to_url(socket);
+        let pod_url = self.socket_to_uri(socket);
         // Convert the request to a request to the pod.
-        let pod_req = convert_request(&self.client, &pod_url, req, payload);
+        let pod_req = convert_request(&pod_url, req);
         // Send the request to the pod and wait for the response.
-        let pod_res = self
-            .client
-            .execute(pod_req)
-            .await
-            .expect("failed to send request");
-        // Convert the response from the pod to a response to the client.
-        let res = convert_response(pod_res).await;
+        let pod_res = self.client.request(pod_req).await.expect("failed to send request");
         // Release the lock on the pod.
         lock.release().await;
         // Return the response to the client.
-        res
+        pod_res
     }
 }

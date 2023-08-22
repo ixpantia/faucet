@@ -53,5 +53,5 @@ pub struct K8Args {
     ///
     /// Example: http://plumber:8080
     #[arg(long)]
-    pub service_url: url::Url,
+    pub service_url: hyper::Uri,
 }

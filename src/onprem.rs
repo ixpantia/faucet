@@ -1,8 +1,8 @@
 use crate::map_mutex::{Dispatcher, LockGuard};
-use crate::prelude::{convert_request, convert_response};
-use bytes::Bytes;
+use crate::prelude::{convert_request};
+
+use hyper::{Body, Request, Response, Uri, client::HttpConnector};
 use tokio::process::Child;
-use url::Url;
 
 const PORT_ENV_VAR: &str = "FAUCET_PORT";
 
@@ -10,7 +10,7 @@ struct PlumberWorker {
     /// The child process running the plumber worker.
     child: Child,
     /// The url of the worker.
-    url: Url,
+    uri: Uri,
     /// The port the worker is listening on.
     port: u16,
 }
@@ -18,7 +18,7 @@ struct PlumberWorker {
 /// Warns the user that the worker is being killed.
 impl Drop for PlumberWorker {
     fn drop(&mut self) {
-        let url = &self.url;
+        let url = &self.uri;
         let id = match self.child.id() {
             Some(id) => id,
             None => return,
@@ -50,15 +50,15 @@ impl PlumberWorker {
     }
 
     /// Returns the url for the worker with the given id.
-    fn build_url(port: u16) -> url::Url {
-        url::Url::parse(&format!("http://127.0.0.1:{}", port)).expect("failed to parse url")
+    fn build_uri(port: u16) -> Uri {
+        Uri::try_from(&format!("http://127.0.0.1:{}", port)).expect("failed to parse url")
     }
 
     async fn new(dir: &std::path::PathBuf, id: usize, base_port: u16) -> Self {
         let port = base_port + id as u16;
         let child = Self::spawn_child_process(dir, port).expect("Failed to spawn child process");
-        let url = Self::build_url(port);
-        Self { child, port, url }
+        let uri = Self::build_uri(port);
+        Self { child, port, uri }
     }
 
     /// Get the id of the worker.
@@ -72,8 +72,8 @@ impl PlumberWorker {
     }
 
     /// Get the url of the worker.
-    fn get_url(&self) -> &Url {
-        &self.url
+    fn get_url(&self) -> &Uri {
+        &self.uri
     }
 }
 
@@ -86,14 +86,14 @@ struct PlumberWorkerId {
 /// A dispatcher for plumber workers.
 pub struct OnPremPlumberDispatcher {
     workers: Vec<PlumberWorker>,
-    client: reqwest::Client,
+    client: hyper::Client<HttpConnector>,
     dispatcher: Dispatcher<PlumberWorkerId>,
 }
 
 impl OnPremPlumberDispatcher {
     pub async fn new(dir: std::path::PathBuf, base_port: u16, n_workers: usize) -> Self {
         // Create a new client that will recycle TCP connections.
-        let client = reqwest::Client::new();
+        let client = hyper::Client::new();
         // Create a vector of workers and initialize them.
         let mut workers = Vec::with_capacity(n_workers);
         for i in 0..n_workers {
@@ -130,9 +130,8 @@ impl OnPremPlumberDispatcher {
     /// Send a request to a worker.
     pub async fn send(
         &self,
-        req: actix_web::HttpRequest,
-        payload: Bytes,
-    ) -> actix_web::HttpResponse {
+        req: Request<Body>,
+    ) -> Response<Body> {
         // Acquire a lock on a worker.
         let lock = self.acquire().await;
         // Get the id of the worker.
@@ -142,18 +141,12 @@ impl OnPremPlumberDispatcher {
         // Get the url of the worker.
         let pod_url = worker.get_url();
         // Convert the request to a worker request.
-        let pod_req = convert_request(&self.client, pod_url, req, payload);
-        // Send the request to the worker and wait for the response.
-        let pod_res = self
-            .client
-            .execute(pod_req)
-            .await
-            .expect("failed to send request");
-        // Convert the response to a response that can be sent to the client.
-        let res = convert_response(pod_res).await;
+        let pod_req = convert_request(pod_url, req);
+        // Send the request to the worker.
+        let pod_res = self.client.request(pod_req).await.expect("failed to send request");
         // Release the lock on the worker.
         lock.release().await;
         // Return the response.
-        res
+        pod_res
     }
 }

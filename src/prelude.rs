@@ -1,40 +1,40 @@
-use bytes::Bytes;
+
+use hyper::{Body, Request };
+use hyper::Uri;
 
 /// Takes a request and builds a new uri to send to the worker.
 /// The uri is built by taking the path and query string from the request
 /// and appending it to the worker's url.
-fn build_uri(base_url: &url::Url, req: &actix_web::HttpRequest) -> url::Url {
-    let mut url = base_url.clone();
-    url.set_path(req.path());
-    url.set_query(Some(req.query_string()));
-    url
+fn build_uri(base_uri: &Uri, req: &Request<Body>) -> Uri {
+    let mut uri = base_uri.clone().into_parts();
+    uri.path_and_query = req.uri().path_and_query().cloned();
+    Uri::from_parts(uri).expect("failed to build uri")
 }
 
 /// Converts a reqwest::Response into an actix_web::HttpResponse
 /// This is done by copying the status code and headers from the response
 /// and then reading the body into a byte array.
-pub async fn convert_response(res: reqwest::Response) -> actix_web::HttpResponse {
-    let mut builder = actix_web::HttpResponseBuilder::new(res.status());
-    // We copy every header from the response into the builder
-    for (key, value) in res.headers() {
-        builder.append_header((key, value));
-    }
-    // We read the body into a byte array and then set the body of the builder
-    builder.body(res.bytes().await.expect("failed to read body into bytes"))
-}
+//pub async fn convert_response(res: Response<Body>) -> Response<Body> {
+//    let mut res_new = Response::builder()
+//        .status(res.status());
+//    for (header_name, header_value) in res.headers() {
+//        res_new = res_new.header(header_name, header_value);
+//    }
+//    res_new.body(res.into_body()).expect("failed to build response")
+//}
 
 /// Converts an actix_web::HttpRequest into a reqwest::Request
 /// This is done by copying the method and uri from the request
 /// and then building a new reqwest::Request.
 pub fn convert_request(
-    client: &reqwest::Client,
-    base_url: &url::Url,
-    req: actix_web::HttpRequest,
-    payload: Bytes,
-) -> reqwest::Request {
-    client
-        .request(req.method().clone(), build_uri(base_url, &req))
-        .body(payload)
-        .build()
-        .expect("failed to build request")
+    base_uri: &Uri,
+    req: Request<Body>,
+) -> Request<Body> {
+    let mut req_new = Request::builder()
+        .method(req.method())
+        .uri(build_uri(base_uri, &req));
+    for (header_name, header_value) in req.headers() {
+        req_new = req_new.header(header_name, header_value);
+    }
+    req_new.body(req.into_body()).expect("failed to build request")
 }

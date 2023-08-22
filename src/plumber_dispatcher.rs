@@ -1,5 +1,6 @@
 use crate::k8::K8PlumberDispatcher;
 use crate::OnPremPlumberDispatcher;
+use hyper:: { Body, Request, Response };
 
 pub enum PlumberDispatcher {
     OnPrem(OnPremPlumberDispatcher),
@@ -21,12 +22,11 @@ impl From<K8PlumberDispatcher> for PlumberDispatcher {
 impl PlumberDispatcher {
     pub async fn send(
         &self,
-        req: actix_web::HttpRequest,
-        payload: bytes::Bytes,
-    ) -> actix_web::HttpResponse {
+        req: Request<Body>,
+    ) -> Response<Body> {
         match self {
-            PlumberDispatcher::OnPrem(dispatcher) => dispatcher.send(req, payload).await,
-            PlumberDispatcher::K8(dispatcher) => dispatcher.send(req, payload).await,
+            PlumberDispatcher::OnPrem(dispatcher) => dispatcher.send(req).await,
+            PlumberDispatcher::K8(dispatcher) => dispatcher.send(req).await,
         }
     }
 }
