@@ -24,9 +24,19 @@ impl PlumberDispatcher {
         &self,
         req: Request<Body>,
     ) -> Response<Body> {
-        match self {
+        let res = match self {
             PlumberDispatcher::OnPrem(dispatcher) => dispatcher.send(req).await,
             PlumberDispatcher::K8(dispatcher) => dispatcher.send(req).await,
+        };
+        match res {
+            Ok(res) => res,
+            Err(err) => {
+                log::error!("error: {}", err);
+                Response::builder()
+                    .status(500)
+                    .body(Body::from(format!("error: {}", err)))
+                    .unwrap()
+            }
         }
     }
 }

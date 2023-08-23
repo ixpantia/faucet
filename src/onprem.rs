@@ -1,6 +1,6 @@
 use crate::map_mutex::{Dispatcher, LockGuard};
 use crate::prelude::{convert_request};
-
+use anyhow::Result;
 use hyper::{Body, Request, Response, Uri, client::HttpConnector};
 use tokio::process::Child;
 
@@ -116,37 +116,51 @@ impl OnPremPlumberDispatcher {
         self.workers.iter().map(|w| w.get_id()).collect()
     }
 
-    async fn acquire(&self) -> LockGuard<PlumberWorkerId> {
+    async fn acquire(&self, workers: &[PlumberWorkerId]) -> LockGuard<PlumberWorkerId> {
         // Cycle through the workers until we find one that is available.
-        let mut workers = self.get_worker_ids().into_iter().cycle();
+        let mut workers = workers.into_iter().cycle();
         loop {
-            let worker = workers.next().unwrap();
-            if let Some(lock) = self.dispatcher.try_acquire(worker).await {
+            let worker = workers.next().expect("no workers");
+            if let Some(lock) = self.dispatcher.try_acquire(*worker).await {
                 return lock;
             }
         }
+    }
+
+    async fn forward_req(&self, lock: &LockGuard<PlumberWorkerId>, req: Request<Body>) -> Result<Response<Body>> {
+        // Get the id of the worker.
+        let worker_id = lock.key();
+        // Find the worker with the given id.
+        let worker = self.find_worker(worker_id).ok_or_else(|| anyhow::anyhow!("missing worker"))?;
+        // Get the url of the worker.
+        let pod_url = worker.get_url();
+        // Convert the request to a worker request.
+        let pod_req = convert_request(pod_url, req)?;
+        // Send the request to the worker.
+        let pod_res = self.client.request(pod_req).await?;
+        Ok(pod_res)
     }
 
     /// Send a request to a worker.
     pub async fn send(
         &self,
         req: Request<Body>,
-    ) -> Response<Body> {
+    ) -> Result<Response<Body>> {
+        let workers = self.get_worker_ids();
         // Acquire a lock on a worker.
-        let lock = self.acquire().await;
-        // Get the id of the worker.
-        let worker_id = lock.key();
-        // Find the worker with the given id.
-        let worker = self.find_worker(worker_id).expect("failed to find worker");
-        // Get the url of the worker.
-        let pod_url = worker.get_url();
-        // Convert the request to a worker request.
-        let pod_req = convert_request(pod_url, req);
-        // Send the request to the worker.
-        let pod_res = self.client.request(pod_req).await.expect("failed to send request");
+        let lock = self.acquire(&workers).await;
+        // Forward the request to the worker.
+        let pod_res = match self.forward_req(&lock, req).await {
+            Ok(res) => res,
+            Err(e) => {
+                // If the request failed, release the lock and return the error.
+                lock.release().await;
+                return Err(e);
+            }
+        };
         // Release the lock on the worker.
         lock.release().await;
         // Return the response.
-        pod_res
+        Ok(pod_res)
     }
 }

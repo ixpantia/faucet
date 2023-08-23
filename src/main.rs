@@ -15,6 +15,7 @@ use plumber_dispatcher::PlumberDispatcher;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use tokio::sync::Semaphore;
 use hyper::{Body, Request, Response, Server};
 use std::sync::Arc;
 use hyper::service::{make_service_fn, service_fn};
@@ -22,7 +23,9 @@ use hyper::service::{make_service_fn, service_fn};
 async fn hyper_redirect(
     req: Request<Body>,
     dispatcher: Arc<PlumberDispatcher>,
+    semaphore: Arc<Semaphore>,
 ) -> Result<Response<Body>, Infallible> {
+    let _permit = semaphore.acquire().await.expect("Semaphore error");
     Ok(dispatcher.send(req).await)
 }
 
@@ -44,6 +47,10 @@ async fn main() {
         Backend::K8s(args) => K8PlumberDispatcher::new(args.service_url).into(),
     };
 
+    // Create a semaphore to limit the number of concurrent requests trying to
+    // access the dispatcher
+    let semaphore = Arc::new(Semaphore::new(args.threads));
+
     // Wrap dispatcher in web::Data to allow it to be shared between threads
     let dispatcher = Arc::new(dispatcher);
 
@@ -51,10 +58,12 @@ async fn main() {
 
     let make_svc = make_service_fn(move |_conn| {
         let dispatcher = dispatcher.clone();
+        let semaphore = semaphore.clone();
         async move{
             Ok::<_, Infallible>(service_fn(move |req| {
                 let dispatcher = dispatcher.clone();
-                hyper_redirect(req, dispatcher)
+                let semaphore = semaphore.clone();
+                hyper_redirect(req, dispatcher, semaphore)
             }))
         }
     });

@@ -1,4 +1,5 @@
 
+use anyhow::Result;
 use hyper::{Body, Request };
 use hyper::Uri;
 
@@ -29,12 +30,12 @@ fn build_uri(base_uri: &Uri, req: &Request<Body>) -> Uri {
 pub fn convert_request(
     base_uri: &Uri,
     req: Request<Body>,
-) -> Request<Body> {
+) -> Result<Request<Body>> {
     let mut req_new = Request::builder()
         .method(req.method())
         .uri(build_uri(base_uri, &req));
     for (header_name, header_value) in req.headers() {
         req_new = req_new.header(header_name, header_value);
     }
-    req_new.body(req.into_body()).expect("failed to build request")
+    Ok(req_new.body(req.into_body())?)
 }
