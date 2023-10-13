@@ -1,6 +1,6 @@
 // Modules
 mod cli;
-mod k8;
+mod k8s;
 mod map_mutex;
 mod onprem;
 mod plumber_dispatcher;
@@ -9,16 +9,16 @@ mod prelude;
 // Imports
 use clap::Parser;
 use cli::Backend;
-use k8::K8PlumberDispatcher;
+use k8s::K8sPlumberDispatcher;
 use onprem::OnPremPlumberDispatcher;
 use plumber_dispatcher::PlumberDispatcher;
 
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server};
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use tokio::sync::Semaphore;
-use hyper::{Body, Request, Response, Server};
 use std::sync::Arc;
-use hyper::service::{make_service_fn, service_fn};
+use tokio::sync::Semaphore;
 
 async fn hyper_redirect(
     req: Request<Body>,
@@ -44,7 +44,7 @@ async fn main() {
                 .await
                 .into()
         }
-        Backend::K8s(args) => K8PlumberDispatcher::new(args.service_url).into(),
+        Backend::K8s(args) => K8sPlumberDispatcher::new(args.service_url).into(),
     };
 
     // Create a semaphore to limit the number of concurrent requests trying to
@@ -59,7 +59,7 @@ async fn main() {
     let make_svc = make_service_fn(move |_conn| {
         let dispatcher = dispatcher.clone();
         let semaphore = semaphore.clone();
-        async move{
+        async move {
             Ok::<_, Infallible>(service_fn(move |req| {
                 let dispatcher = dispatcher.clone();
                 let semaphore = semaphore.clone();

@@ -1,10 +1,10 @@
 use crate::map_mutex::{Dispatcher, LockGuard};
 use crate::prelude::convert_request;
 use anyhow::Result;
-use std::net::{ SocketAddr, ToSocketAddrs };
-use hyper::{Body, Request, Response, Uri, client::HttpConnector};
+use hyper::{client::HttpConnector, Body, Request, Response, Uri};
+use std::net::{SocketAddr, ToSocketAddrs};
 
-pub struct K8PlumberDispatcher {
+pub struct K8sPlumberDispatcher {
     /// The URL of the service to be load balanced.
     uri: Uri,
     /// The HTTP client used to send requests to the service.
@@ -13,7 +13,7 @@ pub struct K8PlumberDispatcher {
     dispatcher: Dispatcher<SocketAddr>,
 }
 
-impl K8PlumberDispatcher {
+impl K8sPlumberDispatcher {
     pub fn new(uri: Uri) -> Self {
         let client = hyper::Client::new();
         Self {
@@ -26,7 +26,8 @@ impl K8PlumberDispatcher {
     /// Get the socket addresses of the pods backing the service
     /// from the URL.
     fn get_socket_addrs(&self) -> Result<Vec<SocketAddr>> {
-        let sockets = self.uri
+        let sockets = self
+            .uri
             .authority()
             .ok_or_else(|| anyhow::anyhow!("missing authority"))?
             .as_str()
@@ -54,7 +55,11 @@ impl K8PlumberDispatcher {
         }
     }
 
-    async fn forward_req(&self, lock: &LockGuard<SocketAddr>, req: Request<Body>) -> Result<Response<Body>> {
+    async fn forward_req(
+        &self,
+        lock: &LockGuard<SocketAddr>,
+        req: Request<Body>,
+    ) -> Result<Response<Body>> {
         // Get the socket address of the pod from the lock.
         let socket = lock.key();
         // Convert the socket address to a URL.
@@ -67,10 +72,7 @@ impl K8PlumberDispatcher {
     }
 
     /// Send a request to a worker.
-    pub async fn send(
-        &self,
-        req: Request<Body>,
-    ) -> Result<Response<Body>> {
+    pub async fn send(&self, req: Request<Body>) -> Result<Response<Body>> {
         // Get the socket addresses of the pods backing the service.
         let sockets = self.get_socket_addrs()?;
         // Acquire a lock on any available pod.
