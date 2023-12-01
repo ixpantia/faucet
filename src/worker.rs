@@ -1,4 +1,4 @@
-use crate::error::{FaucetResult, FucetError};
+use crate::error::{FaucetError, FaucetResult};
 use std::{net::SocketAddr, path::Path};
 use tokio::process::Child;
 use tokio_stream::StreamExt;
@@ -21,14 +21,14 @@ fn log_stdio(mut child: Child) -> FaucetResult<Child> {
     let pid = child.id().expect("Failed to get plumber worker PID");
 
     let mut stdout = FramedRead::new(
-        child.stdout.take().ok_or(FucetError::Unknown(format!(
+        child.stdout.take().ok_or(FaucetError::Unknown(format!(
             "Unable to take stdout from PID {pid}"
         )))?,
         LinesCodec::new(),
     );
 
     let mut stderr = FramedRead::new(
-        child.stderr.take().ok_or(FucetError::Unknown(format!(
+        child.stderr.take().ok_or(FaucetError::Unknown(format!(
             "Unable to take stderr from PID {pid}"
         )))?,
         LinesCodec::new(),

@@ -9,7 +9,7 @@ default-run = "faucet"
 readme = "README.md"
 homepage = "https://github.com/andyquinterom/Faucet"
 repository = "https://github.com/andyquinterom/Faucet"
-keyworks = ["R", "loadbalancer", "server", "plumber", "shiny", "api", "faucet"]
+keywords = ["R", "loadbalancer", "server", "plumber", "shiny", "api", "faucet"]
 
 [[bin]]
 name = "faucet"
@@ -18,7 +18,11 @@ path = "src/main.rs"
 [dependencies]
 async-trait = "0.1.74"
 clap = { version = "4.4.10", features = ["derive", "env"] }
+deadpool = { version = "0.10.0", features = ["rt_tokio_1"] }
 env_logger = "0.10.1"
+http-body-util = "0.1.0"
+hyper = { version = "1.0.1", features = ["full"] }
+hyper-util = { version = "0.1.1", features = ["full"] }
 log = "0.4.20"
 num_cpus = "1.16.0"
 tokio = { version = "1.34.0", features = ["full"] }
