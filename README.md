@@ -1,64 +1,39 @@
-# Faucet
+# Faucet: Fast, Asynchronous, Concurrent R Application Deployment
 
-Faucet is an asynchronous runtime for running [Plumber](https://www.rplumber.io/) APIs. Faucet enables guaranteed concurrency and parallelism for Plumber APIs without the need for a promise based API. Faucet can run either locally or in a Kubernetes cluster.
+Welcome to Faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. Faucet is a high-performance server built with Rust, offering Round Robin and Round Robin + IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, Faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively.
 
-> **Note:** Faucet is currently in early development and is not ready for production use.
+## Features
 
-## Why Faucet?
+- **High Performance:** Faucet is designed with speed in mind, leveraging Rust's performance benefits to ensure your R applications run smoothly and efficiently.
 
-When building an API with `Plumber` a common pattern is to use [promises](https://rstudio.github.io/promises/index.html), however in many cases promises cause significant overhead by creating new R processes on every request; promises also do not support database connections.
+- **Load Balancing:** Choose between Round Robin and Round Robin + IP Hash load balancing strategies to distribute incoming requests among multiple instances, optimizing resource utilization.
 
-In **local** mode, Faucet uses a lock system (similar to how relational databases handle concurrency) to distribute HTTP requests across multiple `Plumber` workers guaranteeing that a single process only handles one request at a time.
+- **Replicas:** Easily scale your Plumber APIs and Shiny Applications by running multiple replicas, allowing for improved performance and increased availability.
 
-In **K8s** mode, Faucet uses the same lock system to distribute load across a Kubernetes service.
+- **Simplified Deployment:** Faucet simplifies the deployment process, making it a breeze to get your R applications up and running quickly.
 
-## What makes it different from other async runtimes?
-
-Faucet is similar to other load balancers like [Valve](https://github.com/JosiahParry/valve/) when working on local mode. However, Faucet is designed to be a versatile runtime that can run either in a normal Linux VM or in a Kubernetes cluster. Faucet is able to use it's worker lock on replicas inside a Kubernetes service, avoiding unwanted request collisions.
+- **Asynchronous & Concurrent:** Faucet leverages asynchronous and concurrent processing, ensuring optimal utilization of resources and responsive handling of requests.
 
 ## Installation
 
-To install Faucet, you first need to install [The Rust Programming Language](https://www.rust-lang.org/) on your system. In the future, platform specific binaries will be distributed.
+### Option 1: Binary Download (Linux)
 
-Clone the repository and run `cargo install --path .` to install the `faucet` binary.
-
-## Usage in local mode
-
-To use Faucet, you will need to have a Plumber API with an entrypoint file named `entrypoint.R` that contains code like the following:
-
-```r
-library(plumber)
-# 'plumber.R' is the location of the file shown above
-pr("plumber.R") %>%
-  pr_run(port = as.integer(Sys.getenv("FAUCET_PORT")))
-```
-
-The environment variable `FAUCET_PORT` is used to specify the port that the specific `Plumber` worker should listen on. Faucet will automatically set this environment variable for each worker.
-
-To run the API, run the following command while in the same directory as the `entrypoint.R` file:
+Download the latest release of Faucet for Linux from the [GitHub Releases page](https://github.com/yourusername/faucet/releases).
 
 ```bash
-faucet
-```
+# Replace "vX.X.X" with the latest version number
+$ wget https://github.com/yourusername/faucet/releases/download/vX.X.X/faucet-linux-x86_64 -O faucet
 
-If you want to run an API on a different directory, you can use the `--dir` flag:
+# Make the binary executable
+$ chmod +x faucet
+
+# Move the binary to a directory in your PATH (e.g., user local bin)
+$ mv faucet ~/.local/bin/
+
+### Option 2: Install with Cargo (Linux, macOS, Windows)
+
+Install Faucet with Cargo, Rust's package manager.
 
 ```bash
-faucet local --dir /path/to/api
+cargo install faucet-server
 ```
-
-For more information on the available flags, run `faucet local --help`.
-
-## Usage in Kubernetes mode
-
-TODO: Improve documentation
-
-This is a work in progress. Please check back later.
-
-For now you can try a little experiment to understand the basic idea:
-
-1. Run a plumber API locally on port 8000
-2. Run `faucet k8s --service-url http://localhost:8000` to start a faucet server
-3. Request any resource to the faucet server and see that it is proxied to the plumber API.
-
-What the faucet server will do is resolve the hostname of the `--service-url` flag and acquire a lock on the specific pod hosting the application. In a Kubernetes environment this hostname would dynamically resolve to different IP addresses according to the number of replicas.

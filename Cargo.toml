@@ -1,9 +1,11 @@
 [package]
 name = "faucet"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Andrés F. Quintero <afquinteromoreano@gmail.com>"]
+description = "Welcome to Faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. Faucet is a high-performance server built with Rust, offering Round Robin and Round Robin + IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, Faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively."
+license = "MIT"
+homepage = "https://github.com/andyquinterom/Faucet"
 
 [dependencies]
 async-trait = "0.1.74"
