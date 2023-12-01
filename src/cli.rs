@@ -27,7 +27,7 @@ enum Strategy {
 /// Fast, async, and concurrent data applications.
 ///
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None, verbatim_doc_comment)]
+#[command(author, version, verbatim_doc_comment)]
 pub struct Args {
     /// The host to bind to.
     #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]

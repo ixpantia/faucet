@@ -29,11 +29,40 @@ $ chmod +x faucet
 
 # Move the binary to a directory in your PATH (e.g., user local bin)
 $ mv faucet ~/.local/bin/
+```
 
 ### Option 2: Install with Cargo (Linux, macOS, Windows)
 
 Install Faucet with Cargo, Rust's package manager.
 
+1. Install Rust by following the instructions [here](https://www.rust-lang.org/tools/install).
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+2. Install Faucet with Cargo.
+
 ```bash
 cargo install faucet-server
+```
+
+### Option 3: Build from Source (Linux, macOS, Windows)
+
+1. Install Rust by following the instructions [here](https://www.rust-lang.org/tools/install).
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+2. Clone the Faucet repository.
+
+```bash
+git clone https://github.com/andyquinterom/Faucet.git
+```
+
+3. Build Faucet with Cargo.
+
+```bash
+cargo install --path .
 ```

@@ -209,8 +209,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "faucet"
-version = "0.1.0"
+name = "faucet-server"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "clap",

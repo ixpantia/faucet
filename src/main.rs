@@ -1,6 +1,6 @@
-use faucet::cli::Args;
-use faucet::error::FaucetResult;
-use faucet::server::FaucetServer;
+use faucet_server::cli::Args;
+use faucet_server::error::FaucetResult;
+use faucet_server::server::FaucetServer;
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
