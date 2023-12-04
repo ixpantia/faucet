@@ -2,13 +2,13 @@ use super::LoadBalancingStrategy;
 use crate::client::Client;
 use crate::error::FaucetResult;
 use async_trait::async_trait;
-use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::AtomicUsize;
-use tokio::sync::Mutex;
 
 struct Targets {
-    targets: Box<[Client]>,
+    targets: &'static [Client],
     index: AtomicUsize,
 }
 
@@ -19,6 +19,7 @@ impl Targets {
             .iter()
             .map(|addr| Client::builder(*addr).build())
             .collect::<FaucetResult<Box<[Client]>>>()?;
+        let targets = Box::leak(targets);
         Ok(Targets {
             targets,
             index: AtomicUsize::new(0),
@@ -53,25 +54,33 @@ impl LoadBalancingStrategy for RoundRobinSimple {
 
 pub struct RoundRobinIpHash {
     targets: Targets,
-    table: Mutex<HashMap<IpAddr, Client>>,
+    targets_len: usize,
 }
 
 impl RoundRobinIpHash {
     pub(crate) fn new(targets: impl AsRef<[SocketAddr]>) -> FaucetResult<Self> {
         Ok(Self {
+            targets_len: targets.as_ref().len(),
             targets: Targets::new(targets)?,
-            table: Mutex::new(HashMap::new()),
         })
     }
+}
+
+fn calculate_hash<T: Hash>(t: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
+}
+
+fn hash_to_index(value: impl Hash, length: usize) -> usize {
+    let hash = calculate_hash(&value);
+    (hash % length as u64) as usize
 }
 
 #[async_trait]
 impl LoadBalancingStrategy for RoundRobinIpHash {
     async fn entry(&self, ip: IpAddr) -> Client {
-        let mut table = self.table.lock().await;
-        table
-            .entry(ip)
-            .or_insert_with(|| self.targets.next())
-            .clone()
+        let index = hash_to_index(ip, self.targets_len);
+        self.targets.targets[index].clone()
     }
 }
