@@ -19,6 +19,13 @@ enum Strategy {
     IpHash,
 }
 
+#[derive(clap::ValueEnum, Debug, Clone, Copy)]
+enum IpFrom {
+    Client,
+    XForwardedFor,
+    XRealIp,
+}
+
 ///
 /// ███████╗ █████╗ ██╗   ██╗ ██████╗███████╗████████╗
 /// ██╔════╝██╔══██╗██║   ██║██╔════╝██╔════╝╚══██╔══╝
@@ -51,6 +58,11 @@ pub struct Args {
     /// Defaults to the current directory.
     #[arg(short, long, env = "FAUCET_DIR", default_value = ".")]
     dir: PathBuf,
+
+    /// The IP address to extract from.
+    /// Defaults to client address.
+    #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
+    ip_from: IpFrom,
 }
 
 impl Args {
@@ -85,5 +97,12 @@ impl Args {
     }
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+    pub fn ip_extractor(&self) -> load_balancing::IpExtractor {
+        match self.ip_from {
+            IpFrom::Client => load_balancing::IpExtractor::ClientAddr,
+            IpFrom::XForwardedFor => load_balancing::IpExtractor::XForwardedFor,
+            IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
+        }
     }
 }

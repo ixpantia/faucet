@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use super::pool::HttpConnection;
 use crate::error::FaucetError;
-use http_body_util::{BodyExt, Empty};
+use http_body_util::{BodyExt, Empty, Full};
 use hyper::body::{Body, Bytes, SizeHint};
 
 pub struct ExclusiveBody {
@@ -22,6 +22,9 @@ impl ExclusiveBody {
     }
     pub fn empty() -> Self {
         Self::new(Empty::new().map_err(Into::into), None)
+    }
+    pub fn plain_text(text: impl Into<String>) -> Self {
+        Self::new(Full::from(text.into()).map_err(Into::into), None)
     }
 }
 

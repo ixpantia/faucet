@@ -5,7 +5,7 @@ use crate::{
 };
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Response};
 use hyper_util::rt::TokioIo;
-use log::{info, warn};
+use log::{error, info, warn};
 use std::{net::SocketAddr, pin::Pin};
 use tokio::net::TcpListener;
 
@@ -20,6 +20,7 @@ pub struct FaucetServer {
     n_workers: usize,
     server_type: Option<WorkerType>,
     workdir: Box<std::path::Path>,
+    extractor: load_balancing::IpExtractor,
 }
 
 impl Default for FaucetServer {
@@ -36,6 +37,7 @@ impl FaucetServer {
             n_workers: 1,
             server_type: None,
             workdir: std::env::current_dir().unwrap().into(),
+            extractor: load_balancing::IpExtractor::ClientAddr,
         }
     }
     pub fn strategy(mut self, strategy: load_balancing::Strategy) -> Self {
@@ -44,6 +46,10 @@ impl FaucetServer {
     }
     pub fn bind(mut self, bind: SocketAddr) -> Self {
         self.bind = bind;
+        self
+    }
+    pub fn extractor(mut self, extractor: load_balancing::IpExtractor) -> Self {
+        self.extractor = extractor;
         self
     }
     pub fn workers(mut self, n: usize) -> Self {
@@ -69,7 +75,7 @@ impl FaucetServer {
         );
         workers.spawn(self.n_workers)?;
         let targets = workers.get_socket_addrs();
-        let load_balancer = LoadBalancer::new(self.strategy, targets)?;
+        let load_balancer = LoadBalancer::new(self.strategy, self.extractor, targets)?;
 
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(self.bind).await?;
@@ -93,7 +99,7 @@ impl FaucetServer {
                 let conn = Pin::new(&mut conn);
 
                 if let Err(e) = conn.await {
-                    warn!("Connection error: {}", e);
+                    error!("Connection error: {}", e);
                 }
             });
         }
@@ -106,7 +112,16 @@ async fn handle_connection(
     client_addr: SocketAddr,
     load_balancer: LoadBalancer,
 ) -> FaucetResult<Response<ExclusiveBody>> {
-    let client = load_balancer.get_client(client_addr.ip()).await;
+    let client = match load_balancer.get_client(&req, client_addr).await {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Error getting client: {}", e);
+            return Ok(Response::builder()
+                .status(500)
+                .body(ExclusiveBody::plain_text("Internal Server Error"))
+                .unwrap());
+        }
+    };
     match client.attemp_upgrade(req).await? {
         UpgradeStatus::Upgraded(res) => Ok(res),
         UpgradeStatus::NotUpgraded(req) => {

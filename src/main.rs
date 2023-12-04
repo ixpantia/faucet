@@ -13,6 +13,7 @@ pub async fn main() -> FaucetResult<()> {
         .strategy(cli_args.strategy())
         .workers(cli_args.workers())
         .server_type(cli_args.server_type())
+        .extractor(cli_args.ip_extractor())
         .bind(cli_args.host().parse()?)
         .workdir(cli_args.dir())
         .run()

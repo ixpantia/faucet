@@ -1,7 +1,8 @@
 use std::convert::Infallible;
 
 pub enum BadRequestReason {
-    NoSecWebSocketKey,
+    MissingHeader(&'static str),
+    InvalidHeader(&'static str),
 }
 
 pub type FaucetResult<T> = std::result::Result<T, FaucetError>;
@@ -18,7 +19,7 @@ pub enum FaucetError {
     HostParseError(std::net::AddrParseError),
     Hyper(hyper::Error),
     Infallible(Infallible),
-    BadUpgradeRequest(BadRequestReason),
+    BadRequest(BadRequestReason),
     InvalidHeaderValues(hyper::header::InvalidHeaderValue),
     Http(hyper::http::Error),
 }
@@ -99,8 +100,13 @@ impl std::fmt::Display for FaucetError {
             Self::Infallible(e) => write!(f, "Infallible error: {}", e),
             Self::Http(e) => write!(f, "Http error: {}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {}", e),
-            Self::BadUpgradeRequest(r) => match r {
-                BadRequestReason::NoSecWebSocketKey => write!(f, "No Sec-WebSocket-Key header"),
+            Self::BadRequest(r) => match r {
+                BadRequestReason::MissingHeader(header) => {
+                    write!(f, "Missing header: {}", header)
+                }
+                BadRequestReason::InvalidHeader(header) => {
+                    write!(f, "Invalid header: {}", header)
+                }
             },
         }
     }
@@ -122,8 +128,13 @@ impl std::fmt::Debug for FaucetError {
             Self::Infallible(e) => write!(f, "Infallible error: {:?}", e),
             Self::Http(e) => write!(f, "Http error: {:?}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {:?}", e),
-            Self::BadUpgradeRequest(r) => match r {
-                BadRequestReason::NoSecWebSocketKey => write!(f, "No Sec-WebSocket-Key header"),
+            Self::BadRequest(r) => match r {
+                BadRequestReason::MissingHeader(header) => {
+                    write!(f, "Missing header: {}", header)
+                }
+                BadRequestReason::InvalidHeader(header) => {
+                    write!(f, "Invalid header: {}", header)
+                }
             },
         }
     }
@@ -133,7 +144,7 @@ impl std::error::Error for FaucetError {}
 
 impl FaucetError {
     pub fn no_sec_web_socket_key() -> Self {
-        Self::BadUpgradeRequest(BadRequestReason::NoSecWebSocketKey)
+        Self::BadRequest(BadRequestReason::MissingHeader("Sec-WebSocket-Key"))
     }
     pub fn unknown(s: impl ToString) -> Self {
         Self::Unknown(s.to_string())
