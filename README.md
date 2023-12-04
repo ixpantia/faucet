@@ -87,6 +87,50 @@ faucet --dir /path/to/plumber/api --type plumber
 faucet --dir /path/to/shiny/app --type shiny
 ```
 
+## With Nginx / Reverse Proxy
+
+If you want to run multiple faucet instances behind a reverse proxy, or you want to enable HTTPS,
+you may use Nginx or any other reverse proxy. However, to make sure faucet correctly detects the
+client IP address, you will need to set the `X-Forwarded-For` header or the `X-Real-IP` header.
+
+### Nginx
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    location / {
+        proxy_pass http://...;
+        proxy_set_header  X-Real-IP $remote_addr;
+        proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
+        ...
+    }
+}
+```
+
+Additionally, when running faucet, you will need to set the `-i` / `--ip-from`
+flat to either `x-forwarded-for` or `x-real-ip` depending on which header you
+set in Nginx.
+
+```bash
+faucet --dir /path/to/plumber/api --ip-from x-forwarded-for
+```
+
+## Environment Variables
+
+Every option / flag can also be set using an environment variable, this is useful
+for example when using Docker.
+
+| Option / Flag | Environment Variable |
+| ------------- | -------------------- |
+| `--dir`       | `FAUCET_DIR`         |
+| `--host`      | `FAUCET_HOST`        |
+| `--workers`   | `FAUCET_WORKERS`     |
+| `--strategy`  | `FAUCET_STRATEGY`    |
+| `--type`      | `FAUCET_TYPE`        |
+| `--ip-from`   | `FAUCET_IP_FROM`     |
+
 ## Installation
 
 ### Option 1: Binary Download (Linux)
