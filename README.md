@@ -1,12 +1,12 @@
 # Faucet: Fast, Asynchronous, Concurrent R Application Deployment
 
-Welcome to Faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. Faucet is a high-performance server built with Rust, offering Round Robin and Round Robin + IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, Faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively.
+Welcome to Faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. Faucet is a high-performance server built with Rust, offering Round Robin and IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, Faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively.
 
 ## Features
 
 - **High Performance:** Faucet is designed with speed in mind, leveraging Rust's performance benefits to ensure your R applications run smoothly and efficiently.
 
-- **Load Balancing:** Choose between Round Robin and Round Robin + IP Hash load balancing strategies to distribute incoming requests among multiple instances, optimizing resource utilization.
+- **Load Balancing:** Choose between Round Robin and IP Hash load balancing strategies to distribute incoming requests among multiple instances, optimizing resource utilization.
 
 - **Replicas:** Easily scale your Plumber APIs and Shiny Applications by running multiple replicas, allowing for improved performance and increased availability.
 
@@ -64,15 +64,15 @@ By default Faucet will start as many workers as there are logical cores on the m
 faucet --dir /path/to/shiny/app --workers 4
 ```
 
-> **Note:** On Shiny applications, Faucet will be forced to use Round Robin + IP Hash load balancing. This is because Shiny applications require a persistent connection between the client and the server. If Round Robin load balancing is used, the client will be redirected to a different instance on each request, causing the connection to be lost.
+> **Note:** On Shiny applications, Faucet will be forced to use IP Hash load balancing. This is because Shiny applications require a persistent connection between the client and the server. If Round Robin load balancing is used, the client will be redirected to a different instance on each request, causing the connection to be lost.
 
 ### Pick a Load Balancing Strategy for Plumber APIs
 
-Faucet supports two load balancing strategies for Plumber APIs: Round Robin and Round Robin + IP Hash.
+Faucet supports two load balancing strategies for Plumber APIs: Round Robin and IP Hash.
 By default, Faucet will use Round Robin load balancing. To change the strategy, use the `--strategy` flag.
 
 ```bash
-faucet --dir /path/to/plumber/api --strategy round-robin-ip-hash
+faucet --dir /path/to/plumber/api --strategy ip-hash
 ```
 
 ### Explicitly set the type of application

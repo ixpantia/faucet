@@ -31,7 +31,7 @@ impl Default for FaucetServer {
 impl FaucetServer {
     pub fn new() -> Self {
         Self {
-            strategy: load_balancing::Strategy::RoundRobinIpHash,
+            strategy: load_balancing::Strategy::RoundRobin,
             bind: ([0, 0, 0, 0], 3000).into(),
             n_workers: 1,
             server_type: None,
@@ -53,8 +53,8 @@ impl FaucetServer {
     pub fn server_type(mut self, server_type: WorkerType) -> Self {
         self.server_type = Some(server_type);
         if server_type == WorkerType::Shiny {
-            warn!("Using server type Shiny, switching to RoundRobinIpHash strategy");
-            self.strategy = load_balancing::Strategy::RoundRobinIpHash;
+            warn!("Using server type Shiny, switching to IpHash strategy");
+            self.strategy = load_balancing::Strategy::IpHash;
         }
         self
     }

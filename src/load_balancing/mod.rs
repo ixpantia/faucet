@@ -1,3 +1,4 @@
+pub mod ip_hash;
 pub mod round_robin;
 
 use crate::client::Client;
@@ -6,6 +7,9 @@ use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use self::ip_hash::IpHash;
+use self::round_robin::RoundRobin;
+
 #[async_trait::async_trait]
 trait LoadBalancingStrategy {
     async fn entry(&self, ip: IpAddr) -> Client;
@@ -13,25 +17,16 @@ trait LoadBalancingStrategy {
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum Strategy {
-    RoundRobinSimple,
-    RoundRobinIpHash,
-}
-
-impl std::fmt::Display for Strategy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Strategy::RoundRobinSimple => write!(f, "round_robin"),
-            Strategy::RoundRobinIpHash => write!(f, "round_robin_ip_hash"),
-        }
-    }
+    RoundRobin,
+    IpHash,
 }
 
 impl FromStr for Strategy {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "round_robin" => Ok(Self::RoundRobinSimple),
-            "round_robin_ip_hash" => Ok(Self::RoundRobinIpHash),
+            "round_robin" => Ok(Self::RoundRobin),
+            "ip_hash" => Ok(Self::IpHash),
             _ => Err("invalid strategy"),
         }
     }
@@ -46,8 +41,8 @@ pub struct LoadBalancer {
 impl LoadBalancer {
     pub fn new(strategy: Strategy, targets: impl AsRef<[SocketAddr]>) -> FaucetResult<Self> {
         let strategy: DynLoadBalancer = match strategy {
-            Strategy::RoundRobinSimple => Arc::new(round_robin::RoundRobinSimple::new(targets)?),
-            Strategy::RoundRobinIpHash => Arc::new(round_robin::RoundRobinIpHash::new(targets)?),
+            Strategy::RoundRobin => Arc::new(RoundRobin::new(targets)?),
+            Strategy::IpHash => Arc::new(IpHash::new(targets)?),
         };
         Ok(Self { strategy })
     }

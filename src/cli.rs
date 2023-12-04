@@ -13,8 +13,10 @@ enum ServerType {
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy)]
 enum Strategy {
+    /// Sends requests to workers in a round-robin fashion.
     RoundRobin,
-    RoundRobinIpHash,
+    /// Hashes the IP address of the client to determine which worker to send the request to.
+    IpHash,
 }
 
 ///
@@ -58,8 +60,8 @@ impl Args {
     pub fn strategy(&self) -> load_balancing::Strategy {
         use Strategy::*;
         match self.strategy {
-            RoundRobin => load_balancing::Strategy::RoundRobinSimple,
-            RoundRobinIpHash => load_balancing::Strategy::RoundRobinIpHash,
+            RoundRobin => load_balancing::Strategy::RoundRobin,
+            IpHash => load_balancing::Strategy::IpHash,
         }
     }
     pub fn workers(&self) -> usize {
