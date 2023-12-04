@@ -1,6 +1,12 @@
-use crate::error::FaucetResult;
+use crate::{
+    client::{ExclusiveBody, UpgradeStatus, WebsocketHandler},
+    error::FaucetResult,
+    load_balancing::LoadBalancer,
+};
+use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Response};
+use hyper_util::rt::TokioIo;
 use log::{info, warn};
-use std::net::SocketAddr;
+use std::{net::SocketAddr, pin::Pin};
 use tokio::net::TcpListener;
 
 use crate::{
@@ -63,33 +69,49 @@ impl FaucetServer {
         );
         workers.spawn(self.n_workers)?;
         let targets = workers.get_socket_addrs();
-        let load_balancer = load_balancing::LoadBalancer::new(self.strategy, targets);
+        let load_balancer = LoadBalancer::new(self.strategy, targets)?;
 
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(self.bind).await?;
         info!("Listening on http://{}", self.bind);
         loop {
             let load_balancer = load_balancer.clone();
-            // When an incoming TCP connection is received grab a TCP stream for
-            // client<->server communication.
-            //
-            // Note, this is a .await point, this loop will loop forever but is not a busy loop. The
-            // .await point allows the Tokio runtime to pull the task off of the thread until the task
-            // has work to do. In this case, a connection arrives on the port we are listening on and
-            // the task is woken up, at which point the task is then put back on a thread, and is
-            // driven forward by the runtime, eventually yielding a TCP stream.
-            let (tcp, x) = listener.accept().await?;
-            // Use an adapter to access something implementing `tokio::io` traits as if they implement
-            // `hyper::rt` IO traits.
 
-            // Spin up a new task in Tokio so we can continue to listen for new TCP connection on the
-            // current task without waiting for the processing of the HTTP1 connection we just received
-            // to finish
+            let (tcp, client_addr) = listener.accept().await?;
+            let tcp = TokioIo::new(tcp);
+
             tokio::task::spawn(async move {
-                if let Err(e) = load_balancer.bridge(tcp, x).await {
-                    log::warn!("Dropping connection due to error: {}", e);
-                };
+                let mut conn = http1::Builder::new()
+                    .serve_connection(
+                        tcp,
+                        service_fn(move |req: Request<Incoming>| {
+                            handle_connection(req, client_addr, load_balancer.clone())
+                        }),
+                    )
+                    .with_upgrades();
+
+                let conn = Pin::new(&mut conn);
+
+                if let Err(e) = conn.await {
+                    warn!("Connection error: {}", e);
+                }
             });
+        }
+    }
+}
+
+// response.
+async fn handle_connection(
+    req: Request<Incoming>,
+    client_addr: SocketAddr,
+    load_balancer: LoadBalancer,
+) -> FaucetResult<Response<ExclusiveBody>> {
+    let client = load_balancer.get_client(client_addr.ip()).await;
+    match client.attemp_upgrade(req).await? {
+        UpgradeStatus::Upgraded(res) => Ok(res),
+        UpgradeStatus::NotUpgraded(req) => {
+            let connection = client.get().await?;
+            connection.send_request(req).await
         }
     }
 }

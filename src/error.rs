@@ -1,5 +1,9 @@
 use std::convert::Infallible;
 
+pub enum BadRequestReason {
+    NoSecWebSocketKey,
+}
+
 pub type FaucetResult<T> = std::result::Result<T, FaucetError>;
 
 pub enum FaucetError {
@@ -8,11 +12,27 @@ pub enum FaucetError {
     PoolPostCreateHook,
     PoolClosed,
     PoolNoRuntimeSpecified,
+    RecvError(tokio::sync::watch::error::RecvError),
     Io(std::io::Error),
     Unknown(String),
     HostParseError(std::net::AddrParseError),
     Hyper(hyper::Error),
     Infallible(Infallible),
+    BadUpgradeRequest(BadRequestReason),
+    InvalidHeaderValues(hyper::header::InvalidHeaderValue),
+    Http(hyper::http::Error),
+}
+
+impl From<hyper::header::InvalidHeaderValue> for FaucetError {
+    fn from(e: hyper::header::InvalidHeaderValue) -> Self {
+        Self::InvalidHeaderValues(e)
+    }
+}
+
+impl From<hyper::http::Error> for FaucetError {
+    fn from(e: hyper::http::Error) -> Self {
+        Self::Http(e)
+    }
 }
 
 impl From<deadpool::managed::PoolError<FaucetError>> for FaucetError {
@@ -24,6 +44,12 @@ impl From<deadpool::managed::PoolError<FaucetError>> for FaucetError {
             deadpool::managed::PoolError::PostCreateHook(_) => Self::PoolPostCreateHook,
             deadpool::managed::PoolError::NoRuntimeSpecified => Self::PoolNoRuntimeSpecified,
         }
+    }
+}
+
+impl From<tokio::sync::watch::error::RecvError> for FaucetError {
+    fn from(e: tokio::sync::watch::error::RecvError) -> Self {
+        Self::RecvError(e)
     }
 }
 
@@ -60,6 +86,7 @@ impl From<hyper::Error> for FaucetError {
 impl std::fmt::Display for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            Self::RecvError(e) => write!(f, "Recv error: {}", e),
             Self::PoolBuild(e) => write!(f, "Pool build error: {}", e),
             Self::PoolTimeout(e) => write!(f, "Pool timeout error: {:?}", e),
             Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
@@ -70,6 +97,11 @@ impl std::fmt::Display for FaucetError {
             Self::HostParseError(e) => write!(f, "Error parsing host address: {}", e),
             Self::Hyper(e) => write!(f, "Hyper error: {}", e),
             Self::Infallible(e) => write!(f, "Infallible error: {}", e),
+            Self::Http(e) => write!(f, "Http error: {}", e),
+            Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {}", e),
+            Self::BadUpgradeRequest(r) => match r {
+                BadRequestReason::NoSecWebSocketKey => write!(f, "No Sec-WebSocket-Key header"),
+            },
         }
     }
 }
@@ -77,6 +109,7 @@ impl std::fmt::Display for FaucetError {
 impl std::fmt::Debug for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            Self::RecvError(e) => write!(f, "Recv error: {:?}", e),
             Self::PoolTimeout(e) => write!(f, "Pool timeout error: {:?}", e),
             Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
             Self::PoolClosed => write!(f, "Pool closed error"),
@@ -87,8 +120,22 @@ impl std::fmt::Debug for FaucetError {
             Self::HostParseError(e) => write!(f, "Error parsing host address: {:?}", e),
             Self::Hyper(e) => write!(f, "Hyper error: {:?}", e),
             Self::Infallible(e) => write!(f, "Infallible error: {:?}", e),
+            Self::Http(e) => write!(f, "Http error: {:?}", e),
+            Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {:?}", e),
+            Self::BadUpgradeRequest(r) => match r {
+                BadRequestReason::NoSecWebSocketKey => write!(f, "No Sec-WebSocket-Key header"),
+            },
         }
     }
 }
 
 impl std::error::Error for FaucetError {}
+
+impl FaucetError {
+    pub fn no_sec_web_socket_key() -> Self {
+        Self::BadUpgradeRequest(BadRequestReason::NoSecWebSocketKey)
+    }
+    pub fn unknown(s: impl ToString) -> Self {
+        Self::Unknown(s.to_string())
+    }
+}

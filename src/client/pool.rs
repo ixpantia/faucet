@@ -16,7 +16,10 @@ struct ConnectionHandle {
 
 async fn create_http_client(addr: SocketAddr) -> FaucetResult<ConnectionHandle> {
     let stream = TokioIo::new(TcpStream::connect(addr).await?);
-    let (sender, _) = hyper::client::conn::http1::handshake(stream).await?;
+    let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
+    tokio::spawn(async move {
+        conn.await.expect("client conn");
+    });
     Ok(ConnectionHandle { sender })
 }
 
@@ -83,20 +86,26 @@ impl ClientBuilder {
             .max_size(self.max_size.unwrap_or(DEFAULT_MAX_SIZE));
         Ok(Client {
             pool: builder.build()?,
+            socket_addr: addr,
         })
     }
 }
 
+#[derive(Clone)]
 pub struct Client {
     pool: Pool<ConnectionManager>,
+    socket_addr: SocketAddr,
 }
 
 impl Client {
-    pub fn builder() -> ClientBuilder {
+    pub fn builder(addr: SocketAddr) -> ClientBuilder {
         ClientBuilder {
             max_size: None,
-            addr: None,
+            addr: Some(addr),
         }
+    }
+    pub fn socket_addr(&self) -> SocketAddr {
+        self.socket_addr
     }
     pub async fn get(&self) -> FaucetResult<HttpConnection> {
         Ok(HttpConnection {

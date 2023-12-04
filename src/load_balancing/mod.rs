@@ -1,15 +1,14 @@
 pub mod round_robin;
 
+use crate::client::Client;
+use crate::error::FaucetResult;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use tokio::io;
-use tokio::net::TcpStream;
-
 #[async_trait::async_trait]
 trait LoadBalancingStrategy {
-    async fn entry(&self, ip: IpAddr) -> SocketAddr;
+    async fn entry(&self, ip: IpAddr) -> Client;
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -45,23 +44,15 @@ pub struct LoadBalancer {
 }
 
 impl LoadBalancer {
-    pub fn new(strategy: Strategy, targets: impl AsRef<[SocketAddr]>) -> Self {
+    pub fn new(strategy: Strategy, targets: impl AsRef<[SocketAddr]>) -> FaucetResult<Self> {
         let strategy: DynLoadBalancer = match strategy {
-            Strategy::RoundRobinSimple => Arc::new(round_robin::RoundRobinSimple::new(targets)),
-            Strategy::RoundRobinIpHash => Arc::new(round_robin::RoundRobinIpHash::new(targets)),
+            Strategy::RoundRobinSimple => Arc::new(round_robin::RoundRobinSimple::new(targets)?),
+            Strategy::RoundRobinIpHash => Arc::new(round_robin::RoundRobinIpHash::new(targets)?),
         };
-        Self { strategy }
+        Ok(Self { strategy })
     }
-    async fn entry(&self, socket: SocketAddr) -> SocketAddr {
-        self.strategy.entry(socket.ip()).await
-    }
-    async fn connect(&self, socket: SocketAddr) -> io::Result<TcpStream> {
-        TcpStream::connect(self.entry(socket).await).await
-    }
-    pub async fn bridge(&self, mut tcp: TcpStream, socket: SocketAddr) -> io::Result<()> {
-        let mut target_tcp = self.connect(socket).await?;
-        io::copy_bidirectional(&mut target_tcp, &mut tcp).await?;
-        Ok(())
+    pub async fn get_client(&self, socket: IpAddr) -> Client {
+        self.strategy.entry(socket).await
     }
 }
 
