@@ -59,7 +59,7 @@ impl FaucetServer {
     pub fn server_type(mut self, server_type: WorkerType) -> Self {
         self.server_type = Some(server_type);
         if server_type == WorkerType::Shiny {
-            warn!("Using server type Shiny, switching to IpHash strategy");
+            warn!(target: "faucet", "Using server type Shiny, switching to IpHash strategy");
             self.strategy = load_balancing::Strategy::IpHash;
         }
         self
@@ -79,7 +79,7 @@ impl FaucetServer {
 
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(self.bind).await?;
-        info!("Listening on http://{}", self.bind);
+        info!(target: "faucet", "Listening on http://{}", self.bind);
         loop {
             let load_balancer = load_balancer.clone();
 

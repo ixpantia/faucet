@@ -1,6 +1,10 @@
 use crate::error::{FaucetError, FaucetResult};
-use std::{net::SocketAddr, path::Path};
-use tokio::process::Child;
+use std::{
+    net::SocketAddr,
+    path::Path,
+    sync::{atomic::AtomicBool, Arc},
+};
+use tokio::{process::Child, sync::Mutex, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
@@ -8,13 +12,6 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 pub enum WorkerType {
     Plumber,
     Shiny,
-}
-
-struct Worker {
-    /// The child process running the plumber worker.
-    _child: Child,
-    /// The address of the worker's socket.
-    socket_addr: SocketAddr,
 }
 
 fn log_stdio(mut child: Child) -> FaucetResult<Child> {
@@ -99,6 +96,22 @@ fn spawn_shiny_worker(workdir: impl AsRef<Path>, port: u16) -> FaucetResult<Chil
     log_stdio(child)
 }
 
+impl WorkerType {
+    fn spawn_process(self, workdir: impl AsRef<Path>, port: u16) -> FaucetResult<Child> {
+        match self {
+            WorkerType::Plumber => spawn_plumber_worker(workdir, port),
+            WorkerType::Shiny => spawn_shiny_worker(workdir, port),
+        }
+    }
+}
+
+struct Worker {
+    /// Whether the worker should be stopped
+    stop: Arc<AtomicBool>,
+    _worker_task: JoinHandle<FaucetResult<()>>,
+    /// The address of the worker's socket.
+    socket_addr: SocketAddr,
+}
 fn get_available_socket() -> FaucetResult<SocketAddr> {
     use std::net::TcpListener;
     TcpListener::bind("127.0.0.1:0")?
@@ -106,25 +119,52 @@ fn get_available_socket() -> FaucetResult<SocketAddr> {
         .map_err(Into::into)
 }
 
+fn spawn_worker_task(
+    addr: SocketAddr,
+    stop: Arc<AtomicBool>,
+    worker_type: WorkerType,
+    workdir: Arc<Path>,
+) -> JoinHandle<FaucetResult<()>> {
+    tokio::spawn(async move {
+        let stop = Arc::clone(&stop);
+        let mut child = worker_type.spawn_process(workdir.clone(), addr.port())?;
+        let pid = child.id().expect("Failed to get plumber worker PID");
+        loop {
+            if stop.clone().load(std::sync::atomic::Ordering::SeqCst) {
+                log::warn!("Worker::{} received stop signal", pid);
+                return Ok(());
+            }
+            let status = child.wait().await?;
+            log::error!(target: "faucet", "Worker::{} exited with status {}", pid, status);
+            child = worker_type.spawn_process(workdir.clone(), addr.port())?;
+        }
+    })
+}
+
 impl Worker {
-    pub fn new(worker_type: WorkerType, workdir: impl AsRef<Path>) -> FaucetResult<Self> {
-        use WorkerType::*;
-        let addr = get_available_socket()?;
-        let child = match worker_type {
-            Plumber => spawn_plumber_worker(workdir, addr.port())?,
-            Shiny => spawn_shiny_worker(workdir, addr.port())?,
-        };
+    pub fn new(worker_type: WorkerType, workdir: Arc<Path>) -> FaucetResult<Self> {
+        let stop = Arc::new(AtomicBool::new(false));
+        let socket_addr = get_available_socket()?;
+        let worker_task =
+            spawn_worker_task(socket_addr, Arc::clone(&stop), worker_type, workdir.clone());
         Ok(Self {
-            _child: child,
-            socket_addr: addr,
+            stop,
+            _worker_task: worker_task,
+            socket_addr,
         })
+    }
+}
+
+impl Drop for Worker {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
 pub(crate) struct Workers {
     workers: Vec<Worker>,
     worker_type: WorkerType,
-    workdir: Box<Path>,
+    workdir: Arc<Path>,
 }
 
 impl Workers {
@@ -139,7 +179,7 @@ impl Workers {
     pub(crate) fn spawn(&mut self, n: usize) -> FaucetResult<()> {
         for _ in 0..n {
             self.workers
-                .push(Worker::new(self.worker_type, &self.workdir)?);
+                .push(Worker::new(self.worker_type, self.workdir.clone())?);
         }
         Ok(())
     }
