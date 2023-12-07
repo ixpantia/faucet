@@ -1,5 +1,9 @@
 # Faucet: Fast, Asynchronous, Concurrent R Application Deployment
 
+<!-- badges: start -->
+[![Crates.io](https://img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)
+<!-- badges: end -->
+
 Welcome to Faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. Faucet is a high-performance server built with Rust, offering Round Robin and IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, Faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively.
 
 ## Features
@@ -138,7 +142,7 @@ for example when using Docker.
 Download the latest release of Faucet for Linux from the [GitHub Releases page](https://github.com/andyquinterom/faucet/releases). This should work with most Linux distributions.
 
 ```bash
-FAUCET_VERSION="v0.2.3"
+FAUCET_VERSION="v0.3.1"
 
 wget https://github.com/andyquinterom/Faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
@@ -162,7 +166,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Install Faucet with Cargo.
 
 ```bash
-cargo install faucet-server
+cargo install faucet-server --version 0.3.1
 ```
 
 ### Option 3: Build from Source (Linux, macOS, Windows)
