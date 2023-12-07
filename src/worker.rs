@@ -4,7 +4,7 @@ use std::{
     path::Path,
     sync::{atomic::AtomicBool, Arc},
 };
-use tokio::{process::Child, sync::Mutex, task::JoinHandle};
+use tokio::{process::Child, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
