@@ -293,7 +293,7 @@ dependencies = [
 
 [[package]]
 name = "faucet-server"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64",
