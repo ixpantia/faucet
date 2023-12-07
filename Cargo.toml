@@ -28,6 +28,6 @@ num_cpus = "1.16.0"
 tokio = { version = "1.34.0", features = ["full"] }
 tokio-stream = "0.1.14"
 tokio-util = { version = "^0.7", features = ["codec"] }
-tokio-tungstenite = { git = "https://github.com/andyquinterom/tokio-tungstenite.git", branch = "with_http1" }
+tokio-tungstenite = "^0.21"
 base64 = "0.21.5"
 sha1 = "0.10.6"
