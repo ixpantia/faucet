@@ -1,5 +1,7 @@
 site_name: faucet
 site_dir: target
+site_url: https://andyquinterom.github.io/faucet/
+repo_url: https://github.com/andyquinterom/faucet
 theme:
   name: material
   features:
