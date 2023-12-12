@@ -1,6 +1,6 @@
 ## Inicio Rápido
 
-Para usar faucet, asegúrate de que esté instalado. Si no lo está, consulta la [documentación oficial de instalación](#link-to-installation-docs).
+Para usar faucet, asegúrate de que esté instalado. Si no lo está, consulta la [documentación oficial de instalación](./install.md).
 
 Una vez instalado, utiliza el siguiente comando para iniciar faucet con la configuración predeterminada:
 

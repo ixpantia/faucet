@@ -17,7 +17,8 @@ plugins:
           nav:
             - Home: index.md
             - Installation: install.md
-            - Getting Started: getting_started.m
+            - Getting Started: getting_started.md
+            - faucet in Containers: in_containers.md
         - locale: es
           default: false
           name: Español
@@ -26,4 +27,5 @@ plugins:
             - Inicio: index.md
             - Instalación: install.md
             - Inicio Rápido: getting_started.md
+            - faucet en Contenedores: in_containers.md
 

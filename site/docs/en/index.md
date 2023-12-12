@@ -25,4 +25,5 @@ For detailed usage instructions, refer to [Getting Started](./getting_started.md
 
 ## With Docker
 
-_Coming Soon..._
+faucet is also available as a Docker image, for detailed usage instructions with
+Docker, refer to [faucet in Containers](./in_containers.md).

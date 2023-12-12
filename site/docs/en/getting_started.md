@@ -1,6 +1,6 @@
 ## Quick Start
 
-To use faucet, ensure that it is installed. If not, refer to the [official installation documentation](#link-to-installation-docs).
+To use faucet, ensure that it is installed. If not, refer to the [official installation documentation](./install.md).
 
 Once installed, use the following command to start faucet with default settings:
 

@@ -22,6 +22,8 @@ Para opciones de instalación, consulta [Instalación](./install.md).
 
 Para instrucciones detalladas de uso, consulta [Cómo Empezar](./getting_started.md).
 
-## Con Docker
+## Con Docker / en Contenedores
 
-_Próximamente..._
+faucet también está disponible como una imagen de Docker, para instrucciones
+detalladas de uso con Docker, consulta [faucet en
+Contenedores](./in_containers.md).
