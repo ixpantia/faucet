@@ -2,13 +2,13 @@
 
 ## Option 1: Binary Download (Linux)
 
-Download the latest release of Faucet for Linux from the
+Download the latest release of faucet for Linux from the
 [GitHub Releases page](https://github.com/andyquinterom/faucet/releases).
 
 ```bash
 FAUCET_VERSION="v0.3.1"
 
-wget https://github.com/andyquinterom/Faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
+wget https://github.com/andyquinterom/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
 # Make the binary executable
 chmod +x faucet
@@ -24,7 +24,7 @@ mv faucet ~/.local/bin
 
 ## Option 2: Install with Cargo (Linux, macOS, Windows)
 
-Install Faucet with Cargo, Rust's package manager.
+Install faucet with Cargo, Rust's package manager.
 
 1. Install Rust by following the instructions [here](https://www.rust-lang.org/tools/install).
 
@@ -32,7 +32,7 @@ Install Faucet with Cargo, Rust's package manager.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-2. Install Faucet with Cargo.
+2. Install faucet with Cargo.
 
 ```bash
 cargo install faucet-server --version 0.3.1
@@ -46,13 +46,13 @@ cargo install faucet-server --version 0.3.1
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-2. Clone the Faucet repository.
+2. Clone the faucet repository.
 
 ```bash
-git clone https://github.com/andyquinterom/Faucet.git
+git clone https://github.com/andyquinterom/faucet.git
 ```
 
-3. Build Faucet with Cargo.
+3. Build faucet with Cargo.
 
 ```bash
 cargo install --path .

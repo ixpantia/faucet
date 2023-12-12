@@ -1,4 +1,4 @@
-site_name: Faucet
+site_name: faucet
 site_dir: target
 theme:
   name: material
