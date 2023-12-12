@@ -1,0 +1,29 @@
+site_name: Faucet
+site_dir: target
+theme:
+  name: material
+  features:
+    - content.code.copy
+docs_dir: docs
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+          nav:
+            - Home: index.md
+            - Installation: install.md
+            - Getting Started: getting_started.m
+        - locale: es
+          default: false
+          name: Español
+          build: true
+          nav:
+            - Inicio: index.md
+            - Instalación: install.md
+            - Inicio Rápido: getting_started.md
+
