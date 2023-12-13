@@ -1,4 +1,4 @@
-# faucet ![logo](figures/faucet.svg){ align=right height=139 width=120 }
+# faucet ![logo](figures/faucet.png){ align=right height=139 width=120 }
 
 <!-- badges: start -->
 [![Crates.io](https://img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)

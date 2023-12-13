@@ -6,7 +6,7 @@ theme:
   name: material
   palette:
     scheme: faucet
-  logo: figures/faucet.svg
+  logo: figures/faucet.png
   features:
     - content.code.copy
 docs_dir: docs
