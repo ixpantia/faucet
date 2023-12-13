@@ -146,9 +146,15 @@ fn spawn_worker_task(
             loop {
                 // Try to connect to the socket
                 let check_status = check_if_online(addr).await;
-                if check_status || child.try_wait()?.is_some() {
+                // If it's online, we can break out of the loop and start serving connections
+                if check_status {
                     log::info!(target: "faucet", "Worker::{} is online and ready to serve connections", id);
                     is_online.store(check_status, std::sync::atomic::Ordering::SeqCst);
+                    break;
+                }
+                // If it's not online but the child process has exited, we should break out of the loop
+                // and restart the process
+                if child.try_wait()?.is_some() {
                     break;
                 }
                 tokio::time::sleep(RECHECK_INTERVAL).await;
