@@ -1,8 +1,12 @@
-# faucet: Fast, Asynchronous, Concurrent R Application Deployment
+# faucet <img src="mkdocs/docs/figures/faucet.svg" align="right" width=120 height=139 alt="" />
 
 <!-- badges: start -->
 [![Crates.io](https://img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)
 <!-- badges: end -->
+
+Scale and deploy Plumber APIs and Shiny applications with ease and efficiency.
+
+## Summary
 
 Welcome to faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. faucet is a high-performance server built with Rust, offering Round Robin and IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively.
 

@@ -1,8 +1,14 @@
-# faucet: Despliegue Rápido, Asincrónico y Concurrente de Aplicaciones R
+# faucet ![logo](figures/faucet.svg){ align=right height=139 width=120 }
 
 <!-- insignias: inicio -->
 [![Crates.io](https://img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)
 <!-- insignias: fin -->
+
+Despliegue Rápido, Asincrónico y Concurrente de Aplicaciones R
+
+---
+
+## Introducción
 
 Bienvenido a faucet, tu solución de alto rendimiento para desplegar APIs de Plumber y Aplicaciones Shiny con velocidad y eficiencia. faucet es un servidor basado en Rust que ofrece equilibrio de carga Round Robin e IP Hash, garantizando una escalabilidad y distribución fluidas de tus aplicaciones R. Ya seas un científico de datos, desarrollador o entusiasta de DevOps, faucet simplifica el despliegue, facilitando la gestión de réplicas y el equilibrio de cargas de manera efectiva.
 

@@ -4,6 +4,9 @@ site_url: https://andyquinterom.github.io/faucet/
 repo_url: https://github.com/andyquinterom/faucet
 theme:
   name: material
+  palette:
+    scheme: faucet
+  logo: figures/faucet.svg
   features:
     - content.code.copy
 docs_dir: docs
@@ -31,3 +34,9 @@ plugins:
             - Inicio Rápido: getting_started.md
             - faucet en Contenedores: in_containers.md
 
+markdown_extensions:
+  - attr_list
+  - md_in_html
+
+extra_css:
+  - stylesheets/extra.css
