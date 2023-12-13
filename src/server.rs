@@ -5,7 +5,6 @@ use crate::{
 };
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Response};
 use hyper_util::rt::TokioIo;
-use log::{error, info, warn};
 use std::{net::SocketAddr, pin::Pin};
 use tokio::net::TcpListener;
 
@@ -59,7 +58,7 @@ impl FaucetServer {
     pub fn server_type(mut self, server_type: WorkerType) -> Self {
         self.server_type = Some(server_type);
         if server_type == WorkerType::Shiny {
-            warn!(target: "faucet", "Using server type Shiny, switching to IpHash strategy");
+            log::warn!(target: "faucet", "Using server type Shiny, switching to IpHash strategy");
             self.strategy = load_balancing::Strategy::IpHash;
         }
         self
@@ -74,12 +73,12 @@ impl FaucetServer {
             self.workdir,
         );
         workers.spawn(self.n_workers)?;
-        let targets = workers.get_socket_addrs();
-        let load_balancer = LoadBalancer::new(self.strategy, self.extractor, targets)?;
+        let targets = workers.get_workers_state();
+        let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
 
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(self.bind).await?;
-        info!(target: "faucet", "Listening on http://{}", self.bind);
+        log::info!(target: "faucet", "Listening on http://{}", self.bind);
         loop {
             let load_balancer = load_balancer.clone();
 
@@ -99,7 +98,7 @@ impl FaucetServer {
                 let conn = Pin::new(&mut conn);
 
                 if let Err(e) = conn.await {
-                    error!("Connection error: {}", e);
+                    log::error!(target: "faucet", "Connection error: {}", e);
                 }
             });
         }
@@ -115,7 +114,7 @@ async fn handle_connection(
     let client = match load_balancer.get_client(&req, client_addr).await {
         Ok(client) => client,
         Err(e) => {
-            error!("Error getting client: {}", e);
+            log::error!("Error getting client: {}", e);
             return Ok(Response::builder()
                 .status(500)
                 .body(ExclusiveBody::plain_text("Internal Server Error"))

@@ -1,5 +1,6 @@
 use super::body::ExclusiveBody;
 use crate::error::{FaucetError, FaucetResult};
+use crate::worker::WorkerState;
 use async_trait::async_trait;
 use deadpool::managed::{self, Object, Pool, RecycleError};
 use http_body_util::BodyExt;
@@ -70,46 +71,49 @@ impl HttpConnection {
     }
 }
 
-pub struct ClientBuilder {
+pub(crate) struct ClientBuilder {
     max_size: Option<usize>,
-    addr: Option<SocketAddr>,
+    worker_state: Option<WorkerState>,
 }
 
 const DEFAULT_MAX_SIZE: usize = 32;
 
 impl ClientBuilder {
     pub fn build(self) -> FaucetResult<Client> {
-        let addr = self
-            .addr
-            .expect("Unable to create connection, no SocketAddr");
-        let builder = Pool::builder(ConnectionManager::new(addr))
+        let worker_state = self
+            .worker_state
+            .expect("Unable to create connection without worker state");
+        let builder = Pool::builder(ConnectionManager::new(worker_state.socket_addr()))
             .max_size(self.max_size.unwrap_or(DEFAULT_MAX_SIZE));
         Ok(Client {
             pool: builder.build()?,
-            socket_addr: addr,
+            worker_state,
         })
     }
 }
 
 #[derive(Clone)]
-pub struct Client {
+pub(crate) struct Client {
     pool: Pool<ConnectionManager>,
-    socket_addr: SocketAddr,
+    worker_state: WorkerState,
 }
 
 impl Client {
-    pub fn builder(addr: SocketAddr) -> ClientBuilder {
+    pub fn builder(worker_state: WorkerState) -> ClientBuilder {
         ClientBuilder {
             max_size: None,
-            addr: Some(addr),
+            worker_state: Some(worker_state),
         }
     }
     pub fn socket_addr(&self) -> SocketAddr {
-        self.socket_addr
+        self.worker_state.socket_addr()
     }
     pub async fn get(&self) -> FaucetResult<HttpConnection> {
         Ok(HttpConnection {
             inner: self.pool.get().await?,
         })
+    }
+    pub fn is_online(&self) -> bool {
+        self.worker_state.is_online()
     }
 }

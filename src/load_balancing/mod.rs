@@ -9,6 +9,7 @@ use hyper::Request;
 
 use crate::client::Client;
 use crate::error::FaucetResult;
+use crate::worker::WorkerState;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -40,7 +41,7 @@ impl FromStr for Strategy {
 
 type DynLoadBalancer = Arc<dyn LoadBalancingStrategy + Send + Sync>;
 
-pub struct LoadBalancer {
+pub(crate) struct LoadBalancer {
     strategy: DynLoadBalancer,
     extractor: IpExtractor,
 }
@@ -49,7 +50,7 @@ impl LoadBalancer {
     pub fn new(
         strategy: Strategy,
         extractor: IpExtractor,
-        targets: impl AsRef<[SocketAddr]>,
+        targets: &[WorkerState],
     ) -> FaucetResult<Self> {
         let strategy: DynLoadBalancer = match strategy {
             Strategy::RoundRobin => Arc::new(RoundRobin::new(targets)?),

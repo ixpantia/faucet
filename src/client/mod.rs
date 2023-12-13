@@ -3,5 +3,5 @@ mod pool;
 mod websockets;
 
 pub use body::ExclusiveBody;
-pub use pool::Client;
+pub(crate) use pool::Client;
 pub use websockets::{UpgradeStatus, WebsocketHandler};

@@ -1,10 +1,12 @@
 use async_trait::async_trait;
 
+use crate::worker::WorkerState;
 use crate::{client::Client, error::FaucetResult};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
-use std::net::SocketAddr;
+
+use std::time::Duration;
 
 use super::LoadBalancingStrategy;
 
@@ -13,11 +15,11 @@ struct Targets {
 }
 
 impl Targets {
-    fn new(targets: impl AsRef<[SocketAddr]>) -> FaucetResult<Self> {
+    fn new(targets: &[WorkerState]) -> FaucetResult<Self> {
         let targets = targets
             .as_ref()
             .iter()
-            .map(|addr| Client::builder(*addr).build())
+            .map(|state| Client::builder(state.clone()).build())
             .collect::<FaucetResult<Box<[Client]>>>()?;
         let targets = Box::leak(targets);
         Ok(Targets { targets })
@@ -30,7 +32,7 @@ pub struct IpHash {
 }
 
 impl IpHash {
-    pub(crate) fn new(targets: impl AsRef<[SocketAddr]>) -> FaucetResult<Self> {
+    pub(crate) fn new(targets: &[WorkerState]) -> FaucetResult<Self> {
         Ok(Self {
             targets_len: targets.as_ref().len(),
             targets: Targets::new(targets)?,
@@ -49,10 +51,26 @@ fn hash_to_index(value: impl Hash, length: usize) -> usize {
     (hash % length as u64) as usize
 }
 
+// 50ms is the minimum backoff time for exponential backoff
+const BASE_BACKOFF: Duration = Duration::from_millis(50);
+
+fn calculate_exponential_backoff(retries: u32) -> Duration {
+    BASE_BACKOFF * 2u32.pow(retries)
+}
+
 #[async_trait]
 impl LoadBalancingStrategy for IpHash {
     async fn entry(&self, ip: IpAddr) -> Client {
+        let mut retries = 0;
         let index = hash_to_index(ip, self.targets_len);
-        self.targets.targets[index].clone()
+        let client = self.targets.targets[index].clone();
+        loop {
+            if client.is_online() {
+                break client;
+            }
+            let backoff = calculate_exponential_backoff(retries);
+            tokio::time::sleep(backoff).await;
+            retries += 1;
+        }
     }
 }
