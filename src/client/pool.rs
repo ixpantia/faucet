@@ -15,8 +15,8 @@ struct ConnectionHandle {
     sender: SendRequest<Incoming>,
 }
 
-async fn create_http_client(addr: SocketAddr) -> FaucetResult<ConnectionHandle> {
-    let stream = TokioIo::new(TcpStream::connect(addr).await?);
+async fn create_http_client(worker_state: &WorkerState) -> FaucetResult<ConnectionHandle> {
+    let stream = TokioIo::new(TcpStream::connect(worker_state.socket_addr()).await?);
     let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
     tokio::spawn(async move {
         conn.await.expect("client conn");
@@ -25,12 +25,12 @@ async fn create_http_client(addr: SocketAddr) -> FaucetResult<ConnectionHandle> 
 }
 
 struct ConnectionManager {
-    addr: SocketAddr,
+    worker_state: WorkerState,
 }
 
 impl ConnectionManager {
-    fn new(addr: SocketAddr) -> Self {
-        Self { addr }
+    fn new(worker_state: WorkerState) -> Self {
+        Self { worker_state }
     }
 }
 
@@ -40,7 +40,7 @@ impl managed::Manager for ConnectionManager {
     type Error = FaucetError;
 
     async fn create(&self) -> FaucetResult<Self::Type> {
-        create_http_client(self.addr).await
+        create_http_client(&self.worker_state).await
     }
 
     async fn recycle(
@@ -83,12 +83,10 @@ impl ClientBuilder {
         let worker_state = self
             .worker_state
             .expect("Unable to create connection without worker state");
-        let builder = Pool::builder(ConnectionManager::new(worker_state.socket_addr()))
+        let builder = Pool::builder(ConnectionManager::new(worker_state.clone()))
             .max_size(self.max_size.unwrap_or(DEFAULT_MAX_SIZE));
-        Ok(Client {
-            pool: builder.build()?,
-            worker_state,
-        })
+        let pool = builder.build()?;
+        Ok(Client { pool, worker_state })
     }
 }
 
@@ -104,6 +102,9 @@ impl Client {
             max_size: None,
             worker_state: Some(worker_state),
         }
+    }
+    pub fn target(&self) -> &'static str {
+        self.worker_state.target()
     }
     pub fn socket_addr(&self) -> SocketAddr {
         self.worker_state.socket_addr()

@@ -1,5 +1,7 @@
 use std::convert::Infallible;
 
+use crate::client::ExclusiveBody;
+
 pub enum BadRequestReason {
     MissingHeader(&'static str),
     InvalidHeader(&'static str),
@@ -148,5 +150,13 @@ impl FaucetError {
     }
     pub fn unknown(s: impl ToString) -> Self {
         Self::Unknown(s.to_string())
+    }
+}
+
+impl From<FaucetError> for hyper::Response<ExclusiveBody> {
+    fn from(val: FaucetError) -> Self {
+        let mut resp = hyper::Response::new(ExclusiveBody::plain_text(val.to_string()));
+        *resp.status_mut() = hyper::StatusCode::INTERNAL_SERVER_ERROR;
+        resp
     }
 }

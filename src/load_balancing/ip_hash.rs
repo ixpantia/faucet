@@ -15,13 +15,13 @@ struct Targets {
 }
 
 impl Targets {
-    fn new(targets: &[WorkerState]) -> FaucetResult<Self> {
-        let targets = targets
-            .as_ref()
-            .iter()
-            .map(|state| Client::builder(state.clone()).build())
-            .collect::<FaucetResult<Box<[Client]>>>()?;
-        let targets = Box::leak(targets);
+    fn new(workers_state: &[WorkerState]) -> FaucetResult<Self> {
+        let mut targets = Vec::new();
+        for state in workers_state {
+            let client = Client::builder(state.clone()).build()?;
+            targets.push(client);
+        }
+        let targets = Box::leak(targets.into_boxed_slice());
         Ok(Targets { targets })
     }
 }

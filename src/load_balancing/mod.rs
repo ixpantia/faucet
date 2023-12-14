@@ -50,24 +50,26 @@ impl LoadBalancer {
     pub fn new(
         strategy: Strategy,
         extractor: IpExtractor,
-        targets: &[WorkerState],
+        workers: &[WorkerState],
     ) -> FaucetResult<Self> {
         let strategy: DynLoadBalancer = match strategy {
-            Strategy::RoundRobin => Arc::new(RoundRobin::new(targets)?),
-            Strategy::IpHash => Arc::new(IpHash::new(targets)?),
+            Strategy::RoundRobin => Arc::new(RoundRobin::new(workers)?),
+            Strategy::IpHash => Arc::new(IpHash::new(workers)?),
         };
         Ok(Self {
             strategy,
             extractor,
         })
     }
-    pub async fn get_client(
-        &self,
-        reqest: &Request<Incoming>,
-        socket: SocketAddr,
-    ) -> FaucetResult<Client> {
-        let ip = self.extractor.extract(reqest, socket)?;
+    pub async fn get_client(&self, ip: IpAddr) -> FaucetResult<Client> {
         Ok(self.strategy.entry(ip).await)
+    }
+    pub fn extract_ip(
+        &self,
+        request: &Request<Incoming>,
+        socket: SocketAddr,
+    ) -> FaucetResult<IpAddr> {
+        self.extractor.extract(request, socket)
     }
 }
 
