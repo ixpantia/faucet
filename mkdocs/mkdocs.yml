@@ -23,7 +23,9 @@ plugins:
             - Home: index.md
             - Installation: install.md
             - Getting Started: getting_started.md
+            - Options: options.md
             - faucet in Containers: in_containers.md
+            - Logging: logging.md
         - locale: es
           default: false
           name: Español
@@ -32,7 +34,9 @@ plugins:
             - Inicio: index.md
             - Instalación: install.md
             - Inicio Rápido: getting_started.md
+            - Opciones: options.md
             - faucet en Contenedores: in_containers.md
+            - Logging: logging.md
 
 markdown_extensions:
   - attr_list

@@ -35,7 +35,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Install faucet with Cargo.
 
 ```bash
-cargo install faucet-server --version 0.3.1
+cargo install faucet-server
 ```
 
 ## Option 3: Build from Source (Linux, macOS, Windows)
