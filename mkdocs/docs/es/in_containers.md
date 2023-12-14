@@ -119,7 +119,7 @@ Si este fuera un proyecto real, probablemente también ignorarías archivos como
 El primer paso para construir nuestra imagen de Docker es crear un archivo `Dockerfile` en la raíz de nuestro proyecto. Este archivo contendrá las instrucciones para construir nuestra imagen de Docker. En este caso, utilizarás la imagen [`andyquinterom/faucet`](https://hub.docker.com/r/andyquinterom/faucet) como base. Esta imagen se basa en la imagen [`rocker/r-ver`](https://hub.docker.com/r/rocker/r-ver), que es una imagen R mínima basada en Debian Linux.
 
 ```dockerfile
-FROM andyquinterom/faucet:0.3.1-r4.3
+FROM andyquinterom/faucet:0.4.0-r4.3
 
 # Algunas variables de entorno para indicar a `renv`
 # instalar paquetes en la ubicación correcta
