@@ -77,9 +77,9 @@ and how to spawn the workers.
 ### Auto
 
 Auto will attempt to determine the type of server based on the contents of the
-directory. If the directory contains a `plumber.R` file, it will be assumed to be
-a plumber server. If the directory does not contain a `plumber.R` file, it will be
-assumed to be a Shiny app.
+directory. If the directory contains a `plumber.R` or `entrypoint.R` file, it
+will be assumed to be a plumber server. If the directory contains a `app.R`, or
+a `server.R` and `ui.R`, it will be assumed to be a Shiny server.
 
 ### Shiny
 

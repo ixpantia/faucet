@@ -4,6 +4,19 @@ use clap::Parser;
 
 use crate::{load_balancing, worker::WorkerType};
 
+fn is_plumber(dir: &Path) -> bool {
+    let plumber = dir.join("plumber.R");
+    let plumber_entrypoint = dir.join("entrypoint.R");
+    plumber.exists() || plumber_entrypoint.exists()
+}
+
+fn is_shiny(dir: &Path) -> bool {
+    let shiny_app = dir.join("app.R");
+    let shiny_ui = dir.join("ui.R");
+    let shiny_server = dir.join("server.R");
+    shiny_app.exists() || (shiny_ui.exists() && shiny_server.exists())
+}
+
 #[derive(clap::ValueEnum, Debug, Clone, Copy)]
 enum ServerType {
     Plumber,
@@ -84,10 +97,12 @@ impl Args {
             ServerType::Plumber => WorkerType::Plumber,
             ServerType::Shiny => WorkerType::Shiny,
             ServerType::Auto => {
-                if self.dir.join("plumber.R").exists() {
+                if is_plumber(&self.dir) {
                     WorkerType::Plumber
-                } else {
+                } else if is_shiny(&self.dir) {
                     WorkerType::Shiny
+                } else {
+                    panic!("Could not determine worker type. Please specify with --type.");
                 }
             }
         }

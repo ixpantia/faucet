@@ -59,7 +59,7 @@ fn spawn_plumber_worker(
     let command = format!(
         r#"
         options("plumber.port" = {port})
-        plumber::pr_run(plumber::pr("plumber.R"))
+        plumber::pr_run(plumber::plumb())
         "#,
     );
     let child = tokio::process::Command::new("Rscript")

@@ -80,9 +80,10 @@ correcta a utilizar y cómo crear los trabajadores.
 ### Auto
 
 Auto intentará determinar el tipo de servidor según el contenido del
-directorio. Si el directorio contiene un archivo `plumber.R`, se asumirá que es
-un servidor Plumber. Si el directorio no contiene un archivo `plumber.R`, se
-asumirá que es una aplicación Shiny.
+directorio. Si el directorio contiene un archivo `plumber.R` o `entrypoint.R`,
+se asumirá que es un servidor Plumber. Si el directorio contiene un archivo
+`app.R` o un archivo `ui.R` y `server.R`, se asumirá que es una aplicación
+Shiny.
 
 ### Shiny
 

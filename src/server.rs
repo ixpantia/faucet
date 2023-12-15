@@ -78,7 +78,7 @@ impl FaucetServer {
             self.server_type.unwrap_or(WorkerType::Plumber),
             self.workdir,
         );
-        workers.spawn(self.n_workers)?;
+        workers.spawn(self.n_workers).await?;
         let targets = workers.get_workers_state();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
 
