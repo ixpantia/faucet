@@ -128,9 +128,10 @@ struct Worker {
     target: &'static str,
 }
 
-fn get_available_socket() -> FaucetResult<SocketAddr> {
-    use std::net::TcpListener;
-    TcpListener::bind("127.0.0.1:0")?
+async fn get_available_socket() -> FaucetResult<SocketAddr> {
+    use tokio::net::TcpListener;
+    TcpListener::bind("127.0.0.1:0")
+        .await?
         .local_addr()
         .map_err(Into::into)
 }
@@ -179,9 +180,9 @@ fn spawn_worker_task(
 }
 
 impl Worker {
-    pub fn new(worker_type: WorkerType, workdir: Arc<Path>, id: usize) -> FaucetResult<Self> {
+    pub async fn new(worker_type: WorkerType, workdir: Arc<Path>, id: usize) -> FaucetResult<Self> {
         let target = Box::leak(format!("Worker::{}", id).into_boxed_str());
-        let socket_addr = get_available_socket()?;
+        let socket_addr = get_available_socket().await?;
         let is_online = Arc::new(AtomicBool::new(false));
         let worker_task = spawn_worker_task(
             socket_addr,
@@ -240,10 +241,10 @@ impl Workers {
             workdir: workdir.into(),
         }
     }
-    pub(crate) fn spawn(&mut self, n: usize) -> FaucetResult<()> {
+    pub(crate) async fn spawn(&mut self, n: usize) -> FaucetResult<()> {
         for id in 0..n {
             self.workers
-                .push(Worker::new(self.worker_type, self.workdir.clone(), id + 1)?);
+                .push(Worker::new(self.worker_type, self.workdir.clone(), id + 1).await?);
         }
         Ok(())
     }
