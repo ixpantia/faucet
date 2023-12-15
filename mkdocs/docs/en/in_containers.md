@@ -154,8 +154,8 @@ image as our base image. This image is based on the
 [`rocker/r-ver`](https://hub.docker.com/r/rocker/r-ver) image,
 which is a minimal R image based on Debian Linux.
 
-```dockerfile
-FROM andyquinterom/faucet:0.4.0-r4.3
+```
+FROM andyquinterom/faucet:{{ FAUCET_VERSION }}-r4.3
 
 # Some environment variables to tell `renv`
 # to install packages in the correct location

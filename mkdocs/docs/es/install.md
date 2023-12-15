@@ -6,7 +6,7 @@ Descarga la última versión de faucet para Linux desde la
 [página de lanzamientos en GitHub](https://github.com/andyquinterom/faucet/releases).
 
 ```bash
-FAUCET_VERSION="v0.4.0"
+FAUCET_VERSION="v{{ FAUCET_VERSION }}"
 
 wget https://github.com/andyquinterom/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 

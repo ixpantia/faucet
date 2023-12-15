@@ -11,6 +11,7 @@ theme:
     - content.code.copy
 docs_dir: docs
 plugins:
+  - macros
   - search
   - i18n:
       docs_structure: folder
@@ -44,3 +45,6 @@ markdown_extensions:
 
 extra_css:
   - stylesheets/extra.css
+
+extra:
+    FAUCET_VERSION: 0.4.1
