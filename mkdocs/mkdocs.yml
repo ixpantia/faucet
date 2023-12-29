@@ -27,6 +27,7 @@ plugins:
             - Options: options.md
             - faucet in Containers: in_containers.md
             - Logging: logging.md
+            - Examples: examples.md
         - locale: es
           default: false
           name: Español
@@ -38,6 +39,7 @@ plugins:
             - Opciones: options.md
             - faucet en Contenedores: in_containers.md
             - Logging: logging.md
+            - Ejemplos: examples.md
 
 markdown_extensions:
   - attr_list
