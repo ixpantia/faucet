@@ -3,12 +3,12 @@
 ## Opción 1: Descarga del Binario (Linux)
 
 Descarga la última versión de faucet para Linux desde la
-[página de lanzamientos en GitHub](https://github.com/andyquinterom/faucet/releases).
+[página de lanzamientos en GitHub](https://github.com/ixpantia/faucet/releases).
 
 ```bash
 FAUCET_VERSION="v{{ FAUCET_VERSION }}"
 
-wget https://github.com/andyquinterom/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
+wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
 # Haz el binario ejecutable
 chmod +x faucet
@@ -49,7 +49,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Clona el repositorio de faucet.
 
 ```bash
-git clone https://github.com/andyquinterom/faucet.git
+git clone https://github.com/ixpantia/faucet.git
 ```
 
 3. Compila faucet con Cargo.

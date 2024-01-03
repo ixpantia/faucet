@@ -149,13 +149,13 @@ like `.git`, `.Rproj.user`, `.DS_Store`, and sensitive files like
 The first step to building our Docker image is to create a `Dockerfile`
 in the root of our project. This file will contain the instructions
 to build our Docker image. In this case, you will use the
-[`andyquinterom/faucet`](https://hub.docker.com/r/andyquinterom/faucet)
+[`ixpantia/faucet`](https://hub.docker.com/r/ixpantia/faucet)
 image as our base image. This image is based on the
 [`rocker/r-ver`](https://hub.docker.com/r/rocker/r-ver) image,
 which is a minimal R image based on Debian Linux.
 
 ```
-FROM andyquinterom/faucet:{{ FAUCET_VERSION }}-r4.3
+FROM ixpantia/faucet:{{ FAUCET_VERSION }}-r4.3
 
 # Some environment variables to tell `renv`
 # to install packages in the correct location

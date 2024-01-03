@@ -143,12 +143,12 @@ for example when using Docker.
 
 ### Option 1: Binary Download (Linux)
 
-Download the latest release of faucet for Linux from the [GitHub Releases page](https://github.com/andyquinterom/faucet/releases). This should work with most Linux distributions.
+Download the latest release of faucet for Linux from the [GitHub Releases page](https://github.com/ixpantia/faucet/releases). This should work with most Linux distributions.
 
 ```bash
-FAUCET_VERSION="v0.4.1"
+FAUCET_VERSION="v0.4.2"
 
-wget https://github.com/andyquinterom/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
+wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
 # Make the binary executable
 chmod +x faucet
@@ -170,7 +170,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Install faucet with Cargo.
 
 ```bash
-cargo install faucet-server --version 0.4.1
+cargo install faucet-server --version ^0.4
 ```
 
 ### Option 3: Build from Source (Linux, macOS, Windows)
@@ -184,7 +184,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Clone the faucet repository.
 
 ```bash
-git clone https://github.com/andyquinterom/faucet.git
+git clone https://github.com/ixpantia/faucet.git
 ```
 
 3. Build faucet with Cargo.

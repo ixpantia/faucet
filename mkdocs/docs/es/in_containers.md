@@ -116,10 +116,10 @@ Si este fuera un proyecto real, probablemente también ignorarías archivos como
 
 #### Escribir el Dockerfile
 
-El primer paso para construir nuestra imagen de Docker es crear un archivo `Dockerfile` en la raíz de nuestro proyecto. Este archivo contendrá las instrucciones para construir nuestra imagen de Docker. En este caso, utilizarás la imagen [`andyquinterom/faucet`](https://hub.docker.com/r/andyquinterom/faucet) como base. Esta imagen se basa en la imagen [`rocker/r-ver`](https://hub.docker.com/r/rocker/r-ver), que es una imagen R mínima basada en Debian Linux.
+El primer paso para construir nuestra imagen de Docker es crear un archivo `Dockerfile` en la raíz de nuestro proyecto. Este archivo contendrá las instrucciones para construir nuestra imagen de Docker. En este caso, utilizarás la imagen [`ixpantia/faucet`](https://hub.docker.com/r/ixpantia/faucet) como base. Esta imagen se basa en la imagen [`rocker/r-ver`](https://hub.docker.com/r/rocker/r-ver), que es una imagen R mínima basada en Debian Linux.
 
 ```
-FROM andyquinterom/faucet:{{ FAUCET_VERSION }}-r4.3
+FROM ixpantia/faucet:{{ FAUCET_VERSION }}-r4.3
 
 # Algunas variables de entorno para indicar a `renv`
 # instalar paquetes en la ubicación correcta
