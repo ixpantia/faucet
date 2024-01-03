@@ -1,4 +1,4 @@
-FROM andyquinterom/faucet:0.4.1-r4.3
+FROM ixpantia/faucet:0.4.2-r4.3
 
 RUN Rscript -e "install.packages('remotes')" && \
     Rscript -e "remotes::install_github(\"sol-eng/plumbpkg\")"

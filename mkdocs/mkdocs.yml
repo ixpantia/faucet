@@ -1,7 +1,7 @@
 site_name: faucet
 site_dir: target
-site_url: https://andyquinterom.github.io/faucet/
-repo_url: https://github.com/andyquinterom/faucet
+site_url: https://ixpantia.github.io/faucet/
+repo_url: https://github.com/ixpantia/faucet
 theme:
   name: material
   palette:
@@ -49,4 +49,4 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
-    FAUCET_VERSION: 0.4.1
+    FAUCET_VERSION: 0.4.2
