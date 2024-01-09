@@ -42,6 +42,15 @@ where
     }
 }
 
+struct LogData {
+    ip: IpAddr,
+    method: Method,
+    path: Uri,
+    version: Version,
+    status: StatusCode,
+    user_agent: LogOption<String>,
+}
+
 pub(super) struct LogService<S> {
     inner: S,
 }

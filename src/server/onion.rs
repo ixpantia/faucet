@@ -27,3 +27,152 @@ impl<S> ServiceBuilder<S> {
         self.service
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_basic_service_response() {
+        struct Svc;
+
+        impl Service<()> for Svc {
+            type Response = String;
+            type Error = ();
+            async fn call(&self, _: ()) -> Result<Self::Response, Self::Error> {
+                Ok("Hello, world!".to_string())
+            }
+        }
+
+        let svc = ServiceBuilder::new(Svc).build();
+
+        assert_eq!(svc.call(()).await.unwrap(), "Hello, world!");
+    }
+
+    #[tokio::test]
+    async fn test_basic_service_middleware() {
+        struct Svc;
+
+        impl Service<&'static str> for Svc {
+            type Response = String;
+            type Error = ();
+            async fn call(&self, _: &'static str) -> Result<Self::Response, Self::Error> {
+                Ok("Hello, world!".to_string())
+            }
+        }
+
+        struct GoodByeService<S> {
+            inner: S,
+        }
+
+        impl<S> Service<&'static str> for GoodByeService<S>
+        where
+            S: Service<&'static str, Response = String, Error = ()>,
+        {
+            type Response = String;
+            type Error = ();
+            async fn call(&self, req: &'static str) -> Result<Self::Response, Self::Error> {
+                if req == "Goodbye" {
+                    Ok("Goodbye, world!".to_string())
+                } else {
+                    self.inner.call(req).await
+                }
+            }
+        }
+
+        struct GoodByeLayer;
+
+        impl<S> Layer<S> for GoodByeLayer {
+            type Service = GoodByeService<S>;
+            fn layer(&self, inner: S) -> Self::Service {
+                GoodByeService { inner }
+            }
+        }
+
+        let svc = ServiceBuilder::new(Svc).layer(GoodByeLayer).build();
+
+        assert_eq!(svc.call("Goodbye").await.unwrap(), "Goodbye, world!");
+        assert_eq!(svc.call("Hello").await.unwrap(), "Hello, world!");
+    }
+
+    #[tokio::test]
+    async fn test_multiple_layer_middleware() {
+        struct Svc;
+
+        impl Service<&'static str> for Svc {
+            type Response = String;
+            type Error = ();
+            async fn call(&self, _: &'static str) -> Result<Self::Response, Self::Error> {
+                Ok("Hello, world!".to_string())
+            }
+        }
+
+        struct GoodByeService<S> {
+            inner: S,
+        }
+
+        impl<S> Service<&'static str> for GoodByeService<S>
+        where
+            S: Service<&'static str, Response = String, Error = ()>,
+        {
+            type Response = String;
+            type Error = ();
+            async fn call(&self, req: &'static str) -> Result<Self::Response, Self::Error> {
+                if req == "Goodbye" {
+                    Ok("Goodbye, world!".to_string())
+                } else {
+                    self.inner.call(req).await
+                }
+            }
+        }
+
+        struct GoodByeLayer;
+
+        impl<S> Layer<S> for GoodByeLayer {
+            type Service = GoodByeService<S>;
+            fn layer(&self, inner: S) -> Self::Service {
+                GoodByeService { inner }
+            }
+        }
+
+        struct HowAreYouService<S> {
+            inner: S,
+        }
+
+        impl<S> Service<&'static str> for HowAreYouService<S>
+        where
+            S: Service<&'static str, Response = String, Error = ()>,
+        {
+            type Response = String;
+            type Error = ();
+            async fn call(&self, req: &'static str) -> Result<Self::Response, Self::Error> {
+                if req == "How are you?" {
+                    Ok("I'm fine, thank you!".to_string())
+                } else {
+                    self.inner.call(req).await
+                }
+            }
+        }
+
+        struct HowAreYouLayer;
+
+        impl<S> Layer<S> for HowAreYouLayer {
+            type Service = HowAreYouService<S>;
+            fn layer(&self, inner: S) -> Self::Service {
+                HowAreYouService { inner }
+            }
+        }
+
+        let svc = ServiceBuilder::new(Svc)
+            .layer(GoodByeLayer)
+            .layer(HowAreYouLayer)
+            .build();
+
+        assert_eq!(svc.call("Goodbye").await.unwrap(), "Goodbye, world!");
+        assert_eq!(svc.call("Hello").await.unwrap(), "Hello, world!");
+        assert_eq!(
+            svc.call("How are you?").await.unwrap(),
+            "I'm fine, thank you!"
+        );
+    }
+}
