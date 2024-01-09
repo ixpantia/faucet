@@ -1,5 +1,4 @@
 use crate::error::{FaucetError, FaucetResult};
-use async_trait::async_trait;
 use base64::Engine;
 use hyper::{
     body::Incoming,
@@ -112,6 +111,7 @@ async fn init_upgrade(
     Ok(res)
 }
 
+#[inline(always)]
 async fn attemp_upgrade(
     req: Request<hyper::body::Incoming>,
     client: Client,
@@ -122,12 +122,13 @@ async fn attemp_upgrade(
     Ok(UpgradeStatus::NotUpgraded(req))
 }
 
-#[async_trait]
 pub trait WebsocketHandler {
-    async fn attemp_upgrade(&self, req: Request<Incoming>) -> FaucetResult<UpgradeStatus>;
+    fn attemp_upgrade(
+        &self,
+        req: Request<Incoming>,
+    ) -> impl std::future::Future<Output = FaucetResult<UpgradeStatus>> + Send;
 }
 
-#[async_trait]
 impl WebsocketHandler for Client {
     async fn attemp_upgrade(&self, req: Request<Incoming>) -> FaucetResult<UpgradeStatus> {
         attemp_upgrade(req, self.clone()).await
