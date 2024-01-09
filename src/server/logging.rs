@@ -1,11 +1,7 @@
-use super::State;
-use crate::{
-    client::ExclusiveBody,
-    error::FaucetResult,
-    middleware::{Layer, Service},
-};
-use async_trait::async_trait;
-use hyper::{body::Incoming, Request, Response};
+use hyper::{Request, Response};
+
+use super::onion::{Layer, Service};
+use crate::server::service::State;
 use std::time;
 
 enum LogOption<T> {
@@ -50,9 +46,14 @@ pub(super) struct LogService<S> {
     inner: S,
 }
 
-#[async_trait]
-impl<S: Service + Send + Sync> Service for LogService<S> {
-    async fn call(&self, req: Request<Incoming>) -> FaucetResult<Response<ExclusiveBody>> {
+impl<S, Body, ResBody> Service<Request<Body>> for LogService<S>
+where
+    S: Service<Request<Body>, Response = Response<ResBody>> + Send + Sync,
+{
+    type Error = S::Error;
+    type Response = Response<ResBody>;
+
+    async fn call(&self, req: Request<Body>) -> Result<Self::Response, Self::Error> {
         // start timer
         let start = time::Instant::now();
 
@@ -85,7 +86,7 @@ impl<S: Service + Send + Sync> Service for LogService<S> {
 
 pub(super) struct LogLayer;
 
-impl<S: Service + Send + Sync> Layer<S> for LogLayer {
+impl<S> Layer<S> for LogLayer {
     type Service = LogService<S>;
     fn layer(&self, inner: S) -> Self::Service {
         LogService { inner }

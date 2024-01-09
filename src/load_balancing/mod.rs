@@ -4,7 +4,6 @@ pub mod round_robin;
 
 pub use ip_extractor::IpExtractor;
 
-use hyper::body::Incoming;
 use hyper::Request;
 
 use crate::client::Client;
@@ -64,11 +63,7 @@ impl LoadBalancer {
     pub async fn get_client(&self, ip: IpAddr) -> FaucetResult<Client> {
         Ok(self.strategy.entry(ip).await)
     }
-    pub fn extract_ip(
-        &self,
-        request: &Request<Incoming>,
-        socket: SocketAddr,
-    ) -> FaucetResult<IpAddr> {
+    pub fn extract_ip<B>(&self, request: &Request<B>, socket: SocketAddr) -> FaucetResult<IpAddr> {
         self.extractor.extract(request, socket)
     }
 }
