@@ -1,7 +1,6 @@
 use crate::error::{BadRequestReason, FaucetError, FaucetResult};
+use hyper::{http::HeaderValue, Request};
 use std::net::{IpAddr, SocketAddr};
-
-use hyper::{body::Incoming, http::HeaderValue, Request};
 
 #[derive(Clone, Copy)]
 pub enum IpExtractor {
@@ -40,7 +39,7 @@ fn extract_ip_from_x_real_ip(x_real_ip: &HeaderValue) -> FaucetResult<IpAddr> {
 }
 
 impl IpExtractor {
-    pub fn extract(self, req: &Request<Incoming>, client_addr: SocketAddr) -> FaucetResult<IpAddr> {
+    pub fn extract<B>(self, req: &Request<B>, client_addr: SocketAddr) -> FaucetResult<IpAddr> {
         use IpExtractor::*;
         let ip = match self {
             ClientAddr => client_addr.ip(),
@@ -54,5 +53,127 @@ impl IpExtractor {
             },
         };
         Ok(ip)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_ip_from_x_forwarded_for_ipv4() {
+        let header_value = HeaderValue::from_static("127.0.0.1");
+        let ip = extract_ip_from_x_forwarded_for(&header_value).unwrap();
+        assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_ip_from_x_forwarded_for_ipv6() {
+        let header_value = HeaderValue::from_static("::1");
+        let ip = extract_ip_from_x_forwarded_for(&header_value).unwrap();
+        assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_ip_from_x_forwarded_for_multiple() {
+        let header_value = HeaderValue::from_static("192.168.0.1, 127.0.0.1");
+        let ip = extract_ip_from_x_forwarded_for(&header_value).unwrap();
+        assert_eq!(ip, IpAddr::from([192, 168, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_x_real_ip_ipv4_from_request() {
+        let header_value = HeaderValue::from_static("127.0.0.1");
+        let request = Request::builder()
+            .header("X-Real-IP", header_value)
+            .body(())
+            .unwrap();
+        let ip = IpExtractor::XRealIp
+            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_x_real_ip_ipv6_from_request() {
+        let header_value = HeaderValue::from_static("::1");
+        let request = Request::builder()
+            .header("X-Real-IP", header_value)
+            .body(())
+            .unwrap();
+        let ip = IpExtractor::XRealIp
+            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_x_forwarded_for_ipv4_from_request() {
+        let header_value = HeaderValue::from_static("127.0.0.1");
+        let request = Request::builder()
+            .header("X-Forwarded-For", header_value)
+            .body(())
+            .unwrap();
+        let ip = IpExtractor::XForwardedFor
+            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_x_forwarded_for_ipv6_from_request() {
+        let header_value = HeaderValue::from_static("::1");
+        let request = Request::builder()
+            .header("X-Forwarded-For", header_value)
+            .body(())
+            .unwrap();
+        let ip = IpExtractor::XForwardedFor
+            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_x_forwarded_for_ipv4_from_request_multiple() {
+        let header_value = HeaderValue::from_static("192.168.0.1, 127.0.0.1");
+        let request = Request::builder()
+            .header("X-Forwarded-For", header_value)
+            .body(())
+            .unwrap();
+        let ip = IpExtractor::XForwardedFor
+            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([192, 168, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_client_addr_ipv4_from_request() {
+        let request = Request::builder().body(()).unwrap();
+        let ip = IpExtractor::ClientAddr
+            .extract(&request, SocketAddr::from(([127, 0, 0, 1], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_client_addr_ipv6_from_request() {
+        let request = Request::builder().body(()).unwrap();
+        let ip = IpExtractor::ClientAddr
+            .extract(&request, SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
+    }
+
+    #[test]
+    fn test_extract_client_addr_ipv4_with_x_forwarded_for_from_request() {
+        let header_value = HeaderValue::from_static("192.168.0.1");
+        let request = Request::builder()
+            .header("X-Forwarded-For", header_value)
+            .body(())
+            .unwrap();
+        let ip = IpExtractor::ClientAddr
+            .extract(&request, SocketAddr::from(([127, 0, 0, 1], 0)))
+            .unwrap();
+        assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }
 }
