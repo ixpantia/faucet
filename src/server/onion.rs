@@ -33,7 +33,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_basic_service_response() {
+    async fn basic_service_response() {
         struct Svc;
 
         impl Service<()> for Svc {
@@ -50,7 +50,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_basic_service_middleware() {
+    async fn basic_service_middleware() {
         struct Svc;
 
         impl Service<&'static str> for Svc {
@@ -96,7 +96,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_multiple_layer_middleware() {
+    async fn multiple_layer_middleware() {
         struct Svc;
 
         impl Service<&'static str> for Svc {

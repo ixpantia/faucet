@@ -155,7 +155,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_log_capture() {
+    async fn log_capture() {
         #[derive(Clone)]
         struct MockState;
 
