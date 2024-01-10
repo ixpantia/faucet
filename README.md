@@ -2,6 +2,7 @@
 
 <!-- badges: start -->
 [![Crates.io](https://img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)
+[![test](https://github.com/ixpantia/faucet/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/ixpantia/faucet/actions/workflows/test.yaml)
 <!-- badges: end -->
 
 Scale and deploy Plumber APIs and Shiny applications with ease and efficiency.
