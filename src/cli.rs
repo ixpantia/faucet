@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 
-use crate::{load_balancing, worker::WorkerType};
+use crate::client::{load_balancing, worker::WorkerType};
 
 fn is_plumber(dir: &Path) -> bool {
     let plumber = dir.join("plumber.R");

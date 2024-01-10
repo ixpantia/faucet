@@ -1,4 +1,7 @@
-use crate::error::{FaucetError, FaucetResult};
+use crate::{
+    error::{FaucetError, FaucetResult},
+    networking::get_available_socket,
+};
 use std::{
     net::SocketAddr,
     path::Path,
@@ -128,14 +131,6 @@ struct Worker {
     target: &'static str,
 }
 
-async fn get_available_socket() -> FaucetResult<SocketAddr> {
-    use tokio::net::TcpListener;
-    TcpListener::bind("127.0.0.1:0")
-        .await?
-        .local_addr()
-        .map_err(Into::into)
-}
-
 async fn check_if_online(addr: SocketAddr) -> bool {
     let stream = tokio::net::TcpStream::connect(addr).await;
     stream.is_ok()
@@ -209,9 +204,9 @@ impl Worker {
 
 #[derive(Clone)]
 pub(crate) struct WorkerState {
-    target: &'static str,
-    is_online: Arc<AtomicBool>,
-    socket_addr: SocketAddr,
+    pub(super) target: &'static str,
+    pub(super) is_online: Arc<AtomicBool>,
+    pub(super) socket_addr: SocketAddr,
 }
 
 impl WorkerState {

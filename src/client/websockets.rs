@@ -1,8 +1,7 @@
+use super::{pool::ExtractSocketAddr, Client, ExclusiveBody};
 use crate::error::{FaucetError, FaucetResult};
-use async_trait::async_trait;
 use base64::Engine;
 use hyper::{
-    body::Incoming,
     header::UPGRADE,
     http::{uri::PathAndQuery, HeaderValue},
     upgrade::Upgraded,
@@ -12,15 +11,13 @@ use hyper_util::rt::TokioIo;
 use sha1::{Digest, Sha1};
 use std::net::SocketAddr;
 
-use super::{Client, ExclusiveBody};
-
 struct UpgradeInfo {
     headers: HeaderMap,
     uri: Uri,
 }
 
 impl UpgradeInfo {
-    fn new(req: &Request<Incoming>, socket_addr: SocketAddr) -> FaucetResult<Self> {
+    fn new<ReqBody>(req: &Request<ReqBody>, socket_addr: SocketAddr) -> FaucetResult<Self> {
         let headers = req.headers().clone();
         let uri = build_uri(socket_addr, req.uri().path_and_query())?;
         Ok(Self { headers, uri })
@@ -42,8 +39,9 @@ fn build_uri(socket_addr: SocketAddr, path: Option<&PathAndQuery>) -> FaucetResu
     let mut uri_builder = Uri::builder()
         .scheme("ws")
         .authority(socket_addr.to_string());
-    if let Some(path) = path {
-        uri_builder = uri_builder.path_and_query(path.clone());
+    match path {
+        Some(path) => uri_builder = uri_builder.path_and_query(path.clone()),
+        None => uri_builder = uri_builder.path_and_query("/"),
     }
     Ok(uri_builder.build()?)
 }
@@ -66,14 +64,14 @@ async fn server_upgraded_io(upgraded: Upgraded, mut upgrade_info: UpgradeInfo) -
     Ok(())
 }
 
-pub enum UpgradeStatus {
+pub enum UpgradeStatus<ReqBody> {
     Upgraded(Response<ExclusiveBody>),
-    NotUpgraded(Request<Incoming>),
+    NotUpgraded(Request<ReqBody>),
 }
 
-async fn upgrade_connection_from_request(
-    mut req: Request<Incoming>,
-    client: Client,
+async fn upgrade_connection_from_request<ReqBody>(
+    mut req: Request<ReqBody>,
+    client: impl ExtractSocketAddr,
 ) -> FaucetResult<()> {
     let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
     let upgraded = hyper::upgrade::on(&mut req).await?;
@@ -81,9 +79,9 @@ async fn upgrade_connection_from_request(
     Ok(())
 }
 
-async fn init_upgrade(
-    req: Request<Incoming>,
-    client: Client,
+async fn init_upgrade<ReqBody: Send + Sync + 'static>(
+    req: Request<ReqBody>,
+    client: impl ExtractSocketAddr + Send + Sync + 'static,
 ) -> FaucetResult<Response<ExclusiveBody>> {
     let mut res = Response::new(ExclusiveBody::empty());
     let sec_websocket_key = req
@@ -112,24 +110,334 @@ async fn init_upgrade(
     Ok(res)
 }
 
-async fn attemp_upgrade(
-    req: Request<hyper::body::Incoming>,
-    client: Client,
-) -> FaucetResult<UpgradeStatus> {
+#[inline(always)]
+async fn attemp_upgrade<ReqBody: Send + Sync + 'static>(
+    req: Request<ReqBody>,
+    client: impl ExtractSocketAddr + Send + Sync + 'static,
+) -> FaucetResult<UpgradeStatus<ReqBody>> {
     if req.headers().contains_key(UPGRADE) {
         return Ok(UpgradeStatus::Upgraded(init_upgrade(req, client).await?));
     }
     Ok(UpgradeStatus::NotUpgraded(req))
 }
 
-#[async_trait]
-pub trait WebsocketHandler {
-    async fn attemp_upgrade(&self, req: Request<Incoming>) -> FaucetResult<UpgradeStatus>;
+impl Client {
+    pub async fn attemp_upgrade<ReqBody>(
+        &self,
+        req: Request<ReqBody>,
+    ) -> FaucetResult<UpgradeStatus<ReqBody>>
+    where
+        ReqBody: Send + Sync + 'static,
+    {
+        attemp_upgrade(req, self.clone()).await
+    }
 }
 
-#[async_trait]
-impl WebsocketHandler for Client {
-    async fn attemp_upgrade(&self, req: Request<Incoming>) -> FaucetResult<UpgradeStatus> {
-        attemp_upgrade(req, self.clone()).await
+#[cfg(test)]
+mod tests {
+    use crate::networking::get_available_socket;
+
+    use super::*;
+
+    #[test]
+    fn test_calculate_sec_websocket_accept() {
+        let key = "dGhlIHNhbXBsZSBub25jZQ==";
+        let accept = calculate_sec_websocket_accept(key.as_bytes());
+        assert_eq!(accept, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+    }
+
+    #[test]
+    fn test_build_uri() {
+        let socket_addr = "127.0.0.1:8000".parse().unwrap();
+        let path_and_query = "/websocket".parse().unwrap();
+        let path = Some(&path_and_query);
+        let result = build_uri(socket_addr, path).unwrap();
+        assert_eq!(result, "ws://127.0.0.1:8000/websocket");
+    }
+
+    #[test]
+    fn build_uri_no_path() {
+        let socket_addr = "127.0.0.1:8000".parse().unwrap();
+        let path = None;
+        let result = build_uri(socket_addr, path).unwrap();
+        assert_eq!(result, "ws://127.0.0.1:8000");
+    }
+
+    #[tokio::test]
+    async fn test_init_upgrade_from_request() {
+        struct MockClient {
+            socket_addr: SocketAddr,
+        }
+
+        impl ExtractSocketAddr for MockClient {
+            fn socket_addr(&self) -> SocketAddr {
+                self.socket_addr
+            }
+        }
+
+        let socket_addr = get_available_socket().await.unwrap();
+
+        let client = MockClient { socket_addr };
+
+        let server = tokio::spawn(async move {
+            dummy_websocket_server::run(socket_addr).await.unwrap();
+        });
+
+        let uri = Uri::builder()
+            .scheme("http")
+            .authority(socket_addr.to_string().as_str())
+            .path_and_query("/")
+            .build()
+            .unwrap();
+
+        let req = Request::builder()
+            .uri(uri)
+            .header(UPGRADE, "websocket")
+            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .body(())
+            .unwrap();
+
+        let result = init_upgrade(req, client).await.unwrap();
+
+        server.abort();
+
+        assert_eq!(result.status(), StatusCode::SWITCHING_PROTOCOLS);
+        assert_eq!(
+            result.headers().get(UPGRADE).unwrap(),
+            HeaderValue::from_static("websocket")
+        );
+        assert_eq!(
+            result.headers().get(SEC_WEBSOCKET_ACCEPT).unwrap(),
+            HeaderValue::from_static("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=")
+        );
+        assert_eq!(
+            result.headers().get(hyper::header::CONNECTION).unwrap(),
+            HeaderValue::from_static("Upgrade")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_init_upgrade_from_request_no_sec_key() {
+        struct MockClient {
+            socket_addr: SocketAddr,
+        }
+
+        impl ExtractSocketAddr for MockClient {
+            fn socket_addr(&self) -> SocketAddr {
+                self.socket_addr
+            }
+        }
+
+        let socket_addr = get_available_socket().await.unwrap();
+
+        let client = MockClient { socket_addr };
+
+        let server = tokio::spawn(async move {
+            dummy_websocket_server::run(socket_addr).await.unwrap();
+        });
+
+        let uri = Uri::builder()
+            .scheme("http")
+            .authority(socket_addr.to_string().as_str())
+            .path_and_query("/")
+            .build()
+            .unwrap();
+
+        let req = Request::builder()
+            .uri(uri)
+            .header(UPGRADE, "websocket")
+            .body(())
+            .unwrap();
+
+        let result = init_upgrade(req, client).await;
+
+        server.abort();
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_attempt_upgrade_no_upgrade_header() {
+        struct MockClient {
+            socket_addr: SocketAddr,
+        }
+
+        impl ExtractSocketAddr for MockClient {
+            fn socket_addr(&self) -> SocketAddr {
+                self.socket_addr
+            }
+        }
+
+        let socket_addr = get_available_socket().await.unwrap();
+
+        let client = MockClient { socket_addr };
+
+        let server = tokio::spawn(async move {
+            dummy_websocket_server::run(socket_addr).await.unwrap();
+        });
+
+        let uri = Uri::builder()
+            .scheme("http")
+            .authority(socket_addr.to_string().as_str())
+            .path_and_query("/")
+            .build()
+            .unwrap();
+
+        let req = Request::builder()
+            .uri(uri)
+            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .body(())
+            .unwrap();
+
+        let result = attemp_upgrade(req, client).await.unwrap();
+
+        server.abort();
+
+        match result {
+            UpgradeStatus::NotUpgraded(_) => {}
+            _ => panic!("Expected NotUpgraded"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_attempt_upgrade_with_upgrade_header() {
+        struct MockClient {
+            socket_addr: SocketAddr,
+        }
+
+        impl ExtractSocketAddr for MockClient {
+            fn socket_addr(&self) -> SocketAddr {
+                self.socket_addr
+            }
+        }
+
+        let socket_addr = get_available_socket().await.unwrap();
+
+        let client = MockClient { socket_addr };
+
+        let server = tokio::spawn(async move {
+            dummy_websocket_server::run(socket_addr).await.unwrap();
+        });
+
+        let uri = Uri::builder()
+            .scheme("http")
+            .authority(socket_addr.to_string().as_str())
+            .path_and_query("/")
+            .build()
+            .unwrap();
+
+        let req = Request::builder()
+            .uri(uri)
+            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .header(UPGRADE, "websocket")
+            .body(())
+            .unwrap();
+
+        let result = attemp_upgrade(req, client).await.unwrap();
+
+        server.abort();
+
+        match result {
+            UpgradeStatus::Upgraded(res) => {
+                assert_eq!(res.status(), StatusCode::SWITCHING_PROTOCOLS);
+                assert_eq!(
+                    res.headers().get(UPGRADE).unwrap(),
+                    HeaderValue::from_static("websocket")
+                );
+                assert_eq!(
+                    res.headers().get(SEC_WEBSOCKET_ACCEPT).unwrap(),
+                    HeaderValue::from_static("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=")
+                );
+                assert_eq!(
+                    res.headers().get(hyper::header::CONNECTION).unwrap(),
+                    HeaderValue::from_static("Upgrade")
+                );
+            }
+            _ => panic!("Expected NotUpgraded"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_upgrade_connection_from_request() {
+        struct MockClient {
+            socket_addr: SocketAddr,
+        }
+
+        impl ExtractSocketAddr for MockClient {
+            fn socket_addr(&self) -> SocketAddr {
+                self.socket_addr
+            }
+        }
+
+        let socket_addr = get_available_socket().await.unwrap();
+
+        let client = MockClient { socket_addr };
+
+        let server = tokio::spawn(async move {
+            dummy_websocket_server::run(socket_addr).await.unwrap();
+        });
+
+        let uri = Uri::builder()
+            .scheme("http")
+            .authority(socket_addr.to_string().as_str())
+            .path_and_query("/")
+            .build()
+            .unwrap();
+
+        let req = Request::builder()
+            .uri(uri)
+            .header(UPGRADE, "websocket")
+            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+            .body(())
+            .unwrap();
+
+        let _ = tokio::spawn(async move {
+            let result = upgrade_connection_from_request(req, client).await;
+            assert!(result.is_ok());
+        })
+        .await;
+
+        server.abort();
+    }
+
+    mod dummy_websocket_server {
+        use std::{io::Error, net::SocketAddr};
+
+        use futures_util::{future, StreamExt, TryStreamExt};
+        use log::info;
+        use tokio::net::{TcpListener, TcpStream};
+
+        pub async fn run(addr: SocketAddr) -> Result<(), Error> {
+            // Create the event loop and TCP listener we'll accept connections on.
+            let try_socket = TcpListener::bind(&addr).await;
+            let listener = try_socket.expect("Failed to bind");
+            info!("Listening on: {}", addr);
+
+            while let Ok((stream, _)) = listener.accept().await {
+                tokio::spawn(accept_connection(stream));
+            }
+
+            Ok(())
+        }
+
+        async fn accept_connection(stream: TcpStream) {
+            let addr = stream
+                .peer_addr()
+                .expect("connected streams should have a peer address");
+            info!("Peer address: {}", addr);
+
+            let ws_stream = tokio_tungstenite::accept_async(stream)
+                .await
+                .expect("Error during the websocket handshake occurred");
+
+            info!("New WebSocket connection: {}", addr);
+
+            let (write, read) = ws_stream.split();
+            // We should not forward messages other than text or binary.
+            read.try_filter(|msg| future::ready(msg.is_text() || msg.is_binary()))
+                .forward(write)
+                .await
+                .expect("Failed to forward messages")
+        }
     }
 }

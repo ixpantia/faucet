@@ -1,23 +1,19 @@
 mod logging;
+mod onion;
+mod service;
 use crate::{
-    client::{Client, ExclusiveBody, UpgradeStatus, WebsocketHandler},
+    client::{
+        load_balancing::{self, LoadBalancer},
+        worker::{WorkerType, Workers},
+    },
     error::FaucetResult,
-    load_balancing::LoadBalancer,
-    middleware::{Layer, Service, ServiceBuilder},
 };
-use async_trait::async_trait;
-use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Response};
+use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
-use std::{
-    net::{IpAddr, SocketAddr},
-    pin::Pin,
-};
+use onion::{Service, ServiceBuilder};
+use service::{AddStateLayer, ProxyService};
+use std::{net::SocketAddr, pin::Pin};
 use tokio::net::TcpListener;
-
-use crate::{
-    load_balancing,
-    worker::{WorkerType, Workers},
-};
 
 pub struct FaucetServer {
     strategy: load_balancing::Strategy,
@@ -94,10 +90,7 @@ impl FaucetServer {
             tokio::task::spawn(async move {
                 let service = ServiceBuilder::new(ProxyService)
                     .layer(logging::LogLayer)
-                    .layer(AddStateLayer {
-                        socket_addr: client_addr,
-                        load_balancer,
-                    })
+                    .layer(AddStateLayer::new(client_addr, load_balancer))
                     .build();
                 let mut conn = http1::Builder::new()
                     .serve_connection(tcp, service_fn(|req: Request<Incoming>| service.call(req)))
@@ -109,74 +102,6 @@ impl FaucetServer {
                     log::error!(target: "faucet", "Connection error: {}", e);
                 }
             });
-        }
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct State {
-    pub remote_addr: IpAddr,
-    pub client: Client,
-}
-
-#[derive(Clone)]
-struct AddStateService<S> {
-    inner: S,
-    socket_addr: SocketAddr,
-    load_balancer: LoadBalancer,
-}
-
-#[async_trait]
-impl<S: Service + Send + Sync> Service for AddStateService<S> {
-    async fn call(&self, mut req: Request<Incoming>) -> FaucetResult<Response<ExclusiveBody>> {
-        let remote_addr = match self.load_balancer.extract_ip(&req, self.socket_addr) {
-            Ok(ip) => ip,
-            Err(e) => {
-                log::error!(target: "faucet", "Error extracting IP, verify that proxy headers are set correctly: {}", e);
-                return Err(e);
-            }
-        };
-        let client = self.load_balancer.get_client(remote_addr).await?;
-        req.extensions_mut().insert(State {
-            remote_addr,
-            client,
-        });
-        self.inner.call(req).await
-    }
-}
-
-struct AddStateLayer {
-    socket_addr: SocketAddr,
-    load_balancer: LoadBalancer,
-}
-
-impl<S: Service + Send + Sync> Layer<S> for AddStateLayer {
-    type Service = AddStateService<S>;
-    fn layer(&self, inner: S) -> Self::Service {
-        AddStateService {
-            inner,
-            socket_addr: self.socket_addr,
-            load_balancer: self.load_balancer.clone(),
-        }
-    }
-}
-
-struct ProxyService;
-
-#[async_trait]
-impl Service for ProxyService {
-    async fn call(&self, req: Request<Incoming>) -> FaucetResult<Response<ExclusiveBody>> {
-        let state = req
-            .extensions()
-            .get::<State>()
-            .expect("State not found")
-            .clone();
-        match state.client.attemp_upgrade(req).await? {
-            UpgradeStatus::Upgraded(res) => Ok(res),
-            UpgradeStatus::NotUpgraded(req) => {
-                let connection = state.client.get().await?;
-                connection.send_request(req).await
-            }
         }
     }
 }

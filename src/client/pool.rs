@@ -1,6 +1,6 @@
 use super::body::ExclusiveBody;
+use super::worker::WorkerState;
 use crate::error::{FaucetError, FaucetResult};
-use crate::worker::WorkerState;
 use async_trait::async_trait;
 use deadpool::managed::{self, Object, Pool, RecycleError};
 use http_body_util::BodyExt;
@@ -106,9 +106,6 @@ impl Client {
     pub fn target(&self) -> &'static str {
         self.worker_state.target()
     }
-    pub fn socket_addr(&self) -> SocketAddr {
-        self.worker_state.socket_addr()
-    }
     pub async fn get(&self) -> FaucetResult<HttpConnection> {
         Ok(HttpConnection {
             inner: self.pool.get().await?,
@@ -116,5 +113,16 @@ impl Client {
     }
     pub fn is_online(&self) -> bool {
         self.worker_state.is_online()
+    }
+}
+
+pub trait ExtractSocketAddr {
+    fn socket_addr(&self) -> SocketAddr;
+}
+
+impl ExtractSocketAddr for Client {
+    #[inline(always)]
+    fn socket_addr(&self) -> SocketAddr {
+        self.worker_state.socket_addr()
     }
 }

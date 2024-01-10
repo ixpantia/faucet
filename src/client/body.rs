@@ -10,6 +10,12 @@ pub struct ExclusiveBody {
     _connection: Option<HttpConnection>,
 }
 
+impl core::fmt::Debug for ExclusiveBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExclusiveBody").finish()
+    }
+}
+
 impl ExclusiveBody {
     pub fn new(
         body: impl Body<Data = Bytes, Error = FaucetError> + Send + Sync + 'static,
