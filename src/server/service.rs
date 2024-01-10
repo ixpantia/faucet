@@ -3,7 +3,7 @@ use std::net::{IpAddr, SocketAddr};
 use crate::{
     client::{Client, ExclusiveBody, UpgradeStatus},
     error::FaucetError,
-    load_balancing::LoadBalancer,
+    server::load_balancing::LoadBalancer,
 };
 use hyper::body::Incoming;
 

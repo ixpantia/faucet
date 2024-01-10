@@ -1,18 +1,19 @@
 mod logging;
 mod onion;
 mod service;
-use crate::{error::FaucetResult, load_balancing::LoadBalancer};
+use crate::{
+    client::{
+        load_balancing::{self, LoadBalancer},
+        worker::{WorkerType, Workers},
+    },
+    error::FaucetResult,
+};
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
 use onion::{Service, ServiceBuilder};
 use service::{AddStateLayer, ProxyService};
 use std::{net::SocketAddr, pin::Pin};
 use tokio::net::TcpListener;
-
-use crate::{
-    load_balancing,
-    worker::{WorkerType, Workers},
-};
 
 pub struct FaucetServer {
     strategy: load_balancing::Strategy,

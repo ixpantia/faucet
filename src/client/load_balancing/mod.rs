@@ -1,14 +1,11 @@
 mod ip_extractor;
 pub mod ip_hash;
 pub mod round_robin;
-
-pub use ip_extractor::IpExtractor;
-
-use hyper::Request;
-
+use super::worker::WorkerState;
 use crate::client::Client;
 use crate::error::FaucetResult;
-use crate::worker::WorkerState;
+use hyper::Request;
+pub use ip_extractor::IpExtractor;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -135,16 +132,16 @@ mod tests {
     async fn test_load_balancer_get_client() {
         use crate::client::ExtractSocketAddr;
         let workers_state = [
-            WorkerState::new(
-                "test",
-                Arc::new(AtomicBool::new(true)),
-                "127.0.0.1:9999".parse().unwrap(),
-            ),
-            WorkerState::new(
-                "test",
-                Arc::new(AtomicBool::new(true)),
-                "127.0.0.1:9998".parse().unwrap(),
-            ),
+            WorkerState {
+                target: "test",
+                is_online: Arc::new(AtomicBool::new(true)),
+                socket_addr: "127.0.0.1:9999".parse().unwrap(),
+            },
+            WorkerState {
+                target: "test",
+                is_online: Arc::new(AtomicBool::new(true)),
+                socket_addr: "127.0.0.1:9998".parse().unwrap(),
+            },
         ];
         let load_balancer = LoadBalancer::new(
             Strategy::RoundRobin,

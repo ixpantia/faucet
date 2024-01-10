@@ -1,5 +1,5 @@
 use super::LoadBalancingStrategy;
-use crate::worker::WorkerState;
+use super::WorkerState;
 use crate::{client::Client, error::FaucetResult};
 use async_trait::async_trait;
 use std::collections::hash_map::DefaultHasher;
@@ -108,11 +108,11 @@ mod tests {
 
     #[test]
     fn test_new_targets() {
-        let worker_state = WorkerState::new(
-            "test",
-            Arc::new(AtomicBool::new(true)),
-            "127.0.0.1:9999".parse().unwrap(),
-        );
+        let worker_state = WorkerState {
+            target: "test",
+            is_online: Arc::new(AtomicBool::new(true)),
+            socket_addr: "127.0.0.1:9999".parse().unwrap(),
+        };
         let Targets { targets } = Targets::new(&[worker_state]).unwrap();
 
         assert_eq!(targets.len(), 1);
@@ -120,11 +120,11 @@ mod tests {
 
     #[test]
     fn test_new_ip_hash() {
-        let worker_state = WorkerState::new(
-            "test",
-            Arc::new(AtomicBool::new(true)),
-            "127.0.0.1:9999".parse().unwrap(),
-        );
+        let worker_state = WorkerState {
+            target: "test",
+            is_online: Arc::new(AtomicBool::new(true)),
+            socket_addr: "127.0.0.1:9999".parse().unwrap(),
+        };
         let IpHash {
             targets,
             targets_len,
@@ -146,16 +146,16 @@ mod tests {
     async fn test_load_balancing_strategy() {
         use crate::client::ExtractSocketAddr;
         let workers = [
-            WorkerState::new(
-                "test",
-                Arc::new(AtomicBool::new(true)),
-                "127.0.0.1:9999".parse().unwrap(),
-            ),
-            WorkerState::new(
-                "test",
-                Arc::new(AtomicBool::new(true)),
-                "127.0.0.1:8888".parse().unwrap(),
-            ),
+            WorkerState {
+                target: "test",
+                is_online: Arc::new(AtomicBool::new(true)),
+                socket_addr: "127.0.0.1:9999".parse().unwrap(),
+            },
+            WorkerState {
+                target: "test",
+                is_online: Arc::new(AtomicBool::new(true)),
+                socket_addr: "127.0.0.1:8888".parse().unwrap(),
+            },
         ];
         let ip_hash = IpHash::new(&workers).unwrap();
         let client1 = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
@@ -176,7 +176,11 @@ mod tests {
         use crate::client::ExtractSocketAddr;
 
         let online = Arc::new(AtomicBool::new(false));
-        let worker = WorkerState::new("test", online.clone(), "127.0.0.1:9999".parse().unwrap());
+        let worker = WorkerState {
+            target: "test",
+            is_online: online.clone(),
+            socket_addr: "127.0.0.1:9999".parse().unwrap(),
+        };
 
         let ip_hash = IpHash::new(&[worker]).unwrap();
 

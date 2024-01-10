@@ -1,6 +1,6 @@
 use super::body::ExclusiveBody;
+use super::worker::WorkerState;
 use crate::error::{FaucetError, FaucetResult};
-use crate::worker::WorkerState;
 use async_trait::async_trait;
 use deadpool::managed::{self, Object, Pool, RecycleError};
 use http_body_util::BodyExt;

@@ -204,19 +204,12 @@ impl Worker {
 
 #[derive(Clone)]
 pub(crate) struct WorkerState {
-    target: &'static str,
-    is_online: Arc<AtomicBool>,
-    socket_addr: SocketAddr,
+    pub(super) target: &'static str,
+    pub(super) is_online: Arc<AtomicBool>,
+    pub(super) socket_addr: SocketAddr,
 }
 
 impl WorkerState {
-    pub fn new(target: &'static str, is_online: Arc<AtomicBool>, socket_addr: SocketAddr) -> Self {
-        Self {
-            target,
-            is_online,
-            socket_addr,
-        }
-    }
     pub fn target(&self) -> &'static str {
         self.target
     }

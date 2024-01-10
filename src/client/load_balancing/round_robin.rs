@@ -1,11 +1,7 @@
+use super::{LoadBalancingStrategy, WorkerState};
+use crate::{client::Client, error::FaucetResult};
 use async_trait::async_trait;
-
-use super::LoadBalancingStrategy;
-use crate::client::Client;
-use crate::error::FaucetResult;
-use crate::worker::WorkerState;
-use std::net::IpAddr;
-use std::sync::atomic::AtomicUsize;
+use std::{net::IpAddr, sync::atomic::AtomicUsize};
 
 struct Targets {
     targets: &'static [Client],
@@ -76,7 +72,11 @@ mod tests {
             let socket_addr = format!("127.0.0.1:900{}", i)
                 .parse()
                 .expect("failed to parse socket addr");
-            let state = WorkerState::new("test", is_online, socket_addr);
+            let state = WorkerState {
+                target: "test",
+                is_online,
+                socket_addr,
+            };
             workers_state.push(state);
         }
 
@@ -91,7 +91,11 @@ mod tests {
             let socket_addr = format!("127.0.0.1:900{}", i)
                 .parse()
                 .expect("failed to parse socket addr");
-            let state = WorkerState::new("test", is_online, socket_addr);
+            let state = WorkerState {
+                target: "test",
+                is_online,
+                socket_addr,
+            };
             workers_state.push(state);
         }
 
@@ -108,7 +112,11 @@ mod tests {
             let socket_addr = format!("127.0.0.1:900{}", i)
                 .parse()
                 .expect("failed to parse socket addr");
-            let state = WorkerState::new("test", is_online, socket_addr);
+            let state = WorkerState {
+                target: "test",
+                is_online,
+                socket_addr,
+            };
             workers_state.push(state);
         }
 
@@ -147,27 +155,27 @@ mod tests {
         use crate::client::ExtractSocketAddr;
 
         let workers_state = [
-            WorkerState::new(
-                "test",
-                Arc::new(AtomicBool::new(false)),
-                "127.0.0.1:9000"
+            WorkerState {
+                target: "test",
+                is_online: Arc::new(AtomicBool::new(false)),
+                socket_addr: "127.0.0.1:9000"
                     .parse()
                     .expect("failed to parse socket addr"),
-            ),
-            WorkerState::new(
-                "test",
-                Arc::new(AtomicBool::new(false)),
-                "127.0.0.1:9001"
+            },
+            WorkerState {
+                target: "test",
+                is_online: Arc::new(AtomicBool::new(false)),
+                socket_addr: "127.0.0.1:9001"
                     .parse()
                     .expect("failed to parse socket addr"),
-            ),
-            WorkerState::new(
-                "test",
-                Arc::new(AtomicBool::new(true)),
-                "127.0.0.1:9002"
+            },
+            WorkerState {
+                target: "test",
+                is_online: Arc::new(AtomicBool::new(true)),
+                socket_addr: "127.0.0.1:9002"
                     .parse()
                     .expect("failed to parse socket addr"),
-            ),
+            },
         ];
 
         let rr = RoundRobin::new(&workers_state).expect("failed to create round robin");
