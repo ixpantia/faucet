@@ -15,12 +15,10 @@ pub enum FaucetError {
     PoolPostCreateHook,
     PoolClosed,
     PoolNoRuntimeSpecified,
-    RecvError(tokio::sync::watch::error::RecvError),
     Io(std::io::Error),
     Unknown(String),
     HostParseError(std::net::AddrParseError),
     Hyper(hyper::Error),
-    Infallible(Infallible),
     BadRequest(BadRequestReason),
     InvalidHeaderValues(hyper::header::InvalidHeaderValue),
     Http(hyper::http::Error),
@@ -50,15 +48,9 @@ impl From<deadpool::managed::PoolError<FaucetError>> for FaucetError {
     }
 }
 
-impl From<tokio::sync::watch::error::RecvError> for FaucetError {
-    fn from(e: tokio::sync::watch::error::RecvError) -> Self {
-        Self::RecvError(e)
-    }
-}
-
 impl From<Infallible> for FaucetError {
-    fn from(e: Infallible) -> Self {
-        Self::Infallible(e)
+    fn from(_: Infallible) -> Self {
+        unreachable!("Infallible error")
     }
 }
 
@@ -89,7 +81,6 @@ impl From<hyper::Error> for FaucetError {
 impl std::fmt::Display for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::RecvError(e) => write!(f, "Recv error: {}", e),
             Self::PoolBuild(e) => write!(f, "Pool build error: {}", e),
             Self::PoolTimeout(e) => write!(f, "Pool timeout error: {:?}", e),
             Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
@@ -99,7 +90,6 @@ impl std::fmt::Display for FaucetError {
             Self::Unknown(e) => write!(f, "Unknown error: {}", e),
             Self::HostParseError(e) => write!(f, "Error parsing host address: {}", e),
             Self::Hyper(e) => write!(f, "Hyper error: {}", e),
-            Self::Infallible(e) => write!(f, "Infallible error: {}", e),
             Self::Http(e) => write!(f, "Http error: {}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {}", e),
             Self::BadRequest(r) => match r {
@@ -117,7 +107,6 @@ impl std::fmt::Display for FaucetError {
 impl std::fmt::Debug for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::RecvError(e) => write!(f, "Recv error: {:?}", e),
             Self::PoolTimeout(e) => write!(f, "Pool timeout error: {:?}", e),
             Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
             Self::PoolClosed => write!(f, "Pool closed error"),
@@ -127,7 +116,6 @@ impl std::fmt::Debug for FaucetError {
             Self::Unknown(e) => write!(f, "Unknown error: {:?}", e),
             Self::HostParseError(e) => write!(f, "Error parsing host address: {:?}", e),
             Self::Hyper(e) => write!(f, "Hyper error: {:?}", e),
-            Self::Infallible(e) => write!(f, "Infallible error: {:?}", e),
             Self::Http(e) => write!(f, "Http error: {:?}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {:?}", e),
             Self::BadRequest(r) => match r {
@@ -158,5 +146,140 @@ impl From<FaucetError> for hyper::Response<ExclusiveBody> {
         let mut resp = hyper::Response::new(ExclusiveBody::plain_text(val.to_string()));
         *resp.status_mut() = hyper::StatusCode::INTERNAL_SERVER_ERROR;
         resp
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_faucet_error() {
+        let err = FaucetError::unknown("test");
+        assert_eq!(err.to_string(), "Unknown error: test");
+    }
+
+    #[test]
+    fn test_faucet_error_debug() {
+        let err = FaucetError::unknown("test");
+        assert_eq!(format!("{:?}", err), r#"Unknown error: "test""#);
+    }
+
+    #[test]
+    fn test_faucet_error_from_hyper_error() {
+        let err = hyper::Request::builder()
+            .uri("INVALID URI")
+            .body(())
+            .unwrap_err();
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_io_error() {
+        let err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_pool_error() {
+        let err = deadpool::managed::PoolError::Backend(FaucetError::unknown("test"));
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_pool_build_error() {
+        let err = deadpool::managed::BuildError::NoRuntimeSpecified;
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_pool_timeout_error() {
+        let err = deadpool::managed::PoolError::<FaucetError>::Timeout(
+            deadpool::managed::TimeoutType::Create,
+        );
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_pool_closed_error() {
+        let err = deadpool::managed::PoolError::<FaucetError>::Closed;
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_pool_post_create_hook_error() {
+        let err = deadpool::managed::PoolError::<FaucetError>::PostCreateHook(
+            deadpool::managed::HookError::StaticMessage("test"),
+        );
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_pool_no_runtime_specified_error() {
+        let err = deadpool::managed::PoolError::<FaucetError>::NoRuntimeSpecified;
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_hyper_invalid_header_value_error() {
+        let err = hyper::header::HeaderValue::from_bytes([0x00].as_ref()).unwrap_err();
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_from_addr_parse_error() {
+        let err = "INVALID".parse::<std::net::SocketAddr>().unwrap_err();
+
+        let err: FaucetError = From::from(err);
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_displat_missing_header() {
+        let err = FaucetError::BadRequest(BadRequestReason::MissingHeader("test"));
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_faucet_error_displat_invalid_header() {
+        let err = FaucetError::BadRequest(BadRequestReason::InvalidHeader("test"));
+        format!("{:?}", err);
+        format!("{}", err);
+    }
+
+    #[test]
+    fn test_from_fauct_error_to_hyper_response() {
+        let err = FaucetError::unknown("test");
+        let resp: hyper::Response<ExclusiveBody> = err.into();
+        assert_eq!(resp.status(), hyper::StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

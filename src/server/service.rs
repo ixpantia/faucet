@@ -1,7 +1,7 @@
 use std::net::{IpAddr, SocketAddr};
 
 use crate::{
-    client::{Client, ExclusiveBody, UpgradeStatus, WebsocketHandler},
+    client::{Client, ExclusiveBody, UpgradeStatus},
     error::FaucetError,
     load_balancing::LoadBalancer,
 };

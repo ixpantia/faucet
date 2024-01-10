@@ -201,4 +201,79 @@ mod tests {
         assert!(log_data.elapsed > 0);
         assert_eq!(log_data.target, "test");
     }
+
+    #[test]
+    fn log_option_display() {
+        assert_eq!(LogOption::<u8>::None.to_string(), "-");
+        assert_eq!(LogOption::Some(1).to_string(), "1");
+    }
+
+    #[test]
+    fn log_option_debug() {
+        assert_eq!(format!("{:?}", LogOption::<u8>::None), r#""-""#);
+        assert_eq!(format!("{:?}", LogOption::Some(1)), "1");
+    }
+
+    #[test]
+    fn log_option_from_option() {
+        assert_eq!(LogOption::<u8>::from(None), LogOption::None);
+        assert_eq!(LogOption::from(Some(1)), LogOption::Some(1));
+    }
+
+    #[test]
+    fn log_data_log() {
+        use std::io::Write;
+        use std::sync::{Arc, Mutex};
+
+        struct Buffer(Arc<Mutex<Vec<u8>>>);
+
+        impl Write for Buffer {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().write(buf)
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                self.0.lock().unwrap().flush()
+            }
+        }
+
+        impl Buffer {
+            fn clone_buf(&self) -> Vec<u8> {
+                self.0.lock().unwrap().clone()
+            }
+        }
+
+        impl Clone for Buffer {
+            fn clone(&self) -> Self {
+                Buffer(Arc::clone(&self.0))
+            }
+        }
+
+        let log_data = LogData {
+            target: "test",
+            ip: IpAddr::V4([127, 0, 0, 1].into()),
+            method: Method::GET,
+            path: "https://example.com/".parse().unwrap(),
+            version: Version::HTTP_11,
+            status: 200,
+            user_agent: LogOption::Some(HeaderValue::from_static("test")),
+            elapsed: 5,
+        };
+
+        let buf = Buffer(Arc::new(Mutex::new(Vec::new())));
+        let mut logger = env_logger::Builder::new();
+        // ALWAYS USE INFO LEVEL FOR LOGGING
+        logger.filter_level(log::LevelFilter::Info);
+        logger.format(|f, record| writeln!(f, "{}", record.args()));
+        logger.target(env_logger::Target::Pipe(Box::new(buf.clone())));
+        logger.init();
+
+        log_data.log();
+
+        let log = String::from_utf8(buf.clone_buf()).unwrap();
+
+        assert_eq!(
+            log.trim(),
+            r#"127.0.0.1 "GET https://example.com/ HTTP/1.1" 200 "test" 5"#
+        )
+    }
 }
