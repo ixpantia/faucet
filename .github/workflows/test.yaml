@@ -128,7 +128,3 @@ jobs:
           key: ${{ steps.target-cache-restore.outputs.cache-primary-key }}
       - name: cargo llvm-cov report
         run: cargo llvm-cov report --release --lcov --output-path lcov.info
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
