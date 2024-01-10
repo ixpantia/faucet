@@ -21,7 +21,7 @@ trait LoadBalancingStrategy {
     async fn entry(&self, ip: IpAddr) -> Client;
 }
 
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, clap::ValueEnum, Eq, PartialEq)]
 pub enum Strategy {
     RoundRobin,
     IpHash,
@@ -74,5 +74,108 @@ impl Clone for LoadBalancer {
             strategy: Arc::clone(&self.strategy),
             extractor: self.extractor,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::AtomicBool;
+
+    use super::*;
+
+    #[test]
+    fn test_strategy_from_str() {
+        assert_eq!(
+            Strategy::from_str("round_robin").unwrap(),
+            Strategy::RoundRobin
+        );
+        assert_eq!(Strategy::from_str("ip_hash").unwrap(), Strategy::IpHash);
+        assert!(Strategy::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn test_load_balancer_new_round_robin() {
+        let workers_state = Vec::new();
+        let _ = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &workers_state,
+        )
+        .expect("failed to create load balancer");
+    }
+
+    #[test]
+    fn test_load_balancer_new_ip_hash() {
+        let workers_state = Vec::new();
+        let _ = LoadBalancer::new(Strategy::IpHash, IpExtractor::XForwardedFor, &workers_state)
+            .expect("failed to create load balancer");
+    }
+
+    #[test]
+    fn test_load_balancer_extract_ip() {
+        let workers_state = Vec::new();
+        let load_balancer = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &workers_state,
+        )
+        .expect("failed to create load balancer");
+        let request = Request::builder()
+            .header("x-forwarded-for", "192.168.0.1")
+            .body(())
+            .unwrap();
+        let ip = load_balancer
+            .extract_ip(&request, "127.0.0.1:9532".parse().unwrap())
+            .expect("failed to extract ip");
+
+        assert_eq!(ip, "192.168.0.1".parse::<IpAddr>().unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_load_balancer_get_client() {
+        use crate::client::ExtractSocketAddr;
+        let workers_state = [
+            WorkerState::new(
+                "test",
+                Arc::new(AtomicBool::new(true)),
+                "127.0.0.1:9999".parse().unwrap(),
+            ),
+            WorkerState::new(
+                "test",
+                Arc::new(AtomicBool::new(true)),
+                "127.0.0.1:9998".parse().unwrap(),
+            ),
+        ];
+        let load_balancer = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &workers_state,
+        )
+        .expect("failed to create load balancer");
+        let ip = "192.168.0.1".parse().unwrap();
+        let client = load_balancer
+            .get_client(ip)
+            .await
+            .expect("failed to get client");
+        assert_eq!(client.socket_addr(), "127.0.0.1:9999".parse().unwrap());
+
+        let client = load_balancer
+            .get_client(ip)
+            .await
+            .expect("failed to get client");
+
+        assert_eq!(client.socket_addr(), "127.0.0.1:9998".parse().unwrap());
+    }
+
+    #[test]
+    fn test_clone_load_balancer() {
+        let workers_state = Vec::new();
+        let load_balancer = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &workers_state,
+        )
+        .expect("failed to create load balancer");
+        let _ = load_balancer.clone();
     }
 }

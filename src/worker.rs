@@ -210,6 +210,13 @@ pub(crate) struct WorkerState {
 }
 
 impl WorkerState {
+    pub fn new(target: &'static str, is_online: Arc<AtomicBool>, socket_addr: SocketAddr) -> Self {
+        Self {
+            target,
+            is_online,
+            socket_addr,
+        }
+    }
     pub fn target(&self) -> &'static str {
         self.target
     }

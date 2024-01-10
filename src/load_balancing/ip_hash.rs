@@ -1,14 +1,11 @@
-use async_trait::async_trait;
-
+use super::LoadBalancingStrategy;
 use crate::worker::WorkerState;
 use crate::{client::Client, error::FaucetResult};
+use async_trait::async_trait;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
-
 use std::time::Duration;
-
-use super::LoadBalancingStrategy;
 
 struct Targets {
     targets: &'static [Client],
@@ -72,5 +69,124 @@ impl LoadBalancingStrategy for IpHash {
             tokio::time::sleep(backoff).await;
             retries += 1;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::sync::{atomic::AtomicBool, Arc};
+
+    use super::*;
+
+    #[test]
+    fn test_hash_to_index() {
+        let index = hash_to_index("test", 10);
+        assert!(index < 10);
+    }
+
+    #[test]
+    fn test_hash_to_index_same() {
+        let index = hash_to_index("test", 10);
+        let index2 = hash_to_index("test", 10);
+        assert_eq!(index, index2);
+    }
+
+    #[test]
+    fn test_hash_to_index_different() {
+        let index = hash_to_index("test", 10);
+        let index2 = hash_to_index("test2", 10);
+        assert_ne!(index, index2);
+    }
+
+    #[test]
+    fn test_hash_to_index_different_length() {
+        let index = hash_to_index("test", 10);
+        let index2 = hash_to_index("test", 3);
+        assert_ne!(index, index2);
+    }
+
+    #[test]
+    fn test_new_targets() {
+        let worker_state = WorkerState::new(
+            "test",
+            Arc::new(AtomicBool::new(true)),
+            "127.0.0.1:9999".parse().unwrap(),
+        );
+        let Targets { targets } = Targets::new(&[worker_state]).unwrap();
+
+        assert_eq!(targets.len(), 1);
+    }
+
+    #[test]
+    fn test_new_ip_hash() {
+        let worker_state = WorkerState::new(
+            "test",
+            Arc::new(AtomicBool::new(true)),
+            "127.0.0.1:9999".parse().unwrap(),
+        );
+        let IpHash {
+            targets,
+            targets_len,
+        } = IpHash::new(&[worker_state]).unwrap();
+
+        assert_eq!(targets.targets.len(), 1);
+        assert_eq!(targets_len, 1);
+    }
+
+    #[test]
+    fn test_calculate_exponential_backoff() {
+        assert_eq!(calculate_exponential_backoff(0), BASE_BACKOFF);
+        assert_eq!(calculate_exponential_backoff(1), BASE_BACKOFF * 2);
+        assert_eq!(calculate_exponential_backoff(2), BASE_BACKOFF * 4);
+        assert_eq!(calculate_exponential_backoff(3), BASE_BACKOFF * 8);
+    }
+
+    #[tokio::test]
+    async fn test_load_balancing_strategy() {
+        use crate::client::ExtractSocketAddr;
+        let workers = [
+            WorkerState::new(
+                "test",
+                Arc::new(AtomicBool::new(true)),
+                "127.0.0.1:9999".parse().unwrap(),
+            ),
+            WorkerState::new(
+                "test",
+                Arc::new(AtomicBool::new(true)),
+                "127.0.0.1:8888".parse().unwrap(),
+            ),
+        ];
+        let ip_hash = IpHash::new(&workers).unwrap();
+        let client1 = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
+        let client2 = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
+        assert_eq!(client1.socket_addr(), client2.socket_addr());
+
+        // This IP address should hash to a different index
+        let client3 = ip_hash.entry("192.168.0.43".parse().unwrap()).await;
+        let client4 = ip_hash.entry("192.168.0.43".parse().unwrap()).await;
+
+        assert_eq!(client3.socket_addr(), client4.socket_addr());
+
+        assert_ne!(client1.socket_addr(), client3.socket_addr());
+    }
+
+    #[tokio::test]
+    async fn test_load_balancing_strategy_offline() {
+        use crate::client::ExtractSocketAddr;
+
+        let online = Arc::new(AtomicBool::new(false));
+        let worker = WorkerState::new("test", online.clone(), "127.0.0.1:9999".parse().unwrap());
+
+        let ip_hash = IpHash::new(&[worker]).unwrap();
+
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            online.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+
+        let entry = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
+
+        assert_eq!(entry.socket_addr(), "127.0.0.1:9999".parse().unwrap());
     }
 }
