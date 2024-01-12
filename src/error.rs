@@ -22,6 +22,7 @@ pub enum FaucetError {
     BadRequest(BadRequestReason),
     InvalidHeaderValues(hyper::header::InvalidHeaderValue),
     Http(hyper::http::Error),
+    MissingArgument(&'static str),
 }
 
 impl From<hyper::header::InvalidHeaderValue> for FaucetError {
@@ -92,6 +93,7 @@ impl std::fmt::Display for FaucetError {
             Self::Hyper(e) => write!(f, "Hyper error: {}", e),
             Self::Http(e) => write!(f, "Http error: {}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {}", e),
+            Self::MissingArgument(s) => write!(f, "Missing argument: {}", s),
             Self::BadRequest(r) => match r {
                 BadRequestReason::MissingHeader(header) => {
                     write!(f, "Missing header: {}", header)
@@ -107,6 +109,7 @@ impl std::fmt::Display for FaucetError {
 impl std::fmt::Debug for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            Self::MissingArgument(s) => write!(f, "Missing argument: {}", s),
             Self::PoolTimeout(e) => write!(f, "Pool timeout error: {:?}", e),
             Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
             Self::PoolClosed => write!(f, "Pool closed error"),

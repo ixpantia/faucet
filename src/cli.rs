@@ -77,30 +77,9 @@ pub struct Args {
     #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
     ip_from: IpFrom,
 
-    /// Path or alias to the `Rscript` executable / binary.
-    #[arg(
-        long,
-        short,
-        env = "FAUCET_RSCRIPT_PATH",
-        default_value = "Rscript",
-        value_parser = RscriptPathParser
-    )]
-    rscript_path: &'static Path,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct RscriptPathParser;
-
-impl clap::builder::TypedValueParser for RscriptPathParser {
-    type Value = &'static Path;
-    fn parse_ref(
-        &self,
-        _cmd: &clap::Command,
-        _arg: Option<&clap::Arg>,
-        value: &std::ffi::OsStr,
-    ) -> Result<Self::Value, clap::Error> {
-        Ok(Box::leak(Path::new(value).into()))
-    }
+    /// Command, path, or executable to run Rscript.
+    #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
+    rscript: PathBuf,
 }
 
 impl Args {
@@ -127,7 +106,8 @@ impl Args {
                 } else if is_shiny(&self.dir) {
                     WorkerType::Shiny
                 } else {
-                    panic!("Could not determine worker type. Please specify with --type.");
+                    log::error!(target: "faucet", "Could not determine worker type. Please specify with --type.");
+                    std::process::exit(1);
                 }
             }
         }
@@ -144,5 +124,8 @@ impl Args {
             IpFrom::XForwardedFor => load_balancing::IpExtractor::XForwardedFor,
             IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
         }
+    }
+    pub fn rscript(&self) -> &Path {
+        &self.rscript
     }
 }
