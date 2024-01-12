@@ -3,6 +3,7 @@ use crate::{
     networking::get_available_socket,
 };
 use std::{
+    ffi::OsStr,
     net::SocketAddr,
     num::NonZeroUsize,
     path::Path,
@@ -56,11 +57,11 @@ fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
 }
 
 fn spawn_child_rscript_process(
-    rscript: impl AsRef<Path>,
+    rscript: impl AsRef<OsStr>,
     workdir: impl AsRef<Path>,
     command: impl AsRef<str>,
 ) -> FaucetResult<Child> {
-    tokio::process::Command::new(rscript.as_ref())
+    tokio::process::Command::new(rscript)
         // Set the current directory to the directory containing the entrypoint
         .current_dir(workdir)
         .arg("-e")
@@ -76,7 +77,7 @@ fn spawn_child_rscript_process(
 }
 
 fn spawn_plumber_worker(
-    rscript: impl AsRef<Path>,
+    rscript: impl AsRef<OsStr>,
     workdir: impl AsRef<Path>,
     port: u16,
     target: &'static str,
@@ -93,7 +94,7 @@ fn spawn_plumber_worker(
 }
 
 fn spawn_shiny_worker(
-    rscript: impl AsRef<Path>,
+    rscript: impl AsRef<OsStr>,
     workdir: impl AsRef<Path>,
     port: u16,
     target: &'static str,
@@ -112,14 +113,22 @@ fn spawn_shiny_worker(
 impl WorkerType {
     fn spawn_process(
         self,
-        rscript: impl AsRef<Path>,
+        rscript: impl AsRef<OsStr>,
         workdir: impl AsRef<Path>,
         port: u16,
         target: &'static str,
-    ) -> FaucetResult<Child> {
-        match self {
+    ) -> Child {
+        let child_result = match self {
             WorkerType::Plumber => spawn_plumber_worker(rscript, workdir, port, target),
             WorkerType::Shiny => spawn_shiny_worker(rscript, workdir, port, target),
+        };
+        match child_result {
+            Ok(child) => child,
+            Err(e) => {
+                log::error!(target: "faucet", "Failed to invoke R for {target}: {e}");
+                log::error!(target: "faucet", "Exiting...");
+                std::process::exit(1);
+            }
         }
     }
 }
@@ -143,7 +152,7 @@ async fn check_if_online(addr: SocketAddr) -> bool {
 const RECHECK_INTERVAL: Duration = Duration::from_millis(10);
 
 fn spawn_worker_task(
-    rscript: Arc<Path>,
+    rscript: Arc<OsStr>,
     addr: SocketAddr,
     worker_type: WorkerType,
     workdir: Arc<Path>,
@@ -151,13 +160,9 @@ fn spawn_worker_task(
     target: &'static str,
 ) -> JoinHandle<FaucetResult<()>> {
     tokio::spawn(async move {
+        let port = addr.port();
         loop {
-            let mut child = worker_type.spawn_process(
-                rscript.as_ref(),
-                workdir.as_ref(),
-                addr.port(),
-                target,
-            )?;
+            let mut child = worker_type.spawn_process(&rscript, &workdir, port, target);
             let pid = child.id().expect("Failed to get plumber worker PID");
             log::info!(target: "faucet", "Starting process {pid} for {target}");
             loop {
@@ -174,6 +179,7 @@ fn spawn_worker_task(
                 if child.try_wait()?.is_some() {
                     break;
                 }
+
                 tokio::time::sleep(RECHECK_INTERVAL).await;
             }
 
@@ -186,7 +192,7 @@ fn spawn_worker_task(
 
 impl Worker {
     pub async fn new(
-        rscript: Arc<Path>,
+        rscript: Arc<OsStr>,
         worker_type: WorkerType,
         workdir: Arc<Path>,
         id: usize,
@@ -241,11 +247,11 @@ pub(crate) struct Workers {
     workers: Vec<Worker>,
     worker_type: WorkerType,
     workdir: Arc<Path>,
-    rscript: Arc<Path>,
+    rscript: Arc<OsStr>,
 }
 
 impl Workers {
-    pub(crate) fn new(worker_type: WorkerType, workdir: Arc<Path>, rscript: Arc<Path>) -> Self {
+    pub(crate) fn new(worker_type: WorkerType, workdir: Arc<Path>, rscript: Arc<OsStr>) -> Self {
         Self {
             workers: Vec::new(),
             worker_type,

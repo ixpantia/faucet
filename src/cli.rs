@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    ffi::{OsStr, OsString},
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
 
@@ -79,7 +82,7 @@ pub struct Args {
 
     /// Command, path, or executable to run Rscript.
     #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
-    rscript: PathBuf,
+    rscript: OsString,
 }
 
 impl Args {
@@ -125,7 +128,7 @@ impl Args {
             IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
         }
     }
-    pub fn rscript(&self) -> &Path {
+    pub fn rscript(&self) -> &OsStr {
         &self.rscript
     }
 }
