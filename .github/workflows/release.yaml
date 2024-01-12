@@ -39,7 +39,7 @@ jobs:
             target
             /home/runner/.cargo
           key: ${{ steps.target-cache-restore.outputs.cache-primary-key }}
-  build-r4.3:
+  build-r43:
     name: Build Docker Image (R 4.3)
     needs: required
     runs-on: ubuntu-latest
@@ -57,10 +57,10 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build Docker image
         env:
-          - PLATFORM: linux/amd64,linux/arm64
-          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.3
-          - TAG_R: ixpantia/faucet:r4.3
-          - TAG_LATEST: ixpantia/faucet:latest
+          PLATFORM: linux/amd64,linux/arm64
+          TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.3
+          TAG_R: ixpantia/faucet:r4.3
+          TAG_LATEST: ixpantia/faucet:latest
         run: |
           docker buildx build \
             --platform $PLATFORM \
@@ -70,7 +70,7 @@ jobs:
             -t $TAG_LATEST \
             --build-arg R_VERSION=4.3 \
             .
-  build-r4.2:
+  build-r42:
     name: Build Docker Image (R 4.2)
     needs: required
     runs-on: ubuntu-latest
@@ -88,9 +88,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build Docker image
         env:
-          - PLATFORM: linux/amd64,linux/arm64
-          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.2
-          - TAG_R: ixpantia/faucet:r4.2
+          PLATFORM: linux/amd64,linux/arm64
+          TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.2
+          TAG_R: ixpantia/faucet:r4.2
         run: |
           docker buildx build \
             --platform $PLATFORM \
@@ -99,7 +99,7 @@ jobs:
             -t $TAG_R \
             --build-arg R_VERSION=4.2 \
             .
-  build-r4.1:
+  build-r41:
     name: Build Docker Image (R 4.1)
     needs: required
     runs-on: ubuntu-latest
@@ -117,9 +117,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build Docker image
         env:
-          - PLATFORM: linux/amd64
-          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.1
-          - TAG_R: ixpantia/faucet:r4.1
+          PLATFORM: linux/amd64
+          TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.1
+          TAG_R: ixpantia/faucet:r4.1
         run: |
           docker buildx build \
             --platform $PLATFORM \
@@ -129,7 +129,7 @@ jobs:
             --build-arg R_VERSION=4.1 \
             .
   publish-site:
-    needs: ['build-r4.2', 'build-r4.3', 'build-r4.1']
+    needs: ['build-r42', 'build-r43', 'build-r41']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
