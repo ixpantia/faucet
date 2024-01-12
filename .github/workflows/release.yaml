@@ -57,10 +57,10 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build Docker image
         env:
-          - PLATFORM: linux/amd64,linux/arm64
-          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.3
-          - TAG_R: ixpantia/faucet:r4.3
-          - TAG_LATEST: ixpantia/faucet:latest
+          PLATFORM: linux/amd64,linux/arm64
+          TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.3
+          TAG_R: ixpantia/faucet:r4.3
+          TAG_LATEST: ixpantia/faucet:latest
         run: |
           docker buildx build \
             --platform $PLATFORM \
@@ -88,9 +88,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build Docker image
         env:
-          - PLATFORM: linux/amd64,linux/arm64
-          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.2
-          - TAG_R: ixpantia/faucet:r4.2
+          PLATFORM: linux/amd64,linux/arm64
+          TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.2
+          TAG_R: ixpantia/faucet:r4.2
         run: |
           docker buildx build \
             --platform $PLATFORM \
@@ -117,9 +117,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build Docker image
         env:
-          - PLATFORM: linux/amd64
-          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.1
-          - TAG_R: ixpantia/faucet:r4.1
+          PLATFORM: linux/amd64
+          TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.1
+          TAG_R: ixpantia/faucet:r4.1
         run: |
           docker buildx build \
             --platform $PLATFORM \
