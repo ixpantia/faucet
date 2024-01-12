@@ -65,7 +65,7 @@ fn spawn_child_rscript_process(
         .current_dir(workdir)
         .arg("-e")
         .arg(command.as_ref())
-        .stdin(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         // Set the port environment variable `PORT` to the port we want to use
