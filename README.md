@@ -131,14 +131,15 @@ faucet --dir /path/to/plumber/api --ip-from x-forwarded-for
 Every option / flag can also be set using an environment variable, this is useful
 for example when using Docker.
 
-| Option / Flag | Environment Variable |
-| ------------- | -------------------- |
-| `--dir`       | `FAUCET_DIR`         |
-| `--host`      | `FAUCET_HOST`        |
-| `--workers`   | `FAUCET_WORKERS`     |
-| `--strategy`  | `FAUCET_STRATEGY`    |
-| `--type`      | `FAUCET_TYPE`        |
-| `--ip-from`   | `FAUCET_IP_FROM`     |
+| Option / Flag | Environment Variable | Description                                    |
+| ------------- | -------------------- | ---------------------------------------------- |
+| `--dir`         | `FAUCET_DIR`           | Path to application                            |
+| `--host`        | `FAUCET_HOST`          | Host and port to bind the server to            |
+| `--workers`     | `FAUCET_WORKERS`       | Number of workers to spawn                     |
+| `--strategy`    | `FAUCET_STRATEGY`      | Load balancing strategy                        |
+| `--type`        | `FAUCET_TYPE`          | Type of application (shiny or plumber)         |
+| `--ip-from`     | `FAUCET_IP_FROM`       | Header or method to get the client IP address  |
+| `--rscript`     | `FAUCET_RSCRIPT`       | Path to Rscript executable                     |
 
 ## Installation
 
