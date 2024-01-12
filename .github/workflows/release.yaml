@@ -1,0 +1,154 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  required:
+    runs-on: ubuntu-latest
+    name: Unit testing on ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - name: Restore cached target/
+        id: target-cache-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            target
+            /home/runner/.cargo
+          key: stable-target
+      - name: cargo test --locked
+        run: cargo test --locked --all-features --all-targets
+      - name: cargo test --doc
+        run: cargo test --locked --all-features --doc
+      - name: Save cached target/
+        id: target-cache-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            target
+            /home/runner/.cargo
+          key: ${{ steps.target-cache-restore.outputs.cache-primary-key }}
+  build-r4.3:
+    name: Build Docker Image (R 4.3)
+    needs: required
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build Docker image
+        env:
+          - PLATFORM: linux/amd64,linux/arm64
+          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.3
+          - TAG_R: ixpantia/faucet:r4.3
+          - TAG_LATEST: ixpantia/faucet:latest
+        run: |
+          docker buildx build \
+            --platform $PLATFORM \
+            --push \
+            -t $TAG_V \
+            -t $TAG_R \
+            -t $TAG_LATEST \
+            --build-arg R_VERSION=4.3 \
+            .
+  build-r4.2:
+    name: Build Docker Image (R 4.2)
+    needs: required
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build Docker image
+        env:
+          - PLATFORM: linux/amd64,linux/arm64
+          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.2
+          - TAG_R: ixpantia/faucet:r4.2
+        run: |
+          docker buildx build \
+            --platform $PLATFORM \
+            --push \
+            -t $TAG_V \
+            -t $TAG_R \
+            --build-arg R_VERSION=4.2 \
+            .
+  build-r4.1:
+    name: Build Docker Image (R 4.1)
+    needs: required
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build Docker image
+        env:
+          - PLATFORM: linux/amd64
+          - TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.1
+          - TAG_R: ixpantia/faucet:r4.1
+        run: |
+          docker buildx build \
+            --platform $PLATFORM \
+            --push \
+            -t $TAG_V \
+            -t $TAG_R \
+            --build-arg R_VERSION=4.1 \
+            .
+  publish-site:
+    needs: ['build-r4.2', 'build-r4.3', 'build-r4.1']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
+      - uses: actions/cache@v3
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-
+      - name: Publish to GH Pages
+        working-directory: ./mkdocs
+        run: |
+          pip install -r requirements.txt
+          mkdocs gh-deploy --force

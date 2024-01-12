@@ -138,3 +138,16 @@ ejecutando faucet detrás de un proxy inverso como _nginx_, debe utilizar
 
 El nivel de logging a utilizar. Consulte la sección [logging](./logging.md)
 para obtener más información.
+
+## Definir el binario/ejecutable de `Rscript`
+
+- CLI: `--rscript` o `-r`
+- Entorno: `FAUCET_RSCRIPT`
+- Por defecto: `Rscript`
+
+Esta opción es útil si tiene varias versiones de R instaladas en su sistema y
+necesita especificar una versión específica de `Rscript` para ejecutar su
+aplicación. También puede ser útil en plataformas como _Windows_ donde el
+ejecutable de `Rscript` no está en el `PATH`.
+
+

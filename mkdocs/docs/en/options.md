@@ -131,3 +131,15 @@ _nginx_, you should use `x-forwarded-for` or `x-real-ip`.
 
 The logging level to use. Refer to the [logging](./logging.md) section for more
 information.
+
+## Define a custom `Rscript` binary/executable
+
+- CLI: `--rscript` or `-r`
+- Environment: `FAUCET_RSCRIPT`
+- Default: `Rscript`
+
+The `Rscript` binary/executable to use. This is useful if you need to have
+multiple versions of R installed on your system. This should be the full path
+to the `Rscript` binary/executable or an alias that is available in your
+`$PATH`. This is also useful in platforms like _Windows_ where the `Rscript`
+binary/executable may not be available in the `$PATH`.

@@ -76,6 +76,10 @@ pub struct Args {
     /// Defaults to client address.
     #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
     ip_from: IpFrom,
+
+    /// Command, path, or executable to run Rscript.
+    #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
+    rscript: PathBuf,
 }
 
 impl Args {
@@ -102,7 +106,8 @@ impl Args {
                 } else if is_shiny(&self.dir) {
                     WorkerType::Shiny
                 } else {
-                    panic!("Could not determine worker type. Please specify with --type.");
+                    log::error!(target: "faucet", "Could not determine worker type. Please specify with --type.");
+                    std::process::exit(1);
                 }
             }
         }
@@ -119,5 +124,8 @@ impl Args {
             IpFrom::XForwardedFor => load_balancing::IpExtractor::XForwardedFor,
             IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
         }
+    }
+    pub fn rscript(&self) -> &Path {
+        &self.rscript
     }
 }

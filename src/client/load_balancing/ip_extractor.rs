@@ -2,7 +2,7 @@ use crate::error::{BadRequestReason, FaucetError, FaucetResult};
 use hyper::{http::HeaderValue, Request};
 use std::net::{IpAddr, SocketAddr};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum IpExtractor {
     ClientAddr,
     XForwardedFor,

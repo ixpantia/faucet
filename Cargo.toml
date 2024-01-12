@@ -10,6 +10,7 @@ readme = "README.md"
 homepage = "https://github.com/ixpantia/faucet"
 repository = "https://github.com/ixpantia/faucet"
 keywords = ["R", "loadbalancer", "server", "plumber", "shiny"]
+rust-version = "1.75"
 
 [[bin]]
 name = "faucet"

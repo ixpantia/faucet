@@ -4,6 +4,7 @@ use crate::{
 };
 use std::{
     net::SocketAddr,
+    num::NonZeroUsize,
     path::Path,
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
@@ -54,7 +55,28 @@ fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
     Ok(child)
 }
 
+fn spawn_child_rscript_process(
+    rscript: impl AsRef<Path>,
+    workdir: impl AsRef<Path>,
+    command: impl AsRef<str>,
+) -> FaucetResult<Child> {
+    tokio::process::Command::new(rscript.as_ref())
+        // Set the current directory to the directory containing the entrypoint
+        .current_dir(workdir)
+        .arg("-e")
+        .arg(command.as_ref())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        // Set the port environment variable `PORT` to the port we want to use
+        // This is needed to make sure the child process is killed when the parent is dropped
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(Into::into)
+}
+
 fn spawn_plumber_worker(
+    rscript: impl AsRef<Path>,
     workdir: impl AsRef<Path>,
     port: u16,
     target: &'static str,
@@ -65,22 +87,13 @@ fn spawn_plumber_worker(
         plumber::pr_run(plumber::plumb())
         "#,
     );
-    let child = tokio::process::Command::new("Rscript")
-        // Set the current directory to the directory containing the entrypoint
-        .current_dir(workdir)
-        .arg("-e")
-        .arg(command)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        // Set the port environment variable `PORT` to the port we want to use
-        // This is needed to make sure the child process is killed when the parent is dropped
-        .kill_on_drop(true)
-        .spawn()?;
+    let child = spawn_child_rscript_process(rscript, workdir, command)?;
 
     log_stdio(child, target)
 }
 
 fn spawn_shiny_worker(
+    rscript: impl AsRef<Path>,
     workdir: impl AsRef<Path>,
     port: u16,
     target: &'static str,
@@ -91,17 +104,7 @@ fn spawn_shiny_worker(
         shiny::runApp()
         "#,
     );
-    let child = tokio::process::Command::new("Rscript")
-        // Set the current directory to the directory containing the entrypoint
-        .current_dir(workdir)
-        .arg("-e")
-        .arg(command)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        // Set the port environment variable `PORT` to the port we want to use
-        // This is needed to make sure the child process is killed when the parent is dropped
-        .kill_on_drop(true)
-        .spawn()?;
+    let child = spawn_child_rscript_process(rscript, workdir, command)?;
 
     log_stdio(child, target)
 }
@@ -109,13 +112,14 @@ fn spawn_shiny_worker(
 impl WorkerType {
     fn spawn_process(
         self,
+        rscript: impl AsRef<Path>,
         workdir: impl AsRef<Path>,
         port: u16,
         target: &'static str,
     ) -> FaucetResult<Child> {
         match self {
-            WorkerType::Plumber => spawn_plumber_worker(workdir, port, target),
-            WorkerType::Shiny => spawn_shiny_worker(workdir, port, target),
+            WorkerType::Plumber => spawn_plumber_worker(rscript, workdir, port, target),
+            WorkerType::Shiny => spawn_shiny_worker(rscript, workdir, port, target),
         }
     }
 }
@@ -139,6 +143,7 @@ async fn check_if_online(addr: SocketAddr) -> bool {
 const RECHECK_INTERVAL: Duration = Duration::from_millis(10);
 
 fn spawn_worker_task(
+    rscript: Arc<Path>,
     addr: SocketAddr,
     worker_type: WorkerType,
     workdir: Arc<Path>,
@@ -147,7 +152,12 @@ fn spawn_worker_task(
 ) -> JoinHandle<FaucetResult<()>> {
     tokio::spawn(async move {
         loop {
-            let mut child = worker_type.spawn_process(workdir.clone(), addr.port(), target)?;
+            let mut child = worker_type.spawn_process(
+                rscript.as_ref(),
+                workdir.as_ref(),
+                addr.port(),
+                target,
+            )?;
             let pid = child.id().expect("Failed to get plumber worker PID");
             log::info!(target: "faucet", "Starting process {pid} for {target}");
             loop {
@@ -175,14 +185,20 @@ fn spawn_worker_task(
 }
 
 impl Worker {
-    pub async fn new(worker_type: WorkerType, workdir: Arc<Path>, id: usize) -> FaucetResult<Self> {
+    pub async fn new(
+        rscript: Arc<Path>,
+        worker_type: WorkerType,
+        workdir: Arc<Path>,
+        id: usize,
+    ) -> FaucetResult<Self> {
         let target = Box::leak(format!("Worker::{}", id).into_boxed_str());
         let socket_addr = get_available_socket().await?;
         let is_online = Arc::new(AtomicBool::new(false));
         let worker_task = spawn_worker_task(
+            rscript,
             socket_addr,
             worker_type,
-            workdir.clone(),
+            workdir,
             is_online.clone(),
             target,
         );
@@ -225,21 +241,29 @@ pub(crate) struct Workers {
     workers: Vec<Worker>,
     worker_type: WorkerType,
     workdir: Arc<Path>,
+    rscript: Arc<Path>,
 }
 
 impl Workers {
-    pub(crate) fn new(worker_type: WorkerType, workdir: impl AsRef<Path>) -> Self {
-        let workdir = workdir.as_ref();
+    pub(crate) fn new(worker_type: WorkerType, workdir: Arc<Path>, rscript: Arc<Path>) -> Self {
         Self {
             workers: Vec::new(),
             worker_type,
-            workdir: workdir.into(),
+            workdir,
+            rscript,
         }
     }
-    pub(crate) async fn spawn(&mut self, n: usize) -> FaucetResult<()> {
-        for id in 0..n {
-            self.workers
-                .push(Worker::new(self.worker_type, self.workdir.clone(), id + 1).await?);
+    pub(crate) async fn spawn(&mut self, n: NonZeroUsize) -> FaucetResult<()> {
+        for id in 0..(n.get()) {
+            self.workers.push(
+                Worker::new(
+                    Arc::clone(&self.rscript),
+                    self.worker_type,
+                    Arc::clone(&self.workdir),
+                    id + 1,
+                )
+                .await?,
+            );
         }
         Ok(())
     }
