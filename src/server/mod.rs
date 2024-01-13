@@ -163,6 +163,7 @@ impl FaucetServer {
             let load_balancer = load_balancer.clone();
 
             let (tcp, client_addr) = listener.accept().await?;
+            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
             let tcp = TokioIo::new(tcp);
 
             tokio::task::spawn(async move {

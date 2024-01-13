@@ -1,6 +1,6 @@
 use crate::{
     error::{FaucetError, FaucetResult},
-    networking::get_available_socket,
+    networking::get_available_sockets,
 };
 use std::{
     ffi::OsStr,
@@ -149,7 +149,7 @@ async fn check_if_online(addr: SocketAddr) -> bool {
     stream.is_ok()
 }
 
-const RECHECK_INTERVAL: Duration = Duration::from_millis(10);
+const RECHECK_INTERVAL: Duration = Duration::from_millis(250);
 
 fn spawn_worker_task(
     rscript: Arc<OsStr>,
@@ -164,7 +164,7 @@ fn spawn_worker_task(
         loop {
             let mut child = worker_type.spawn_process(&rscript, &workdir, port, target);
             let pid = child.id().expect("Failed to get plumber worker PID");
-            log::info!(target: "faucet", "Starting process {pid} for {target}");
+            log::info!(target: "faucet", "Starting process {pid} for {target} on port {port}");
             loop {
                 // Try to connect to the socket
                 let check_status = check_if_online(addr).await;
@@ -192,13 +192,13 @@ fn spawn_worker_task(
 
 impl Worker {
     pub async fn new(
+        socket_addr: SocketAddr,
         rscript: Arc<OsStr>,
         worker_type: WorkerType,
         workdir: Arc<Path>,
         id: usize,
     ) -> FaucetResult<Self> {
         let target = Box::leak(format!("Worker::{}", id).into_boxed_str());
-        let socket_addr = get_available_socket().await?;
         let is_online = Arc::new(AtomicBool::new(false));
         let worker_task = spawn_worker_task(
             rscript,
@@ -260,9 +260,11 @@ impl Workers {
         }
     }
     pub(crate) async fn spawn(&mut self, n: NonZeroUsize) -> FaucetResult<()> {
-        for id in 0..(n.get()) {
+        let socket_addrs = get_available_sockets(n.get()).await;
+        for (id, socket_addr) in socket_addrs.enumerate() {
             self.workers.push(
                 Worker::new(
+                    socket_addr,
                     Arc::clone(&self.rscript),
                     self.worker_type,
                     Arc::clone(&self.workdir),

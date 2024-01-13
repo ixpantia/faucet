@@ -90,8 +90,16 @@ impl Service<hyper::Request<Incoming>> for ProxyService {
             .get::<State>()
             .expect("State not found")
             .clone();
-        match state.client.attemp_upgrade(req).await? {
-            UpgradeStatus::Upgraded(res) => Ok(res),
+        match state.client.attempt_upgrade(req).await? {
+            UpgradeStatus::Upgraded(res) => {
+                log::debug!(
+                    target: "faucet",
+                    "Initializing WebSocket bridge from {} to {}",
+                    state.remote_addr,
+                    state.client.target()
+                );
+                Ok(res)
+            }
             UpgradeStatus::NotUpgraded(req) => {
                 let connection = state.client.get().await?;
                 connection.send_request(req).await

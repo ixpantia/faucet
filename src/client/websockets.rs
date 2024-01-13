@@ -111,7 +111,7 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
 }
 
 #[inline(always)]
-async fn attemp_upgrade<ReqBody: Send + Sync + 'static>(
+async fn attempt_upgrade<ReqBody: Send + Sync + 'static>(
     req: Request<ReqBody>,
     client: impl ExtractSocketAddr + Send + Sync + 'static,
 ) -> FaucetResult<UpgradeStatus<ReqBody>> {
@@ -122,20 +122,20 @@ async fn attemp_upgrade<ReqBody: Send + Sync + 'static>(
 }
 
 impl Client {
-    pub async fn attemp_upgrade<ReqBody>(
+    pub async fn attempt_upgrade<ReqBody>(
         &self,
         req: Request<ReqBody>,
     ) -> FaucetResult<UpgradeStatus<ReqBody>>
     where
         ReqBody: Send + Sync + 'static,
     {
-        attemp_upgrade(req, self.clone()).await
+        attempt_upgrade(req, self.clone()).await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::networking::get_available_socket;
+    use crate::networking::get_available_sockets;
 
     use super::*;
 
@@ -175,7 +175,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_socket().await.unwrap();
+        let socket_addr = get_available_sockets(1).await.next().unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -228,7 +228,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_socket().await.unwrap();
+        let socket_addr = get_available_sockets(1).await.next().unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -268,7 +268,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_socket().await.unwrap();
+        let socket_addr = get_available_sockets(1).await.next().unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -289,7 +289,7 @@ mod tests {
             .body(())
             .unwrap();
 
-        let result = attemp_upgrade(req, client).await.unwrap();
+        let result = attempt_upgrade(req, client).await.unwrap();
 
         server.abort();
 
@@ -311,7 +311,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_socket().await.unwrap();
+        let socket_addr = get_available_sockets(1).await.next().unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -333,7 +333,7 @@ mod tests {
             .body(())
             .unwrap();
 
-        let result = attemp_upgrade(req, client).await.unwrap();
+        let result = attempt_upgrade(req, client).await.unwrap();
 
         server.abort();
 
@@ -369,7 +369,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_socket().await.unwrap();
+        let socket_addr = get_available_sockets(1).await.next().unwrap();
 
         let client = MockClient { socket_addr };
 
