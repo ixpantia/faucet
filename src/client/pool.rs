@@ -16,11 +16,13 @@ struct ConnectionHandle {
 }
 
 async fn create_http_client(worker_state: &WorkerState) -> FaucetResult<ConnectionHandle> {
+    log::debug!(target: "faucet", "Establishing TCP connection to {}", worker_state.target());
     let stream = TokioIo::new(TcpStream::connect(worker_state.socket_addr()).await?);
     let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
     tokio::spawn(async move {
         conn.await.expect("client conn");
     });
+    log::debug!(target: "faucet", "Established TCP connection to {}", worker_state.target());
     Ok(ConnectionHandle { sender })
 }
 
@@ -51,6 +53,7 @@ impl managed::Manager for ConnectionManager {
         if conn.sender.is_closed() {
             Err(RecycleError::StaticMessage("Connection closed"))
         } else {
+            log::debug!(target: "faucet", "Recycling TCP connection to {}", self.worker_state.target());
             Ok(())
         }
     }

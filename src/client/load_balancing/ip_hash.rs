@@ -65,7 +65,17 @@ impl LoadBalancingStrategy for IpHash {
             if client.is_online() {
                 break client;
             }
+
             let backoff = calculate_exponential_backoff(retries);
+
+            log::debug!(
+                target: "faucet",
+                "IP {} tried to connect to offline {}, retrying in {:?}",
+                ip,
+                client.target(),
+                backoff
+            );
+
             tokio::time::sleep(backoff).await;
             retries += 1;
         }

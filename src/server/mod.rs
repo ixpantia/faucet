@@ -12,7 +12,7 @@ use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
 use onion::{Service, ServiceBuilder};
 use service::{AddStateLayer, ProxyService};
-use std::{net::SocketAddr, num::NonZeroUsize, path::Path, pin::Pin, sync::Arc};
+use std::{ffi::OsStr, net::SocketAddr, num::NonZeroUsize, path::Path, pin::Pin, sync::Arc};
 use tokio::net::TcpListener;
 
 fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> Strategy {
@@ -43,7 +43,7 @@ pub struct FaucetServerBuilder {
     server_type: Option<WorkerType>,
     workdir: Option<Arc<Path>>,
     extractor: Option<load_balancing::IpExtractor>,
-    rscript: Option<Arc<Path>>,
+    rscript: Option<Arc<OsStr>>,
 }
 
 impl FaucetServerBuilder {
@@ -94,7 +94,7 @@ impl FaucetServerBuilder {
         self.workdir = Some(workdir.as_ref().into());
         self
     }
-    pub fn rscript(mut self, rscript: impl AsRef<Path>) -> Self {
+    pub fn rscript(mut self, rscript: impl AsRef<OsStr>) -> Self {
         log::info!(target: "faucet", "Using Rscript command: {:?}", rscript.as_ref());
         self.rscript = Some(rscript.as_ref().into());
         self
@@ -115,7 +115,7 @@ impl FaucetServerBuilder {
         });
         let rscript = self.rscript.unwrap_or_else(|| {
             log::info!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
-            Path::new("Rscript").into()
+            OsStr::new("Rscript").into()
         });
         let extractor = self.extractor.unwrap_or_else(|| {
             log::info!(target: "faucet", "No IP extractor specified. Defaulting to client address.");
@@ -146,7 +146,7 @@ pub struct FaucetServer {
     server_type: WorkerType,
     workdir: Arc<Path>,
     extractor: load_balancing::IpExtractor,
-    rscript: Arc<Path>,
+    rscript: Arc<OsStr>,
 }
 
 impl FaucetServer {
@@ -163,6 +163,7 @@ impl FaucetServer {
             let load_balancer = load_balancer.clone();
 
             let (tcp, client_addr) = listener.accept().await?;
+            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
             let tcp = TokioIo::new(tcp);
 
             tokio::task::spawn(async move {
