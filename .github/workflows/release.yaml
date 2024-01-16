@@ -148,7 +148,6 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - name: Publish to GH Pages
-        working-directory: ./mkdocs
         run: |
           pip install -r requirements.txt
           mkdocs gh-deploy --force

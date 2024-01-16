@@ -1,5 +1,5 @@
 site_name: faucet
-site_dir: target
+site_dir: target/site
 site_url: https://ixpantia.github.io/faucet/
 repo_url: https://github.com/ixpantia/faucet
 theme:
