@@ -1,4 +1,4 @@
-# faucet <img src="mkdocs/docs/figures/faucet.png" align="right" width=120 height=139 alt="" />
+# faucet <img src="docs/figures/faucet.png" align="right" width=120 height=139 alt="" />
 
 <!-- badges: start -->
 [![Crates.io](https://img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)
