@@ -155,7 +155,7 @@ image as our base image. This image is based on the
 which is a minimal R image based on Debian Linux.
 
 ```
-FROM ixpantia/faucet:{{ FAUCET_VERSION }}-r4.3
+FROM ixpantia/faucet:r4.3
 
 # Some environment variables to tell `renv`
 # to install packages in the correct location

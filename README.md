@@ -148,7 +148,7 @@ for example when using Docker.
 Download the latest release of faucet for Linux from the [GitHub Releases page](https://github.com/ixpantia/faucet/releases). This should work with most Linux distributions.
 
 ```bash
-FAUCET_VERSION="v0.5.1"
+FAUCET_VERSION="v0.5.2"
 
 wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
