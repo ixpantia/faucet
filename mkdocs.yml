@@ -1,5 +1,5 @@
 site_name: faucet
-site_dir: target
+site_dir: target/site
 site_url: https://ixpantia.github.io/faucet/
 repo_url: https://github.com/ixpantia/faucet
 theme:
@@ -27,6 +27,7 @@ plugins:
             - Options: options.md
             - faucet in Containers: in_containers.md
             - Logging: logging.md
+            - With Reverse Proxy: reverse_proxy.md
             - Examples: examples.md
         - locale: es
           default: false
@@ -39,6 +40,7 @@ plugins:
             - Opciones: options.md
             - faucet en Contenedores: in_containers.md
             - Logging: logging.md
+            - Con Proxy Inverso: reverse_proxy.md
             - Ejemplos: examples.md
 
 markdown_extensions:
