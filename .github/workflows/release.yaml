@@ -21,7 +21,7 @@ jobs:
           toolchain: stable
       - name: Restore cached target/
         id: target-cache-restore
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: |
             target
@@ -33,7 +33,7 @@ jobs:
         run: cargo test --locked --all-features --doc
       - name: Save cached target/
         id: target-cache-save
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             target
