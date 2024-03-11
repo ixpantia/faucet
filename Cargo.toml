@@ -34,4 +34,4 @@ base64 = "0.21.7"
 sha1 = "0.10.6"
 futures-util = "0.3.30"
 tower = { version = "^0.4.1" }
-ctrlc = "3.4.2"
+ctrlc = "3.4.4"
