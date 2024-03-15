@@ -20,7 +20,7 @@ path = "src/main.rs"
 async-trait = "0.1"
 clap = { version = "4.5", features = ["derive", "env"] }
 deadpool = { version = "0.10", features = ["rt_tokio_1"] }
-env_logger = "0.10"
+env_logger = "0.11"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
@@ -33,5 +33,5 @@ tokio-tungstenite = "^0.21"
 base64 = "0.22"
 sha1 = "0.10"
 futures-util = "0.3"
-tower = { version = "^0.4" }
+tower = "^0.4.13"
 ctrlc = "3"
