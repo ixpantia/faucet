@@ -60,6 +60,7 @@ fn spawn_child_rscript_process(
     rscript: impl AsRef<OsStr>,
     workdir: impl AsRef<Path>,
     command: impl AsRef<str>,
+    worker_id: usize,
 ) -> FaucetResult<Child> {
     tokio::process::Command::new(rscript)
         // Set the current directory to the directory containing the entrypoint
@@ -69,7 +70,7 @@ fn spawn_child_rscript_process(
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        // Set the port environment variable `PORT` to the port we want to use
+        .env("FAUCET_WORKER_ID", worker_id.to_string())
         // This is needed to make sure the child process is killed when the parent is dropped
         .kill_on_drop(true)
         .spawn()
@@ -81,6 +82,7 @@ fn spawn_plumber_worker(
     workdir: impl AsRef<Path>,
     port: u16,
     target: &'static str,
+    worker_id: usize,
 ) -> FaucetResult<Child> {
     let command = format!(
         r#"
@@ -88,7 +90,7 @@ fn spawn_plumber_worker(
         plumber::pr_run(plumber::plumb())
         "#,
     );
-    let child = spawn_child_rscript_process(rscript, workdir, command)?;
+    let child = spawn_child_rscript_process(rscript, workdir, command, worker_id)?;
 
     log_stdio(child, target)
 }
@@ -98,6 +100,7 @@ fn spawn_shiny_worker(
     workdir: impl AsRef<Path>,
     port: u16,
     target: &'static str,
+    worker_id: usize,
 ) -> FaucetResult<Child> {
     let command = format!(
         r#"
@@ -105,7 +108,7 @@ fn spawn_shiny_worker(
         shiny::runApp()
         "#,
     );
-    let child = spawn_child_rscript_process(rscript, workdir, command)?;
+    let child = spawn_child_rscript_process(rscript, workdir, command, worker_id)?;
 
     log_stdio(child, target)
 }
@@ -117,10 +120,11 @@ impl WorkerType {
         workdir: impl AsRef<Path>,
         port: u16,
         target: &'static str,
+        worker_id: usize,
     ) -> Child {
         let child_result = match self {
-            WorkerType::Plumber => spawn_plumber_worker(rscript, workdir, port, target),
-            WorkerType::Shiny => spawn_shiny_worker(rscript, workdir, port, target),
+            WorkerType::Plumber => spawn_plumber_worker(rscript, workdir, port, target, worker_id),
+            WorkerType::Shiny => spawn_shiny_worker(rscript, workdir, port, target, worker_id),
         };
         match child_result {
             Ok(child) => child,
@@ -158,11 +162,12 @@ fn spawn_worker_task(
     workdir: Arc<Path>,
     is_online: Arc<AtomicBool>,
     target: &'static str,
+    id: usize,
 ) -> JoinHandle<FaucetResult<()>> {
     tokio::spawn(async move {
         let port = addr.port();
         loop {
-            let mut child = worker_type.spawn_process(&rscript, &workdir, port, target);
+            let mut child = worker_type.spawn_process(&rscript, &workdir, port, target, id);
             let pid = child.id().expect("Failed to get plumber worker PID");
             log::info!(target: "faucet", "Starting process {pid} for {target} on port {port}");
             loop {
@@ -207,6 +212,7 @@ impl Worker {
             workdir,
             is_online.clone(),
             target,
+            id,
         );
         Ok(Self {
             _worker_task: worker_task,
