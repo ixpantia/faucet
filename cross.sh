@@ -12,7 +12,7 @@ function build() {
     export EXTENSION=$2
     echo "Building for $TARGET"
     cross build --release --target $TARGET
-    mv target/$TARGET/release/faucet$EXTENSION target/cross/faucet-$TARGET$EXTENSION
+    mv $CARGO_TARGET_DIR/$TARGET/release/faucet$EXTENSION target/cross/faucet-$TARGET$EXTENSION
     sha256sum target/cross/faucet-$TARGET$EXTENSION > target/cross/faucet-$TARGET$EXTENSION.sha256
 }
 
