@@ -99,7 +99,7 @@ pub struct RouterArgs {
         long,
         short,
         env = "FAUCET_ROUTER_CONF",
-        default_value = "frouter.toml"
+        default_value = "./frouter.toml"
     )]
     conf: PathBuf,
 }
