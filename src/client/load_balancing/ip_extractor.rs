@@ -90,7 +90,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XRealIp
-            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
+            .extract(&request, Some(IpAddr::from([0, 0, 0, 0])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }
@@ -103,7 +103,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XRealIp
-            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
+            .extract(&request, Some(IpAddr::from([0, 0, 0, 0])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
     }
@@ -116,7 +116,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XForwardedFor
-            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
+            .extract(&request, Some(IpAddr::from([0, 0, 0, 0])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }
@@ -129,7 +129,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XForwardedFor
-            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
+            .extract(&request, Some(IpAddr::from([0, 0, 0, 0])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
     }
@@ -142,7 +142,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XForwardedFor
-            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
+            .extract(&request, Some(IpAddr::from([0, 0, 0, 0])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([192, 168, 0, 1]));
     }
@@ -151,7 +151,7 @@ mod tests {
     fn extract_client_addr_ipv4_from_request() {
         let request = Request::builder().body(()).unwrap();
         let ip = IpExtractor::ClientAddr
-            .extract(&request, Some(IpAddr::from(([127, 0, 0, 1]))))
+            .extract(&request, Some(IpAddr::from([127, 0, 0, 1])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }
@@ -160,7 +160,7 @@ mod tests {
     fn extract_client_addr_ipv6_from_request() {
         let request = Request::builder().body(()).unwrap();
         let ip = IpExtractor::ClientAddr
-            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0, 0, 0, 0, 1]))))
+            .extract(&request, Some(IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
     }
@@ -173,7 +173,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::ClientAddr
-            .extract(&request, Some(IpAddr::from(([127, 0, 0, 1]))))
+            .extract(&request, Some(IpAddr::from([127, 0, 0, 1])))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }

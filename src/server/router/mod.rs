@@ -1,24 +1,14 @@
-use std::{
-    collections::HashSet,
-    io::Write,
-    net::SocketAddr,
-    pin::{self, pin, Pin},
-};
+use std::{collections::HashSet, io::Write, net::SocketAddr, pin::pin};
 
-use fxhash::FxHashMap;
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Uri};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
-use tokio_tungstenite::tungstenite::http::uri::PathAndQuery;
 
-use super::{
-    onion::{Service, ServiceBuilder},
-    FaucetServerService,
-};
+use super::{onion::Service, FaucetServerService};
 use crate::{
     client::ExclusiveBody,
     error::{FaucetError, FaucetResult},
-    server::{logging, service::ProxyService, FaucetServerConfig},
+    server::FaucetServerConfig,
 };
 
 #[derive(serde::Deserialize)]

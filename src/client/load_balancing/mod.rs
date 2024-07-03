@@ -6,7 +6,7 @@ use crate::client::Client;
 use crate::error::FaucetResult;
 use hyper::Request;
 pub use ip_extractor::IpExtractor;
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 

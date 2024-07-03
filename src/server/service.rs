@@ -1,4 +1,4 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 
 use crate::{
     client::{Client, ExclusiveBody, UpgradeStatus},

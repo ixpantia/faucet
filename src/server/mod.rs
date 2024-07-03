@@ -19,7 +19,7 @@ use std::{
     net::SocketAddr,
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    pin::{pin, Pin},
+    pin::pin,
 };
 use tokio::net::TcpListener;
 
