@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 use crate::client::{load_balancing, worker::WorkerType};
 
@@ -42,18 +42,8 @@ enum IpFrom {
     XRealIp,
 }
 
-///
-/// ███████╗ █████╗ ██╗   ██╗ ██████╗███████╗████████╗
-/// ██╔════╝██╔══██╗██║   ██║██╔════╝██╔════╝╚══██╔══╝
-/// █████╗  ███████║██║   ██║██║     █████╗     ██║
-/// ██╔══╝  ██╔══██║██║   ██║██║     ██╔══╝     ██║
-/// ██║     ██║  ██║╚██████╔╝╚██████╗███████╗   ██║
-/// ╚═╝     ╚═╝  ╚═╝ ╚═════╝  ╚═════╝╚══════╝   ╚═╝
-/// Fast, async, and concurrent data applications.
-///
 #[derive(Parser, Debug)]
-#[command(author, version, verbatim_doc_comment)]
-pub struct Args {
+pub struct StartArgs {
     /// The host to bind to.
     #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]
     host: String,
@@ -89,10 +79,33 @@ pub struct Args {
     app_dir: Option<String>,
 }
 
-impl Args {
-    pub fn parse() -> Self {
-        Self::parse_from(std::env::args_os())
-    }
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Start a simple faucet server.
+    #[command(name = "start")]
+    Start(StartArgs),
+    /// Runs faucet in "router" mode. (Experimental)
+    #[command(name = "router")]
+    Router,
+}
+
+///
+/// ███████╗ █████╗ ██╗   ██╗ ██████╗███████╗████████╗
+/// ██╔════╝██╔══██╗██║   ██║██╔════╝██╔════╝╚══██╔══╝
+/// █████╗  ███████║██║   ██║██║     █████╗     ██║
+/// ██╔══╝  ██╔══██║██║   ██║██║     ██╔══╝     ██║
+/// ██║     ██║  ██║╚██████╔╝╚██████╗███████╗   ██║
+/// ╚═╝     ╚═╝  ╚═╝ ╚═════╝  ╚═════╝╚══════╝   ╚═╝
+/// Fast, async, and concurrent data applications.
+///
+#[derive(Parser)]
+#[command(author, version, verbatim_doc_comment)]
+pub struct Args {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+impl StartArgs {
     pub fn strategy(&self) -> load_balancing::Strategy {
         use Strategy::*;
         match self.strategy {

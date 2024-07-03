@@ -64,13 +64,18 @@ pub(crate) struct WorkerConfig {
 }
 
 impl WorkerConfig {
-    fn new(worker_id: usize, addr: SocketAddr, server_config: FaucetServerConfig) -> Self {
+    fn new(
+        worker_id: usize,
+        addr: SocketAddr,
+        server_config: FaucetServerConfig,
+        target_prefix: &str,
+    ) -> Self {
         Self {
             addr,
             worker_id,
             is_online: Box::leak(Box::new(AtomicBool::new(false))),
             workdir: server_config.workdir,
-            target: Box::leak(format!("Worker::{}", worker_id).into_boxed_str()),
+            target: Box::leak(format!("{}Worker::{}", target_prefix, worker_id).into_boxed_str()),
             app_dir: server_config.app_dir,
             wtype: server_config.server_type,
             rscript: server_config.rscript,
@@ -218,11 +223,16 @@ pub(crate) struct Workers {
 }
 
 impl Workers {
-    pub(crate) async fn new(server_config: FaucetServerConfig) -> FaucetResult<Self> {
+    pub(crate) async fn new(
+        server_config: FaucetServerConfig,
+        target_prefix: &str,
+    ) -> FaucetResult<Self> {
         let workers = get_available_sockets(server_config.n_workers.get())
             .await
             .enumerate()
-            .map(|(id, socket_addr)| WorkerConfig::new(id + 1, socket_addr, server_config))
+            .map(|(id, socket_addr)| {
+                WorkerConfig::new(id + 1, socket_addr, server_config, target_prefix)
+            })
             .map(Worker::from_config)
             .collect::<FaucetResult<Box<[Worker]>>>()?;
         Ok(Self { workers })

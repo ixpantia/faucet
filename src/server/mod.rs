@@ -6,6 +6,7 @@ use crate::{
     client::{
         load_balancing::{self, LoadBalancer, Strategy},
         worker::{WorkerType, Workers},
+        ExclusiveBody,
     },
     error::{FaucetError, FaucetResult},
 };
@@ -21,6 +22,10 @@ use std::{
     pin::{pin, Pin},
 };
 use tokio::net::TcpListener;
+
+pub use router::RouterConfig;
+
+use self::{logging::LogService, service::AddStateService};
 
 fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> Strategy {
     match server_type {
@@ -174,16 +179,31 @@ mod impl_serde {
 
     use super::*;
 
+    fn default_rscript() -> OsString {
+        OsString::from("Rscript")
+    }
+
+    fn default_extractor() -> load_balancing::IpExtractor {
+        load_balancing::IpExtractor::ClientAddr
+    }
+
+    fn default_workdir() -> PathBuf {
+        PathBuf::from(".")
+    }
+
     #[derive(serde::Deserialize)]
     struct IntermediateFaucetServerConfig {
-        pub strategy: Strategy,
+        pub strategy: Option<Strategy>,
         pub bind: Option<SocketAddr>,
         pub n_workers: NonZeroUsize,
         pub server_type: WorkerType,
+        #[serde(default = "default_workdir")]
         pub workdir: PathBuf,
+        #[serde(default = "default_extractor")]
         pub extractor: load_balancing::IpExtractor,
+        #[serde(default = "default_rscript")]
         pub rscript: OsString,
-        pub app_dir: Option<String>,
+        pub app_dir: String,
     }
 
     impl<'de> serde::Deserialize<'de> for FaucetServerConfig {
@@ -191,10 +211,18 @@ mod impl_serde {
         where
             D: serde::Deserializer<'de>,
         {
-            let inter = IntermediateFaucetServerConfig::deserialize(deserializer)?;
+            let mut inter = IntermediateFaucetServerConfig::deserialize(deserializer)?;
+
+            if inter.strategy.is_none() {
+                inter.strategy = match inter.server_type {
+                    WorkerType::Shiny => Some(Strategy::IpHash),
+                    WorkerType::Plumber => Some(Strategy::RoundRobin),
+                };
+            }
+
             Ok(FaucetServerConfig {
-                app_dir: inter.app_dir.map(|s| s.leak() as &'static str),
-                strategy: inter.strategy,
+                app_dir: Some(inter.app_dir.leak()),
+                strategy: inter.strategy.expect("Strategy will always be set"),
                 extractor: inter.extractor,
                 bind: inter.bind,
                 workdir: Box::leak(inter.workdir.into_boxed_path()),
@@ -208,7 +236,7 @@ mod impl_serde {
 
 impl FaucetServerConfig {
     pub async fn run(self) -> FaucetResult<()> {
-        let workers = Workers::new(self).await?;
+        let workers = Workers::new(self, "").await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
         let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
@@ -247,38 +275,35 @@ impl FaucetServerConfig {
             });
         }
     }
-    #[cfg(unix)]
-    pub async fn run_socket(self, listener: tokio::net::UnixListener) -> FaucetResult<()> {
-        let workers = Workers::new(self).await?;
+    pub async fn extract_service(self, prefix: &str) -> FaucetResult<FaucetServerService> {
+        let workers = Workers::new(self, prefix).await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
 
         let load_balancer = load_balancer.clone();
-        let service = Box::leak(Box::new(
+        let service: &'static _ = Box::leak(Box::new(
             ServiceBuilder::new(ProxyService)
                 .layer(logging::LogLayer)
                 .layer(AddStateLayer::new(load_balancer))
                 .build(),
         ));
 
-        loop {
-            let (tcp, _) = listener.accept().await?;
-            let tcp = TokioIo::new(tcp);
+        Ok(FaucetServerService { inner: service })
+    }
+}
 
-            tokio::task::spawn(async {
-                let mut conn = http1::Builder::new()
-                    .serve_connection(
-                        tcp,
-                        service_fn(|req: Request<Incoming>| service.call(req, None)),
-                    )
-                    .with_upgrades();
+pub struct FaucetServerService {
+    inner: &'static AddStateService<LogService<ProxyService>>,
+}
 
-                let conn = pin!(&mut conn);
-
-                if let Err(e) = conn.await {
-                    log::error!(target: "faucet", "Connection error: {}", e);
-                }
-            });
-        }
+impl Service<hyper::Request<Incoming>> for FaucetServerService {
+    type Error = FaucetError;
+    type Response = hyper::Response<ExclusiveBody>;
+    async fn call(
+        &self,
+        req: hyper::Request<Incoming>,
+        ip_addr: Option<std::net::IpAddr>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.inner.call(req, ip_addr).await
     }
 }

@@ -1,6 +1,7 @@
-use faucet_server::cli::Args;
+use clap::Parser;
+use faucet_server::cli::{Args, Commands};
 use faucet_server::error::FaucetResult;
-use faucet_server::server::FaucetServerBuilder;
+use faucet_server::server::{FaucetServerBuilder, RouterConfig};
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
@@ -12,21 +13,30 @@ pub async fn main() -> FaucetResult<()> {
 
     env_logger::init_from_env(env_logger::Env::new().filter_or("FAUCET_LOG", "info"));
     let cli_args = Args::parse();
+    match cli_args.command {
+        Commands::Start(start_args) => {
+            log::info!(target: "faucet", "Building the faucet server...");
 
-    log::info!(target: "faucet", "Building the faucet server...");
+            FaucetServerBuilder::new()
+                .strategy(start_args.strategy())
+                .workers(start_args.workers())
+                .server_type(start_args.server_type())
+                .extractor(start_args.ip_extractor())
+                .bind(start_args.host().parse()?)
+                .workdir(start_args.dir())
+                .rscript(start_args.rscript())
+                .app_dir(start_args.app_dir())
+                .build()?
+                .run()
+                .await?;
+        }
+        Commands::Router => {
+            let config: RouterConfig =
+                toml::from_str(&std::fs::read_to_string("router.toml").unwrap()).unwrap();
 
-    FaucetServerBuilder::new()
-        .strategy(cli_args.strategy())
-        .workers(cli_args.workers())
-        .server_type(cli_args.server_type())
-        .extractor(cli_args.ip_extractor())
-        .bind(cli_args.host().parse()?)
-        .workdir(cli_args.dir())
-        .rscript(cli_args.rscript())
-        .app_dir(cli_args.app_dir())
-        .build()?
-        .run()
-        .await?;
+            config.run().await?;
+        }
+    }
 
     Ok(())
 }
