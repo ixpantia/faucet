@@ -1,8 +1,9 @@
 use crate::error::{BadRequestReason, FaucetError, FaucetResult};
 use hyper::{http::HeaderValue, Request};
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
+#[serde(rename = "snake_case")]
 pub enum IpExtractor {
     ClientAddr,
     XForwardedFor,
@@ -39,10 +40,10 @@ fn extract_ip_from_x_real_ip(x_real_ip: &HeaderValue) -> FaucetResult<IpAddr> {
 }
 
 impl IpExtractor {
-    pub fn extract<B>(self, req: &Request<B>, client_addr: SocketAddr) -> FaucetResult<IpAddr> {
+    pub fn extract<B>(self, req: &Request<B>, client_addr: Option<IpAddr>) -> FaucetResult<IpAddr> {
         use IpExtractor::*;
         let ip = match self {
-            ClientAddr => client_addr.ip(),
+            ClientAddr => client_addr.expect("Unable to get client address"),
             XForwardedFor => match req.headers().get("X-Forwarded-For") {
                 Some(header) => extract_ip_from_x_forwarded_for(header)?,
                 None => return Err(MISSING_X_FORWARDED_FOR),
@@ -89,7 +90,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XRealIp
-            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }
@@ -102,7 +103,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XRealIp
-            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
     }
@@ -115,7 +116,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XForwardedFor
-            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }
@@ -128,7 +129,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XForwardedFor
-            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
     }
@@ -141,7 +142,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::XForwardedFor
-            .extract(&request, SocketAddr::from(([0, 0, 0, 0], 0)))
+            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([192, 168, 0, 1]));
     }
@@ -150,7 +151,7 @@ mod tests {
     fn extract_client_addr_ipv4_from_request() {
         let request = Request::builder().body(()).unwrap();
         let ip = IpExtractor::ClientAddr
-            .extract(&request, SocketAddr::from(([127, 0, 0, 1], 0)))
+            .extract(&request, Some(IpAddr::from(([127, 0, 0, 1]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }
@@ -159,7 +160,7 @@ mod tests {
     fn extract_client_addr_ipv6_from_request() {
         let request = Request::builder().body(()).unwrap();
         let ip = IpExtractor::ClientAddr
-            .extract(&request, SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 0)))
+            .extract(&request, Some(IpAddr::from(([0, 0, 0, 0, 0, 0, 0, 1]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]));
     }
@@ -172,7 +173,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = IpExtractor::ClientAddr
-            .extract(&request, SocketAddr::from(([127, 0, 0, 1], 0)))
+            .extract(&request, Some(IpAddr::from(([127, 0, 0, 1]))))
             .unwrap();
         assert_eq!(ip, IpAddr::from([127, 0, 0, 1]));
     }

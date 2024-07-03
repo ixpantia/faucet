@@ -18,7 +18,6 @@ pub(crate) struct State {
 #[derive(Clone)]
 pub struct AddStateService<S> {
     inner: S,
-    socket_addr: SocketAddr,
     load_balancer: LoadBalancer,
 }
 
@@ -35,8 +34,12 @@ where
     type Error = FaucetError;
     type Response = hyper::Response<ExclusiveBody>;
 
-    async fn call(&self, mut req: hyper::Request<ReqBody>) -> Result<Self::Response, Self::Error> {
-        let remote_addr = match self.load_balancer.extract_ip(&req, self.socket_addr) {
+    async fn call(
+        &self,
+        mut req: hyper::Request<ReqBody>,
+        socket_addr: Option<IpAddr>,
+    ) -> Result<Self::Response, Self::Error> {
+        let remote_addr = match self.load_balancer.extract_ip(&req, socket_addr) {
             Ok(ip) => ip,
             Err(e) => {
                 log::error!(target: "faucet", "Error extracting IP, verify that proxy headers are set correctly: {}", e);
@@ -48,22 +51,18 @@ where
             remote_addr,
             client,
         });
-        self.inner.call(req).await
+        self.inner.call(req, Some(remote_addr)).await
     }
 }
 
 pub struct AddStateLayer {
-    socket_addr: SocketAddr,
     load_balancer: LoadBalancer,
 }
 
 impl AddStateLayer {
     #[inline]
-    pub fn new(socket_addr: SocketAddr, load_balancer: LoadBalancer) -> Self {
-        Self {
-            socket_addr,
-            load_balancer,
-        }
+    pub fn new(load_balancer: LoadBalancer) -> Self {
+        Self { load_balancer }
     }
 }
 
@@ -72,7 +71,6 @@ impl<S> Layer<S> for AddStateLayer {
     fn layer(&self, inner: S) -> Self::Service {
         AddStateService {
             inner,
-            socket_addr: self.socket_addr,
             load_balancer: self.load_balancer.clone(),
         }
     }
@@ -84,7 +82,11 @@ impl Service<hyper::Request<Incoming>> for ProxyService {
     type Error = FaucetError;
     type Response = hyper::Response<ExclusiveBody>;
 
-    async fn call(&self, req: hyper::Request<Incoming>) -> Result<Self::Response, Self::Error> {
+    async fn call(
+        &self,
+        req: hyper::Request<Incoming>,
+        _: Option<IpAddr>,
+    ) -> Result<Self::Response, Self::Error> {
         let state = req
             .extensions()
             .get::<State>()

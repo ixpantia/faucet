@@ -99,7 +99,7 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
     let user_agent: LogOption<_> = req.headers().get(hyper::header::USER_AGENT).cloned().into();
 
     // Make the request
-    let res = inner.call(req).await?;
+    let res = inner.call(req, None).await?;
 
     // Extract response info for logging
     let status = res.status().as_u16();
@@ -130,7 +130,11 @@ where
     type Error = S::Error;
     type Response = Response<ResBody>;
 
-    async fn call(&self, req: Request<Body>) -> Result<Self::Response, Self::Error> {
+    async fn call(
+        &self,
+        req: Request<Body>,
+        _: Option<IpAddr>,
+    ) -> Result<Self::Response, Self::Error> {
         let (res, log_data) = capture_log_data::<_, _, _, State>(&self.inner, req).await?;
 
         log_data.log();
@@ -170,7 +174,11 @@ mod tests {
         impl Service<Request<()>> for Svc {
             type Response = Response<()>;
             type Error = ();
-            async fn call(&self, _: Request<()>) -> Result<Self::Response, Self::Error> {
+            async fn call(
+                &self,
+                _: Request<()>,
+                _: Option<IpAddr>,
+            ) -> Result<Self::Response, Self::Error> {
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
                 Ok(Response::builder().status(StatusCode::OK).body(()).unwrap())
             }

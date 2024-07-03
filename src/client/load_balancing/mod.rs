@@ -18,7 +18,8 @@ trait LoadBalancingStrategy {
     async fn entry(&self, ip: IpAddr) -> Client;
 }
 
-#[derive(Debug, Clone, Copy, clap::ValueEnum, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, clap::ValueEnum, Eq, PartialEq, serde::Deserialize)]
+#[serde(rename = "snake_case")]
 pub enum Strategy {
     RoundRobin,
     IpHash,
@@ -60,7 +61,11 @@ impl LoadBalancer {
     pub async fn get_client(&self, ip: IpAddr) -> FaucetResult<Client> {
         Ok(self.strategy.entry(ip).await)
     }
-    pub fn extract_ip<B>(&self, request: &Request<B>, socket: SocketAddr) -> FaucetResult<IpAddr> {
+    pub fn extract_ip<B>(
+        &self,
+        request: &Request<B>,
+        socket: Option<IpAddr>,
+    ) -> FaucetResult<IpAddr> {
         self.extractor.extract(request, socket)
     }
 }
@@ -114,7 +119,7 @@ mod tests {
             .body(())
             .unwrap();
         let ip = load_balancer
-            .extract_ip(&request, "127.0.0.1:9532".parse().unwrap())
+            .extract_ip(&request, Some("127.0.0.1".parse().unwrap()))
             .expect("failed to extract ip");
 
         assert_eq!(ip, "192.168.0.1".parse::<IpAddr>().unwrap());

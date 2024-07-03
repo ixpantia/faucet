@@ -1,7 +1,13 @@
+use std::net::IpAddr;
+
 pub trait Service<Request> {
     type Response;
     type Error;
-    async fn call(&self, req: Request) -> Result<Self::Response, Self::Error>;
+    async fn call(
+        &self,
+        req: Request,
+        ip_addr: Option<IpAddr>,
+    ) -> Result<Self::Response, Self::Error>;
 }
 
 pub trait Layer<S> {
@@ -39,14 +45,14 @@ mod tests {
         impl Service<()> for Svc {
             type Response = String;
             type Error = ();
-            async fn call(&self, _: ()) -> Result<Self::Response, Self::Error> {
+            async fn call(&self, _: (), _: Option<IpAddr>) -> Result<Self::Response, Self::Error> {
                 Ok("Hello, world!".to_string())
             }
         }
 
         let svc = ServiceBuilder::new(Svc).build();
 
-        assert_eq!(svc.call(()).await.unwrap(), "Hello, world!");
+        assert_eq!(svc.call((), None).await.unwrap(), "Hello, world!");
     }
 
     #[tokio::test]
@@ -56,7 +62,11 @@ mod tests {
         impl Service<&'static str> for Svc {
             type Response = String;
             type Error = ();
-            async fn call(&self, _: &'static str) -> Result<Self::Response, Self::Error> {
+            async fn call(
+                &self,
+                _: &'static str,
+                _: Option<IpAddr>,
+            ) -> Result<Self::Response, Self::Error> {
                 Ok("Hello, world!".to_string())
             }
         }
@@ -71,11 +81,15 @@ mod tests {
         {
             type Response = String;
             type Error = ();
-            async fn call(&self, req: &'static str) -> Result<Self::Response, Self::Error> {
+            async fn call(
+                &self,
+                req: &'static str,
+                _: Option<IpAddr>,
+            ) -> Result<Self::Response, Self::Error> {
                 if req == "Goodbye" {
                     Ok("Goodbye, world!".to_string())
                 } else {
-                    self.inner.call(req).await
+                    self.inner.call(req, None).await
                 }
             }
         }
@@ -91,8 +105,8 @@ mod tests {
 
         let svc = ServiceBuilder::new(Svc).layer(GoodByeLayer).build();
 
-        assert_eq!(svc.call("Goodbye").await.unwrap(), "Goodbye, world!");
-        assert_eq!(svc.call("Hello").await.unwrap(), "Hello, world!");
+        assert_eq!(svc.call("Goodbye", None).await.unwrap(), "Goodbye, world!");
+        assert_eq!(svc.call("Hello", None).await.unwrap(), "Hello, world!");
     }
 
     #[tokio::test]
@@ -102,7 +116,11 @@ mod tests {
         impl Service<&'static str> for Svc {
             type Response = String;
             type Error = ();
-            async fn call(&self, _: &'static str) -> Result<Self::Response, Self::Error> {
+            async fn call(
+                &self,
+                _: &'static str,
+                _: Option<IpAddr>,
+            ) -> Result<Self::Response, Self::Error> {
                 Ok("Hello, world!".to_string())
             }
         }
@@ -117,11 +135,15 @@ mod tests {
         {
             type Response = String;
             type Error = ();
-            async fn call(&self, req: &'static str) -> Result<Self::Response, Self::Error> {
+            async fn call(
+                &self,
+                req: &'static str,
+                _: Option<IpAddr>,
+            ) -> Result<Self::Response, Self::Error> {
                 if req == "Goodbye" {
                     Ok("Goodbye, world!".to_string())
                 } else {
-                    self.inner.call(req).await
+                    self.inner.call(req, None).await
                 }
             }
         }
@@ -145,11 +167,15 @@ mod tests {
         {
             type Response = String;
             type Error = ();
-            async fn call(&self, req: &'static str) -> Result<Self::Response, Self::Error> {
+            async fn call(
+                &self,
+                req: &'static str,
+                _: Option<IpAddr>,
+            ) -> Result<Self::Response, Self::Error> {
                 if req == "How are you?" {
                     Ok("I'm fine, thank you!".to_string())
                 } else {
-                    self.inner.call(req).await
+                    self.inner.call(req, None).await
                 }
             }
         }
@@ -168,10 +194,10 @@ mod tests {
             .layer(HowAreYouLayer)
             .build();
 
-        assert_eq!(svc.call("Goodbye").await.unwrap(), "Goodbye, world!");
-        assert_eq!(svc.call("Hello").await.unwrap(), "Hello, world!");
+        assert_eq!(svc.call("Goodbye", None).await.unwrap(), "Goodbye, world!");
+        assert_eq!(svc.call("Hello", None).await.unwrap(), "Hello, world!");
         assert_eq!(
-            svc.call("How are you?").await.unwrap(),
+            svc.call("How are you?", None).await.unwrap(),
             "I'm fine, thank you!"
         );
     }

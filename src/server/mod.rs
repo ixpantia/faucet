@@ -1,5 +1,6 @@
 mod logging;
 mod onion;
+mod router;
 mod service;
 use crate::{
     client::{
@@ -17,7 +18,7 @@ use std::{
     net::SocketAddr,
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    pin::Pin,
+    pin::{pin, Pin},
 };
 use tokio::net::TcpListener;
 
@@ -116,7 +117,7 @@ impl FaucetServerBuilder {
             .server_type
             .ok_or(FaucetError::MissingArgument("server_type"))?;
         let strategy = determine_strategy(server_type, self.strategy);
-        let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
+        let bind = self.bind;
         let n_workers = self.n_workers.unwrap_or_else(|| {
             log::info!(target: "faucet", "No number of workers specified. Defaulting to the number of logical cores.");
             num_cpus::get().try_into().expect("num_cpus::get() returned 0")
@@ -160,7 +161,7 @@ impl Default for FaucetServerBuilder {
 #[derive(Clone, Copy)]
 pub struct FaucetServerConfig {
     pub strategy: Strategy,
-    pub bind: SocketAddr,
+    pub bind: Option<SocketAddr>,
     pub n_workers: NonZeroUsize,
     pub server_type: WorkerType,
     pub workdir: &'static Path,
@@ -169,32 +170,110 @@ pub struct FaucetServerConfig {
     pub app_dir: Option<&'static str>,
 }
 
+mod impl_serde {
+
+    use super::*;
+
+    #[derive(serde::Deserialize)]
+    struct IntermediateFaucetServerConfig {
+        pub strategy: Strategy,
+        pub bind: Option<SocketAddr>,
+        pub n_workers: NonZeroUsize,
+        pub server_type: WorkerType,
+        pub workdir: PathBuf,
+        pub extractor: load_balancing::IpExtractor,
+        pub rscript: OsString,
+        pub app_dir: Option<String>,
+    }
+
+    impl<'de> serde::Deserialize<'de> for FaucetServerConfig {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let inter = IntermediateFaucetServerConfig::deserialize(deserializer)?;
+            Ok(FaucetServerConfig {
+                app_dir: inter.app_dir.map(|s| s.leak() as &'static str),
+                strategy: inter.strategy,
+                extractor: inter.extractor,
+                bind: inter.bind,
+                workdir: Box::leak(inter.workdir.into_boxed_path()),
+                rscript: Box::leak(inter.rscript.into_boxed_os_str()),
+                n_workers: inter.n_workers,
+                server_type: inter.server_type,
+            })
+        }
+    }
+}
+
 impl FaucetServerConfig {
     pub async fn run(self) -> FaucetResult<()> {
         let workers = Workers::new(self).await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
+        let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
+
+        let load_balancer = load_balancer.clone();
+        let service: &'static _ = Box::leak(Box::new(
+            ServiceBuilder::new(ProxyService)
+                .layer(logging::LogLayer)
+                .layer(AddStateLayer::new(load_balancer))
+                .build(),
+        ));
 
         // Bind to the port and listen for incoming TCP connections
-        let listener = TcpListener::bind(self.bind).await?;
-        log::info!(target: "faucet", "Listening on http://{}", self.bind);
+        let listener = TcpListener::bind(bind).await?;
+        log::info!(target: "faucet", "Listening on http://{}", bind);
         loop {
-            let load_balancer = load_balancer.clone();
-
             let (tcp, client_addr) = listener.accept().await?;
-            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
             let tcp = TokioIo::new(tcp);
+            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
             tokio::task::spawn(async move {
-                let service = ServiceBuilder::new(ProxyService)
-                    .layer(logging::LogLayer)
-                    .layer(AddStateLayer::new(client_addr, load_balancer))
-                    .build();
                 let mut conn = http1::Builder::new()
-                    .serve_connection(tcp, service_fn(|req: Request<Incoming>| service.call(req)))
+                    .serve_connection(
+                        tcp,
+                        service_fn(|req: Request<Incoming>| {
+                            service.call(req, Some(client_addr.ip()))
+                        }),
+                    )
                     .with_upgrades();
 
-                let conn = Pin::new(&mut conn);
+                let conn = pin!(&mut conn);
+
+                if let Err(e) = conn.await {
+                    log::error!(target: "faucet", "Connection error: {}", e);
+                }
+            });
+        }
+    }
+    #[cfg(unix)]
+    pub async fn run_socket(self, listener: tokio::net::UnixListener) -> FaucetResult<()> {
+        let workers = Workers::new(self).await?;
+        let targets = workers.get_workers_config();
+        let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
+
+        let load_balancer = load_balancer.clone();
+        let service = Box::leak(Box::new(
+            ServiceBuilder::new(ProxyService)
+                .layer(logging::LogLayer)
+                .layer(AddStateLayer::new(load_balancer))
+                .build(),
+        ));
+
+        loop {
+            let (tcp, _) = listener.accept().await?;
+            let tcp = TokioIo::new(tcp);
+
+            tokio::task::spawn(async {
+                let mut conn = http1::Builder::new()
+                    .serve_connection(
+                        tcp,
+                        service_fn(|req: Request<Incoming>| service.call(req, None)),
+                    )
+                    .with_upgrades();
+
+                let conn = pin!(&mut conn);
 
                 if let Err(e) = conn.await {
                     log::error!(target: "faucet", "Connection error: {}", e);

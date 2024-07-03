@@ -8,7 +8,8 @@ use tokio::{process::Child, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, serde::Deserialize)]
+#[serde(rename = "snake_case")]
 pub enum WorkerType {
     Plumber,
     Shiny,
