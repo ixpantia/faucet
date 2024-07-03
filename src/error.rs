@@ -23,6 +23,7 @@ pub enum FaucetError {
     InvalidHeaderValues(hyper::header::InvalidHeaderValue),
     Http(hyper::http::Error),
     MissingArgument(&'static str),
+    DuplicateRoute(&'static str),
 }
 
 impl From<hyper::header::InvalidHeaderValue> for FaucetError {
@@ -94,6 +95,7 @@ impl std::fmt::Display for FaucetError {
             Self::Http(e) => write!(f, "Http error: {}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {}", e),
             Self::MissingArgument(s) => write!(f, "Missing argument: {}", s),
+            Self::DuplicateRoute(route) => writeln!(f, "Route '{route}' is duplicated"),
             Self::BadRequest(r) => match r {
                 BadRequestReason::MissingHeader(header) => {
                     write!(f, "Missing header: {}", header)
@@ -121,6 +123,7 @@ impl std::fmt::Debug for FaucetError {
             Self::Hyper(e) => write!(f, "Hyper error: {:?}", e),
             Self::Http(e) => write!(f, "Http error: {:?}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {:?}", e),
+            Self::DuplicateRoute(route) => writeln!(f, "Route '{route}' is duplicated"),
             Self::BadRequest(r) => match r {
                 BadRequestReason::MissingHeader(header) => {
                     write!(f, "Missing header: {}", header)

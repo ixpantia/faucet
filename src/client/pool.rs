@@ -1,5 +1,5 @@
 use super::body::ExclusiveBody;
-use super::worker::WorkerState;
+use super::worker::WorkerConfig;
 use crate::error::{FaucetError, FaucetResult};
 use async_trait::async_trait;
 use deadpool::managed::{self, Object, Pool, RecycleError};
@@ -15,24 +15,24 @@ struct ConnectionHandle {
     sender: SendRequest<Incoming>,
 }
 
-async fn create_http_client(worker_state: &WorkerState) -> FaucetResult<ConnectionHandle> {
-    log::debug!(target: "faucet", "Establishing TCP connection to {}", worker_state.target());
-    let stream = TokioIo::new(TcpStream::connect(worker_state.socket_addr()).await?);
+async fn create_http_client(config: WorkerConfig) -> FaucetResult<ConnectionHandle> {
+    log::debug!(target: "faucet", "Establishing TCP connection to {}", config.target);
+    let stream = TokioIo::new(TcpStream::connect(config.addr).await?);
     let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
     tokio::spawn(async move {
         conn.await.expect("client conn");
     });
-    log::debug!(target: "faucet", "Established TCP connection to {}", worker_state.target());
+    log::debug!(target: "faucet", "Established TCP connection to {}", config.target);
     Ok(ConnectionHandle { sender })
 }
 
 struct ConnectionManager {
-    worker_state: WorkerState,
+    config: WorkerConfig,
 }
 
 impl ConnectionManager {
-    fn new(worker_state: WorkerState) -> Self {
-        Self { worker_state }
+    fn new(config: WorkerConfig) -> Self {
+        Self { config }
     }
 }
 
@@ -42,7 +42,7 @@ impl managed::Manager for ConnectionManager {
     type Error = FaucetError;
 
     async fn create(&self) -> FaucetResult<Self::Type> {
-        create_http_client(&self.worker_state).await
+        create_http_client(self.config).await
     }
 
     async fn recycle(
@@ -53,7 +53,7 @@ impl managed::Manager for ConnectionManager {
         if conn.sender.is_closed() {
             Err(RecycleError::StaticMessage("Connection closed"))
         } else {
-            log::debug!(target: "faucet", "Recycling TCP connection to {}", self.worker_state.target());
+            log::debug!(target: "faucet", "Recycling TCP connection to {}", self.config.target);
             Ok(())
         }
     }
@@ -76,46 +76,46 @@ impl HttpConnection {
 
 pub(crate) struct ClientBuilder {
     max_size: Option<usize>,
-    worker_state: Option<WorkerState>,
+    config: Option<WorkerConfig>,
 }
 
 const DEFAULT_MAX_SIZE: usize = 32;
 
 impl ClientBuilder {
     pub fn build(self) -> FaucetResult<Client> {
-        let worker_state = self
-            .worker_state
+        let config = self
+            .config
             .expect("Unable to create connection without worker state");
-        let builder = Pool::builder(ConnectionManager::new(worker_state.clone()))
+        let builder = Pool::builder(ConnectionManager::new(config))
             .max_size(self.max_size.unwrap_or(DEFAULT_MAX_SIZE));
         let pool = builder.build()?;
-        Ok(Client { pool, worker_state })
+        Ok(Client { pool, config })
     }
 }
 
 #[derive(Clone)]
 pub(crate) struct Client {
     pool: Pool<ConnectionManager>,
-    worker_state: WorkerState,
+    pub(crate) config: WorkerConfig,
 }
 
 impl Client {
-    pub fn builder(worker_state: WorkerState) -> ClientBuilder {
+    pub fn builder(config: WorkerConfig) -> ClientBuilder {
         ClientBuilder {
             max_size: None,
-            worker_state: Some(worker_state),
+            config: Some(config),
         }
     }
-    pub fn target(&self) -> &'static str {
-        self.worker_state.target()
-    }
+
     pub async fn get(&self) -> FaucetResult<HttpConnection> {
         Ok(HttpConnection {
             inner: self.pool.get().await?,
         })
     }
     pub fn is_online(&self) -> bool {
-        self.worker_state.is_online()
+        self.config
+            .is_online
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -126,6 +126,6 @@ pub trait ExtractSocketAddr {
 impl ExtractSocketAddr for Client {
     #[inline(always)]
     fn socket_addr(&self) -> SocketAddr {
-        self.worker_state.socket_addr()
+        self.config.addr
     }
 }

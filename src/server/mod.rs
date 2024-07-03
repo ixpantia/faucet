@@ -1,10 +1,12 @@
 mod logging;
 mod onion;
+mod router;
 mod service;
 use crate::{
     client::{
         load_balancing::{self, LoadBalancer, Strategy},
         worker::{WorkerType, Workers},
+        ExclusiveBody,
     },
     error::{FaucetError, FaucetResult},
 };
@@ -12,8 +14,18 @@ use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
 use onion::{Service, ServiceBuilder};
 use service::{AddStateLayer, ProxyService};
-use std::{ffi::OsStr, net::SocketAddr, num::NonZeroUsize, path::Path, pin::Pin, sync::Arc};
+use std::{
+    ffi::{OsStr, OsString},
+    net::SocketAddr,
+    num::NonZeroUsize,
+    path::{Path, PathBuf},
+    pin::pin,
+};
 use tokio::net::TcpListener;
+
+pub use router::RouterConfig;
+
+use self::{logging::LogService, service::AddStateService};
 
 fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> Strategy {
     match server_type {
@@ -41,9 +53,10 @@ pub struct FaucetServerBuilder {
     bind: Option<SocketAddr>,
     n_workers: Option<NonZeroUsize>,
     server_type: Option<WorkerType>,
-    workdir: Option<Arc<Path>>,
+    workdir: Option<PathBuf>,
     extractor: Option<load_balancing::IpExtractor>,
-    rscript: Option<Arc<OsStr>>,
+    rscript: Option<OsString>,
+    app_dir: Option<String>,
 }
 
 impl FaucetServerBuilder {
@@ -56,11 +69,16 @@ impl FaucetServerBuilder {
             workdir: None,
             extractor: None,
             rscript: None,
+            app_dir: None,
         }
     }
-    pub fn strategy(mut self, strategy: Strategy) -> Self {
+    pub fn app_dir(mut self, app_dir: Option<impl AsRef<str>>) -> Self {
+        self.app_dir = app_dir.map(|s| s.as_ref().into());
+        self
+    }
+    pub fn strategy(mut self, strategy: Option<Strategy>) -> Self {
         log::info!(target: "faucet", "Using load balancing strategy: {:?}", strategy);
-        self.strategy = Some(strategy);
+        self.strategy = strategy;
         self
     }
     pub fn bind(mut self, bind: SocketAddr) -> Self {
@@ -99,29 +117,34 @@ impl FaucetServerBuilder {
         self.rscript = Some(rscript.as_ref().into());
         self
     }
-    pub fn build(self) -> FaucetResult<FaucetServer> {
+    pub fn build(self) -> FaucetResult<FaucetServerConfig> {
         let server_type = self
             .server_type
             .ok_or(FaucetError::MissingArgument("server_type"))?;
         let strategy = determine_strategy(server_type, self.strategy);
-        let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
+        let bind = self.bind;
         let n_workers = self.n_workers.unwrap_or_else(|| {
             log::info!(target: "faucet", "No number of workers specified. Defaulting to the number of logical cores.");
             num_cpus::get().try_into().expect("num_cpus::get() returned 0")
         });
-        let workdir = self.workdir.unwrap_or_else(|| {
-            log::info!(target: "faucet", "No workdir specified. Defaulting to the current directory.");
-            Path::new(".").into()
-        });
-        let rscript = self.rscript.unwrap_or_else(|| {
-            log::info!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
-            OsStr::new("Rscript").into()
-        });
+        let workdir = self.workdir
+            .map(|wd| Box::leak(wd.into_boxed_path()) as &'static Path)
+            .unwrap_or_else(|| {
+                log::info!(target: "faucet", "No workdir specified. Defaulting to the current directory.");
+                Path::new(".")
+            });
+        let rscript = self.rscript
+            .map(|wd| Box::leak(wd.into_boxed_os_str()) as &'static OsStr)
+            .unwrap_or_else(|| {
+                log::info!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
+                OsStr::new("Rscript")
+            });
         let extractor = self.extractor.unwrap_or_else(|| {
             log::info!(target: "faucet", "No IP extractor specified. Defaulting to client address.");
             load_balancing::IpExtractor::ClientAddr
         });
-        Ok(FaucetServer {
+        let app_dir = self.app_dir.map(|app_dir| app_dir.leak() as &'static str);
+        Ok(FaucetServerConfig {
             strategy,
             bind,
             n_workers,
@@ -129,6 +152,7 @@ impl FaucetServerBuilder {
             workdir,
             extractor,
             rscript,
+            app_dir,
         })
     }
 }
@@ -139,48 +163,88 @@ impl Default for FaucetServerBuilder {
     }
 }
 
-pub struct FaucetServer {
-    strategy: Strategy,
-    bind: SocketAddr,
-    n_workers: NonZeroUsize,
-    server_type: WorkerType,
-    workdir: Arc<Path>,
-    extractor: load_balancing::IpExtractor,
-    rscript: Arc<OsStr>,
+#[derive(Clone, Copy)]
+pub struct FaucetServerConfig {
+    pub strategy: Strategy,
+    pub bind: Option<SocketAddr>,
+    pub n_workers: NonZeroUsize,
+    pub server_type: WorkerType,
+    pub workdir: &'static Path,
+    pub extractor: load_balancing::IpExtractor,
+    pub rscript: &'static OsStr,
+    pub app_dir: Option<&'static str>,
 }
 
-impl FaucetServer {
+impl FaucetServerConfig {
     pub async fn run(self) -> FaucetResult<()> {
-        let mut workers = Workers::new(self.server_type, self.workdir, self.rscript);
-        workers.spawn(self.n_workers).await?;
-        let targets = workers.get_workers_state();
+        let workers = Workers::new(self, "").await?;
+        let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
+        let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
+
+        let load_balancer = load_balancer.clone();
+        let service: &'static _ = Box::leak(Box::new(
+            ServiceBuilder::new(ProxyService)
+                .layer(logging::LogLayer)
+                .layer(AddStateLayer::new(load_balancer))
+                .build(),
+        ));
 
         // Bind to the port and listen for incoming TCP connections
-        let listener = TcpListener::bind(self.bind).await?;
-        log::info!(target: "faucet", "Listening on http://{}", self.bind);
+        let listener = TcpListener::bind(bind).await?;
+        log::info!(target: "faucet", "Listening on http://{}", bind);
         loop {
-            let load_balancer = load_balancer.clone();
-
             let (tcp, client_addr) = listener.accept().await?;
-            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
             let tcp = TokioIo::new(tcp);
+            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
             tokio::task::spawn(async move {
-                let service = ServiceBuilder::new(ProxyService)
-                    .layer(logging::LogLayer)
-                    .layer(AddStateLayer::new(client_addr, load_balancer))
-                    .build();
                 let mut conn = http1::Builder::new()
-                    .serve_connection(tcp, service_fn(|req: Request<Incoming>| service.call(req)))
+                    .serve_connection(
+                        tcp,
+                        service_fn(|req: Request<Incoming>| {
+                            service.call(req, Some(client_addr.ip()))
+                        }),
+                    )
                     .with_upgrades();
 
-                let conn = Pin::new(&mut conn);
+                let conn = pin!(&mut conn);
 
                 if let Err(e) = conn.await {
                     log::error!(target: "faucet", "Connection error: {}", e);
                 }
             });
         }
+    }
+    pub async fn extract_service(self, prefix: &str) -> FaucetResult<FaucetServerService> {
+        let workers = Workers::new(self, prefix).await?;
+        let targets = workers.get_workers_config();
+        let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
+
+        let load_balancer = load_balancer.clone();
+        let service: &'static _ = Box::leak(Box::new(
+            ServiceBuilder::new(ProxyService)
+                .layer(logging::LogLayer)
+                .layer(AddStateLayer::new(load_balancer))
+                .build(),
+        ));
+
+        Ok(FaucetServerService { inner: service })
+    }
+}
+
+pub struct FaucetServerService {
+    inner: &'static AddStateService<LogService<ProxyService>>,
+}
+
+impl Service<hyper::Request<Incoming>> for FaucetServerService {
+    type Error = FaucetError;
+    type Response = hyper::Response<ExclusiveBody>;
+    async fn call(
+        &self,
+        req: hyper::Request<Incoming>,
+        ip_addr: Option<std::net::IpAddr>,
+    ) -> Result<Self::Response, Self::Error> {
+        self.inner.call(req, ip_addr).await
     }
 }

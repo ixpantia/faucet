@@ -1,5 +1,8 @@
-use super::{LoadBalancingStrategy, WorkerState};
-use crate::{client::Client, error::FaucetResult};
+use super::LoadBalancingStrategy;
+use crate::{
+    client::{worker::WorkerConfig, Client},
+    error::FaucetResult,
+};
 use async_trait::async_trait;
 use std::{net::IpAddr, sync::atomic::AtomicUsize};
 
@@ -13,10 +16,10 @@ struct Targets {
 const WAIT_TIME_UNTIL_RETRY: std::time::Duration = std::time::Duration::from_micros(500);
 
 impl Targets {
-    fn new(workers_state: &[WorkerState]) -> FaucetResult<Self> {
+    fn new(configs: &[WorkerConfig]) -> FaucetResult<Self> {
         let mut targets = Vec::new();
-        for state in workers_state {
-            let client = Client::builder(state.clone()).build()?;
+        for state in configs {
+            let client = Client::builder(*state).build()?;
             targets.push(client);
         }
         let targets = Box::leak(targets.into_boxed_slice());
@@ -36,7 +39,7 @@ pub struct RoundRobin {
 }
 
 impl RoundRobin {
-    pub(crate) fn new(targets: &[WorkerState]) -> FaucetResult<Self> {
+    pub(crate) fn new(targets: &[WorkerConfig]) -> FaucetResult<Self> {
         Ok(Self {
             targets: Targets::new(targets)?,
         })
@@ -60,131 +63,60 @@ impl LoadBalancingStrategy for RoundRobin {
 #[cfg(test)]
 mod tests {
 
-    use std::sync::{atomic::AtomicBool, Arc};
-
     use super::*;
 
     #[test]
     fn test_new_targets() {
-        let mut workers_state = Vec::new();
-        for i in 0..3 {
-            let is_online = Arc::new(AtomicBool::new(true));
-            let socket_addr = format!("127.0.0.1:900{}", i)
-                .parse()
-                .expect("failed to parse socket addr");
-            let state = WorkerState {
-                target: "test",
-                is_online,
-                socket_addr,
-            };
-            workers_state.push(state);
-        }
+        let configs = (0..3)
+            .map(|i| WorkerConfig::dummy("test", &format!("127.0.0.1:900{i}"), true))
+            .collect::<Vec<_>>();
 
-        let _ = Targets::new(&workers_state).expect("failed to create targets");
+        let _ = Targets::new(&configs).expect("failed to create targets");
     }
 
     #[test]
     fn test_new_round_robin() {
-        let mut workers_state = Vec::new();
-        for i in 0..3 {
-            let is_online = Arc::new(AtomicBool::new(true));
-            let socket_addr = format!("127.0.0.1:900{}", i)
-                .parse()
-                .expect("failed to parse socket addr");
-            let state = WorkerState {
-                target: "test",
-                is_online,
-                socket_addr,
-            };
-            workers_state.push(state);
-        }
+        let configs = (0..3)
+            .map(|i| WorkerConfig::dummy("test", &format!("127.0.0.1:900{i}"), true))
+            .collect::<Vec<_>>();
 
-        let _ = RoundRobin::new(&workers_state).expect("failed to create round robin");
+        let _ = RoundRobin::new(&configs).expect("failed to create round robin");
     }
 
     #[tokio::test]
     async fn test_round_robin_entry() {
         use crate::client::ExtractSocketAddr;
 
-        let mut workers_state = Vec::new();
-        for i in 0..3 {
-            let is_online = Arc::new(AtomicBool::new(true));
-            let socket_addr = format!("127.0.0.1:900{}", i)
-                .parse()
-                .expect("failed to parse socket addr");
-            let state = WorkerState {
-                target: "test",
-                is_online,
-                socket_addr,
-            };
-            workers_state.push(state);
-        }
+        let configs = (0..3)
+            .map(|i| WorkerConfig::dummy("test", &format!("127.0.0.1:900{i}"), true))
+            .collect::<Vec<_>>();
 
-        let rr = RoundRobin::new(&workers_state).expect("failed to create round robin");
+        let rr = RoundRobin::new(&configs).expect("failed to create round robin");
 
         let ip = "0.0.0.0".parse().expect("failed to parse ip");
 
-        assert_eq!(
-            rr.entry(ip).await.socket_addr(),
-            workers_state[0].socket_addr()
-        );
-        assert_eq!(
-            rr.entry(ip).await.socket_addr(),
-            workers_state[1].socket_addr()
-        );
-        assert_eq!(
-            rr.entry(ip).await.socket_addr(),
-            workers_state[2].socket_addr()
-        );
-        assert_eq!(
-            rr.entry(ip).await.socket_addr(),
-            workers_state[0].socket_addr()
-        );
-        assert_eq!(
-            rr.entry(ip).await.socket_addr(),
-            workers_state[1].socket_addr()
-        );
-        assert_eq!(
-            rr.entry(ip).await.socket_addr(),
-            workers_state[2].socket_addr()
-        );
+        assert_eq!(rr.entry(ip).await.socket_addr(), configs[0].addr);
+        assert_eq!(rr.entry(ip).await.socket_addr(), configs[1].addr);
+        assert_eq!(rr.entry(ip).await.socket_addr(), configs[2].addr);
+        assert_eq!(rr.entry(ip).await.socket_addr(), configs[0].addr);
+        assert_eq!(rr.entry(ip).await.socket_addr(), configs[1].addr);
+        assert_eq!(rr.entry(ip).await.socket_addr(), configs[2].addr);
     }
 
     #[tokio::test]
     async fn test_round_robin_entry_with_offline_target() {
         use crate::client::ExtractSocketAddr;
 
-        let workers_state = [
-            WorkerState {
-                target: "test",
-                is_online: Arc::new(AtomicBool::new(false)),
-                socket_addr: "127.0.0.1:9000"
-                    .parse()
-                    .expect("failed to parse socket addr"),
-            },
-            WorkerState {
-                target: "test",
-                is_online: Arc::new(AtomicBool::new(false)),
-                socket_addr: "127.0.0.1:9001"
-                    .parse()
-                    .expect("failed to parse socket addr"),
-            },
-            WorkerState {
-                target: "test",
-                is_online: Arc::new(AtomicBool::new(true)),
-                socket_addr: "127.0.0.1:9002"
-                    .parse()
-                    .expect("failed to parse socket addr"),
-            },
+        let configs = [
+            WorkerConfig::dummy("test", "127.0.0.1:9000", false),
+            WorkerConfig::dummy("test", "127.0.0.1:9001", false),
+            WorkerConfig::dummy("test", "127.0.0.1:9002", true),
         ];
 
-        let rr = RoundRobin::new(&workers_state).expect("failed to create round robin");
+        let rr = RoundRobin::new(&configs).expect("failed to create round robin");
 
         let ip = "0.0.0.0".parse().expect("failed to parse ip");
 
-        assert_eq!(
-            rr.entry(ip).await.socket_addr(),
-            workers_state[2].socket_addr()
-        );
+        assert_eq!(rr.entry(ip).await.socket_addr(), configs[2].addr);
     }
 }
