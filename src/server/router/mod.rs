@@ -6,6 +6,7 @@ use std::{
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Uri};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
+use tokio_tungstenite::tungstenite::http::uri::PathAndQuery;
 
 use super::{onion::Service, FaucetServerBuilder, FaucetServerService};
 use crate::{
@@ -49,6 +50,25 @@ struct RouterService {
     clients: &'static [FaucetServerService],
 }
 
+fn strip_prefix(uri: &Uri, prefix: &str) -> Option<Uri> {
+    let path_and_query = uri.path_and_query()?;
+
+    // Try to strip the prefix. It is fails we short-circuit.
+    let after_prefix = path_and_query.path().strip_prefix(prefix)?;
+
+    let new_path_and_query = match (after_prefix.starts_with('/'), path_and_query.query()) {
+        (true, None) => after_prefix.parse().unwrap(),
+        (true, Some(query)) => format!("{after_prefix}?{query}").parse().unwrap(),
+        (false, None) => format!("/{after_prefix}").parse().unwrap(),
+        (false, Some(query)) => format!("/{after_prefix}?{query}").parse().unwrap(),
+    };
+
+    let mut parts = uri.clone().into_parts();
+    parts.path_and_query = Some(new_path_and_query);
+
+    Some(Uri::from_parts(parts).unwrap())
+}
+
 impl Service<hyper::Request<Incoming>> for RouterService {
     type Error = FaucetError;
     type Response = hyper::Response<ExclusiveBody>;
@@ -61,26 +81,9 @@ impl Service<hyper::Request<Incoming>> for RouterService {
         let mut client = None;
         for i in 0..self.routes.len() {
             let route = self.routes[i];
-            if req.uri().path().starts_with(route) {
+            if let Some(new_uri) = strip_prefix(req.uri(), route) {
                 client = Some(&self.clients[i]);
-                let mut new_uri = Uri::builder();
-                let mut new_path_and_query = Vec::<u8>::new();
-                let path = req
-                    .uri()
-                    .path()
-                    .strip_prefix(route)
-                    .expect("You may strip route from prefix");
-
-                let _ = write!(&mut new_path_and_query, "/{path}");
-
-                if let Some(query) = req.uri().query() {
-                    let _ = write!(&mut new_path_and_query, "{query}");
-                }
-
-                new_uri = new_uri.path_and_query(new_path_and_query);
-
-                *req.uri_mut() = new_uri.build().expect("Should work");
-
+                *req.uri_mut() = new_uri;
                 break;
             }
         }
