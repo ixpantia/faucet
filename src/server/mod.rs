@@ -76,9 +76,9 @@ impl FaucetServerBuilder {
         self.app_dir = app_dir.map(|s| s.as_ref().into());
         self
     }
-    pub fn strategy(mut self, strategy: Strategy) -> Self {
+    pub fn strategy(mut self, strategy: Option<Strategy>) -> Self {
         log::info!(target: "faucet", "Using load balancing strategy: {:?}", strategy);
-        self.strategy = Some(strategy);
+        self.strategy = strategy;
         self
     }
     pub fn bind(mut self, bind: SocketAddr) -> Self {
@@ -173,65 +173,6 @@ pub struct FaucetServerConfig {
     pub extractor: load_balancing::IpExtractor,
     pub rscript: &'static OsStr,
     pub app_dir: Option<&'static str>,
-}
-
-mod impl_serde {
-
-    use super::*;
-
-    fn default_rscript() -> OsString {
-        OsString::from("Rscript")
-    }
-
-    fn default_extractor() -> load_balancing::IpExtractor {
-        load_balancing::IpExtractor::ClientAddr
-    }
-
-    fn default_workdir() -> PathBuf {
-        PathBuf::from(".")
-    }
-
-    #[derive(serde::Deserialize)]
-    struct IntermediateFaucetServerConfig {
-        pub strategy: Option<Strategy>,
-        pub bind: Option<SocketAddr>,
-        pub n_workers: NonZeroUsize,
-        pub server_type: WorkerType,
-        #[serde(default = "default_workdir")]
-        pub workdir: PathBuf,
-        #[serde(default = "default_extractor")]
-        pub extractor: load_balancing::IpExtractor,
-        #[serde(default = "default_rscript")]
-        pub rscript: OsString,
-        pub app_dir: String,
-    }
-
-    impl<'de> serde::Deserialize<'de> for FaucetServerConfig {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let mut inter = IntermediateFaucetServerConfig::deserialize(deserializer)?;
-
-            if inter.strategy.is_none() {
-                inter.strategy = match inter.server_type {
-                    WorkerType::Shiny => Some(Strategy::IpHash),
-                    WorkerType::Plumber => Some(Strategy::RoundRobin),
-                };
-            }
-
-            Ok(FaucetServerConfig {
-                app_dir: Some(inter.app_dir.leak()),
-                strategy: inter.strategy.expect("Strategy will always be set"),
-                extractor: inter.extractor,
-                bind: inter.bind,
-                workdir: Box::leak(inter.workdir.into_boxed_path()),
-                rscript: Box::leak(inter.rscript.into_boxed_os_str()),
-                n_workers: inter.n_workers,
-                server_type: inter.server_type,
-            })
-        }
-    }
 }
 
 impl FaucetServerConfig {

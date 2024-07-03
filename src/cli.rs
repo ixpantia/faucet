@@ -79,6 +79,31 @@ pub struct StartArgs {
     app_dir: Option<String>,
 }
 
+#[derive(Parser, Debug)]
+pub struct RouterArgs {
+    /// The host to bind to.
+    #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]
+    host: String,
+
+    /// The IP address to extract from.
+    /// Defaults to client address.
+    #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
+    ip_from: IpFrom,
+
+    /// Command, path, or executable to run Rscript.
+    #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
+    rscript: OsString,
+
+    /// Router config file.
+    #[arg(
+        long,
+        short,
+        env = "FAUCET_ROUTER_CONF",
+        default_value = "frouter.toml"
+    )]
+    conf: PathBuf,
+}
+
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Start a simple faucet server.
@@ -86,7 +111,7 @@ pub enum Commands {
     Start(StartArgs),
     /// Runs faucet in "router" mode. (Experimental)
     #[command(name = "router")]
-    Router,
+    Router(RouterArgs),
 }
 
 ///
@@ -150,5 +175,24 @@ impl StartArgs {
     }
     pub fn app_dir(&self) -> Option<&str> {
         self.app_dir.as_deref()
+    }
+}
+
+impl RouterArgs {
+    pub fn host(&self) -> &str {
+        self.host.as_str()
+    }
+    pub fn conf(&self) -> &Path {
+        self.conf.as_path()
+    }
+    pub fn ip_extractor(&self) -> load_balancing::IpExtractor {
+        match self.ip_from {
+            IpFrom::Client => load_balancing::IpExtractor::ClientAddr,
+            IpFrom::XForwardedFor => load_balancing::IpExtractor::XForwardedFor,
+            IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
+        }
+    }
+    pub fn rscript(&self) -> &OsStr {
+        self.rscript.as_os_str()
     }
 }

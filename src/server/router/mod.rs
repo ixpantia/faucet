@@ -1,27 +1,46 @@
-use std::{collections::HashSet, io::Write, net::SocketAddr, pin::pin};
+use std::{
+    collections::HashSet, ffi::OsStr, io::Write, net::SocketAddr, num::NonZeroUsize, path::PathBuf,
+    pin::pin,
+};
 
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Uri};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 
-use super::{onion::Service, FaucetServerService};
+use super::{onion::Service, FaucetServerBuilder, FaucetServerService};
 use crate::{
-    client::ExclusiveBody,
+    client::{
+        load_balancing::{IpExtractor, Strategy},
+        worker::WorkerType,
+        ExclusiveBody,
+    },
     error::{FaucetError, FaucetResult},
-    server::FaucetServerConfig,
 };
+
+fn default_workdir() -> PathBuf {
+    PathBuf::from(".")
+}
+
+#[derive(serde::Deserialize)]
+struct ReducedServerConfig {
+    pub strategy: Option<Strategy>,
+    #[serde(default = "default_workdir")]
+    pub workdir: PathBuf,
+    pub app_dir: String,
+    pub workers: NonZeroUsize,
+    pub server_type: WorkerType,
+}
 
 #[derive(serde::Deserialize)]
 struct RouteConfig {
     route: String,
     #[serde(flatten)]
-    config: FaucetServerConfig,
+    config: ReducedServerConfig,
 }
 
 #[derive(serde::Deserialize)]
 pub struct RouterConfig {
-    host: SocketAddr,
-    routes: Vec<RouteConfig>,
+    route: Vec<RouteConfig>,
 }
 
 #[derive(Copy, Clone)]
@@ -76,37 +95,51 @@ impl Service<hyper::Request<Incoming>> for RouterService {
 }
 
 impl RouterConfig {
-    async fn into_service(self) -> FaucetResult<(SocketAddr, RouterService)> {
-        let socket_addr = self.host;
-        let mut routes = Vec::with_capacity(self.routes.len());
-        let mut clients = Vec::with_capacity(self.routes.len());
-        let mut routes_set = HashSet::with_capacity(self.routes.len());
-        for route_conf in self.routes.into_iter() {
+    async fn into_service(
+        self,
+        rscript: impl AsRef<OsStr>,
+        ip_from: IpExtractor,
+    ) -> FaucetResult<RouterService> {
+        let mut routes = Vec::with_capacity(self.route.len());
+        let mut clients = Vec::with_capacity(self.route.len());
+        let mut routes_set = HashSet::with_capacity(self.route.len());
+        for route_conf in self.route.into_iter() {
             let route: &'static str = route_conf.route.leak();
             if !routes_set.insert(route) {
                 return Err(FaucetError::DuplicateRoute(route));
             }
             routes.push(route);
-            clients.push(
-                route_conf
-                    .config
-                    .extract_service(&format!("[{route}]"))
-                    .await?,
-            );
+            let client = FaucetServerBuilder::new()
+                .workdir(route_conf.config.workdir)
+                .server_type(route_conf.config.server_type)
+                .strategy(route_conf.config.strategy)
+                .rscript(&rscript)
+                .workers(route_conf.config.workers.get())
+                .extractor(ip_from)
+                .app_dir(Some(route_conf.config.app_dir))
+                .build()?
+                .extract_service(&format!("[{route}]::"))
+                .await?;
+            clients.push(client);
         }
         let routes = routes.leak();
         let clients = clients.leak();
         let service = RouterService { clients, routes };
-        Ok((socket_addr, service))
+        Ok(service)
     }
 }
 
 impl RouterConfig {
-    pub async fn run(self) -> FaucetResult<()> {
-        let (bind, service) = self.into_service().await?;
+    pub async fn run(
+        self,
+        rscript: impl AsRef<OsStr>,
+        ip_from: IpExtractor,
+        addr: SocketAddr,
+    ) -> FaucetResult<()> {
+        let service = self.into_service(rscript, ip_from).await?;
         // Bind to the port and listen for incoming TCP connections
-        let listener = TcpListener::bind(bind).await?;
-        log::info!(target: "faucet", "Listening on http://{}", bind);
+        let listener = TcpListener::bind(addr).await?;
+        log::info!(target: "faucet", "Listening on http://{}", addr);
         loop {
             let (tcp, client_addr) = listener.accept().await?;
             let tcp = TokioIo::new(tcp);

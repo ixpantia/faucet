@@ -18,7 +18,7 @@ pub async fn main() -> FaucetResult<()> {
             log::info!(target: "faucet", "Building the faucet server...");
 
             FaucetServerBuilder::new()
-                .strategy(start_args.strategy())
+                .strategy(Some(start_args.strategy()))
                 .workers(start_args.workers())
                 .server_type(start_args.server_type())
                 .extractor(start_args.ip_extractor())
@@ -30,11 +30,17 @@ pub async fn main() -> FaucetResult<()> {
                 .run()
                 .await?;
         }
-        Commands::Router => {
+        Commands::Router(router_args) => {
             let config: RouterConfig =
-                toml::from_str(&std::fs::read_to_string("router.toml").unwrap()).unwrap();
+                toml::from_str(&std::fs::read_to_string(router_args.conf()).unwrap()).unwrap();
 
-            config.run().await?;
+            config
+                .run(
+                    router_args.rscript(),
+                    router_args.ip_extractor(),
+                    router_args.host().parse()?,
+                )
+                .await?;
         }
     }
 
