@@ -23,6 +23,7 @@ pub async fn main() -> FaucetResult<()> {
         .bind(cli_args.host().parse()?)
         .workdir(cli_args.dir())
         .rscript(cli_args.rscript())
+        .app_dir(cli_args.app_dir())
         .build()?
         .run()
         .await?;

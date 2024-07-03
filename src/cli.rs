@@ -83,6 +83,10 @@ pub struct Args {
     /// Command, path, or executable to run Rscript.
     #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
     rscript: OsString,
+
+    /// Argument passed on to `appDir` when running Shiny.
+    #[arg(long, short, env = "FAUCET_APP_DIR", default_value = None)]
+    app_dir: Option<String>,
 }
 
 impl Args {
@@ -130,5 +134,8 @@ impl Args {
     }
     pub fn rscript(&self) -> &OsStr {
         &self.rscript
+    }
+    pub fn app_dir(&self) -> Option<&str> {
+        self.app_dir.as_deref()
     }
 }

@@ -1,5 +1,5 @@
 use super::LoadBalancingStrategy;
-use super::WorkerState;
+use super::WorkerConfig;
 use crate::{client::Client, error::FaucetResult};
 use async_trait::async_trait;
 use std::collections::hash_map::DefaultHasher;
@@ -12,10 +12,10 @@ struct Targets {
 }
 
 impl Targets {
-    fn new(workers_state: &[WorkerState]) -> FaucetResult<Self> {
+    fn new(configs: &[WorkerConfig]) -> FaucetResult<Self> {
         let mut targets = Vec::new();
-        for state in workers_state {
-            let client = Client::builder(state.clone()).build()?;
+        for state in configs {
+            let client = Client::builder(*state).build()?;
             targets.push(client);
         }
         let targets = Box::leak(targets.into_boxed_slice());
@@ -29,7 +29,7 @@ pub struct IpHash {
 }
 
 impl IpHash {
-    pub(crate) fn new(targets: &[WorkerState]) -> FaucetResult<Self> {
+    pub(crate) fn new(targets: &[WorkerConfig]) -> FaucetResult<Self> {
         Ok(Self {
             targets_len: targets.as_ref().len(),
             targets: Targets::new(targets)?,
@@ -72,7 +72,7 @@ impl LoadBalancingStrategy for IpHash {
                 target: "faucet",
                 "IP {} tried to connect to offline {}, retrying in {:?}",
                 ip,
-                client.target(),
+                client.config.target,
                 backoff
             );
 
@@ -118,11 +118,7 @@ mod tests {
 
     #[test]
     fn test_new_targets() {
-        let worker_state = WorkerState {
-            target: "test",
-            is_online: Arc::new(AtomicBool::new(true)),
-            socket_addr: "127.0.0.1:9999".parse().unwrap(),
-        };
+        let worker_state = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
         let Targets { targets } = Targets::new(&[worker_state]).unwrap();
 
         assert_eq!(targets.len(), 1);
@@ -130,11 +126,7 @@ mod tests {
 
     #[test]
     fn test_new_ip_hash() {
-        let worker_state = WorkerState {
-            target: "test",
-            is_online: Arc::new(AtomicBool::new(true)),
-            socket_addr: "127.0.0.1:9999".parse().unwrap(),
-        };
+        let worker_state = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
         let IpHash {
             targets,
             targets_len,
@@ -156,16 +148,8 @@ mod tests {
     async fn test_load_balancing_strategy() {
         use crate::client::ExtractSocketAddr;
         let workers = [
-            WorkerState {
-                target: "test",
-                is_online: Arc::new(AtomicBool::new(true)),
-                socket_addr: "127.0.0.1:9999".parse().unwrap(),
-            },
-            WorkerState {
-                target: "test",
-                is_online: Arc::new(AtomicBool::new(true)),
-                socket_addr: "127.0.0.1:8888".parse().unwrap(),
-            },
+            WorkerConfig::dummy("test", "127.0.0.1:9999", true),
+            WorkerConfig::dummy("test", "127.0.0.1:8888", true),
         ];
         let ip_hash = IpHash::new(&workers).unwrap();
         let client1 = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
@@ -186,11 +170,7 @@ mod tests {
         use crate::client::ExtractSocketAddr;
 
         let online = Arc::new(AtomicBool::new(false));
-        let worker = WorkerState {
-            target: "test",
-            is_online: online.clone(),
-            socket_addr: "127.0.0.1:9999".parse().unwrap(),
-        };
+        let worker = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
 
         let ip_hash = IpHash::new(&[worker]).unwrap();
 

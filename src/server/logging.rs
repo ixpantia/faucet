@@ -12,7 +12,7 @@ impl StateLogData for State {
     #[inline(always)]
     fn get_state_data(&self) -> (IpAddr, &'static str) {
         let ip = self.remote_addr;
-        let target = self.client.target();
+        let target = self.client.config.target;
         (ip, target)
     }
 }

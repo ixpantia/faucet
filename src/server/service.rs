@@ -96,7 +96,7 @@ impl Service<hyper::Request<Incoming>> for ProxyService {
                     target: "faucet",
                     "Initializing WebSocket bridge from {} to {}",
                     state.remote_addr,
-                    state.client.target()
+                    state.client.config.target
                 );
                 Ok(res)
             }
