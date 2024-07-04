@@ -26,6 +26,8 @@ pub async fn main() -> FaucetResult<()> {
                 .workdir(start_args.dir())
                 .rscript(start_args.rscript())
                 .app_dir(start_args.app_dir())
+                .quarto(start_args.quarto())
+                .qmd(start_args.qmd())
                 .build()?
                 .run()
                 .await?;
@@ -37,6 +39,7 @@ pub async fn main() -> FaucetResult<()> {
             config
                 .run(
                     router_args.rscript(),
+                    router_args.quarto(),
                     router_args.ip_extractor(),
                     router_args.host().parse()?,
                 )
