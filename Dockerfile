@@ -38,4 +38,5 @@ ENV FAUCET_HOST=0.0.0.0:3838
 ENV FAUCET_DIR=/srv/faucet
 ENV FAUCET_IP_FROM=client
 
-CMD ["faucet"]
+ENTRYPOINT ["/usr/local/bin/faucet"]
+CMD ["start"]
