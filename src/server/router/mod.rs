@@ -77,7 +77,6 @@ impl Service<hyper::Request<Incoming>> for RouterService {
         mut req: hyper::Request<Incoming>,
         ip_addr: Option<std::net::IpAddr>,
     ) -> Result<Self::Response, Self::Error> {
-        println!("{:?}", req.uri());
         let mut client = None;
         for i in 0..self.routes.len() {
             let route = self.routes[i];
