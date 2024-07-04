@@ -30,6 +30,7 @@ struct ReducedServerConfig {
     pub app_dir: Option<String>,
     pub workers: NonZeroUsize,
     pub server_type: WorkerType,
+    pub qmd: Option<PathBuf>,
 }
 
 #[derive(serde::Deserialize)]
@@ -100,6 +101,7 @@ impl RouterConfig {
     async fn into_service(
         self,
         rscript: impl AsRef<OsStr>,
+        quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
     ) -> FaucetResult<RouterService> {
         let mut routes = Vec::with_capacity(self.route.len());
@@ -116,6 +118,8 @@ impl RouterConfig {
                 .server_type(route_conf.config.server_type)
                 .strategy(route_conf.config.strategy)
                 .rscript(&rscript)
+                .quarto(&quarto)
+                .qmd(route_conf.config.qmd)
                 .workers(route_conf.config.workers.get())
                 .extractor(ip_from)
                 .app_dir(route_conf.config.app_dir)
@@ -135,10 +139,11 @@ impl RouterConfig {
     pub async fn run(
         self,
         rscript: impl AsRef<OsStr>,
+        quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
         addr: SocketAddr,
     ) -> FaucetResult<()> {
-        let service = self.into_service(rscript, ip_from).await?;
+        let service = self.into_service(rscript, quarto, ip_from).await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;
         log::info!(target: "faucet", "Listening on http://{}", addr);

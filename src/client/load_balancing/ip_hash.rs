@@ -1,5 +1,6 @@
 use super::LoadBalancingStrategy;
 use super::WorkerConfig;
+use crate::leak;
 use crate::{client::Client, error::FaucetResult};
 use async_trait::async_trait;
 use std::collections::hash_map::DefaultHasher;
@@ -18,7 +19,7 @@ impl Targets {
             let client = Client::builder(*state).build()?;
             targets.push(client);
         }
-        let targets = Box::leak(targets.into_boxed_slice());
+        let targets = leak!(targets);
         Ok(Targets { targets })
     }
 }

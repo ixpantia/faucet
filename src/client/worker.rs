@@ -1,5 +1,6 @@
 use crate::{
     error::{FaucetError, FaucetResult},
+    leak,
     networking::get_available_sockets,
     server::FaucetServerConfig,
 };
@@ -13,6 +14,7 @@ use tokio_util::codec::{FramedRead, LinesCodec};
 pub enum WorkerType {
     Plumber,
     Shiny,
+    QuartoShiny,
 }
 
 fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
@@ -56,11 +58,13 @@ pub(crate) struct WorkerConfig {
     pub(crate) wtype: WorkerType,
     pub(crate) app_dir: Option<&'static str>,
     pub(crate) rscript: &'static OsStr,
+    pub(crate) quarto: &'static OsStr,
     pub(crate) workdir: &'static Path,
     pub(crate) addr: SocketAddr,
     pub(crate) target: &'static str,
     pub(crate) worker_id: usize,
     pub(crate) is_online: &'static AtomicBool,
+    pub(crate) qmd: Option<&'static Path>,
 }
 
 impl WorkerConfig {
@@ -73,25 +77,29 @@ impl WorkerConfig {
         Self {
             addr,
             worker_id,
-            is_online: Box::leak(Box::new(AtomicBool::new(false))),
+            is_online: leak!(AtomicBool::new(false)),
             workdir: server_config.workdir,
-            target: Box::leak(format!("{}Worker::{}", target_prefix, worker_id).into_boxed_str()),
+            target: leak!(format!("{}Worker::{}", target_prefix, worker_id)),
             app_dir: server_config.app_dir,
             wtype: server_config.server_type,
             rscript: server_config.rscript,
+            quarto: server_config.quarto,
+            qmd: server_config.qmd,
         }
     }
     #[allow(dead_code)]
     pub fn dummy(target: &'static str, addr: &str, online: bool) -> WorkerConfig {
         WorkerConfig {
             target,
-            is_online: Box::leak(Box::new(AtomicBool::new(online))),
+            is_online: leak!(AtomicBool::new(online)),
             addr: addr.parse().unwrap(),
             app_dir: None,
             rscript: OsStr::new(""),
             wtype: crate::client::worker::WorkerType::Shiny,
             worker_id: 1,
+            quarto: OsStr::new(""),
             workdir: Path::new("."),
+            qmd: None,
         }
     }
 }
@@ -142,11 +150,30 @@ fn spawn_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
     log_stdio(child, config.target)
 }
 
+fn spawn_quarto_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
+    let child = tokio::process::Command::new(config.quarto)
+        // Set the current directory to the directory containing the entrypoint
+        .current_dir(config.workdir)
+        .arg("serve")
+        .args(["--port", config.addr.port().to_string().as_str()])
+        .arg(config.qmd.ok_or(FaucetError::MissingArgument("qmd"))?)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .env("FAUCET_WORKER_ID", config.worker_id.to_string())
+        // This is needed to make sure the child process is killed when the parent is dropped
+        .kill_on_drop(true)
+        .spawn()?;
+
+    log_stdio(child, config.target)
+}
+
 impl WorkerConfig {
     fn spawn_process(self, config: WorkerConfig) -> Child {
         let child_result = match self.wtype {
             WorkerType::Plumber => spawn_plumber_worker(config),
             WorkerType::Shiny => spawn_shiny_worker(config),
+            WorkerType::QuartoShiny => spawn_quarto_shiny_worker(config),
         };
         match child_result {
             Ok(child) => child,

@@ -9,6 +9,7 @@ use crate::{
         ExclusiveBody,
     },
     error::{FaucetError, FaucetResult},
+    leak,
 };
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
@@ -34,7 +35,7 @@ fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> St
                 log::info!(target: "faucet", "No load balancing strategy specified. Defaulting to round robin for plumber.");
                 Strategy::RoundRobin
             }),
-        WorkerType::Shiny => match strategy {
+        WorkerType::Shiny | WorkerType::QuartoShiny => match strategy {
             None => {
                 log::info!(target: "faucet", "No load balancing strategy specified. Defaulting to IP hash for shiny.");
                 Strategy::IpHash
@@ -57,6 +58,8 @@ pub struct FaucetServerBuilder {
     extractor: Option<load_balancing::IpExtractor>,
     rscript: Option<OsString>,
     app_dir: Option<String>,
+    quarto: Option<OsString>,
+    qmd: Option<PathBuf>,
 }
 
 impl FaucetServerBuilder {
@@ -70,6 +73,8 @@ impl FaucetServerBuilder {
             extractor: None,
             rscript: None,
             app_dir: None,
+            quarto: None,
+            qmd: None,
         }
     }
     pub fn app_dir(mut self, app_dir: Option<impl AsRef<str>>) -> Self {
@@ -117,6 +122,15 @@ impl FaucetServerBuilder {
         self.rscript = Some(rscript.as_ref().into());
         self
     }
+    pub fn quarto(mut self, quarto: impl AsRef<OsStr>) -> Self {
+        log::info!(target: "faucet", "Using quarto command: {:?}", quarto.as_ref());
+        self.quarto = Some(quarto.as_ref().into());
+        self
+    }
+    pub fn qmd(mut self, qmd: Option<impl AsRef<Path>>) -> Self {
+        self.qmd = qmd.map(|s| s.as_ref().into());
+        self
+    }
     pub fn build(self) -> FaucetResult<FaucetServerConfig> {
         let server_type = self
             .server_type
@@ -128,22 +142,25 @@ impl FaucetServerBuilder {
             num_cpus::get().try_into().expect("num_cpus::get() returned 0")
         });
         let workdir = self.workdir
-            .map(|wd| Box::leak(wd.into_boxed_path()) as &'static Path)
+            .map(|wd| leak!(wd, Path))
             .unwrap_or_else(|| {
                 log::info!(target: "faucet", "No workdir specified. Defaulting to the current directory.");
                 Path::new(".")
             });
-        let rscript = self.rscript
-            .map(|wd| Box::leak(wd.into_boxed_os_str()) as &'static OsStr)
-            .unwrap_or_else(|| {
-                log::info!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
-                OsStr::new("Rscript")
-            });
+        let rscript = self.rscript.map(|wd| leak!(wd, OsStr)).unwrap_or_else(|| {
+            log::info!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
+            OsStr::new("Rscript")
+        });
         let extractor = self.extractor.unwrap_or_else(|| {
             log::info!(target: "faucet", "No IP extractor specified. Defaulting to client address.");
             load_balancing::IpExtractor::ClientAddr
         });
-        let app_dir = self.app_dir.map(|app_dir| app_dir.leak() as &'static str);
+        let app_dir = self.app_dir.map(|app_dir| leak!(app_dir, str));
+        let qmd = self.qmd.map(|qmd| leak!(qmd, Path));
+        let quarto = self.quarto.map(|qmd| leak!(qmd, OsStr)).unwrap_or_else(|| {
+            log::info!(target: "faucet", "No quarto command specified. Defaulting to `quarto`.");
+            OsStr::new("quarto")
+        });
         Ok(FaucetServerConfig {
             strategy,
             bind,
@@ -153,6 +170,8 @@ impl FaucetServerBuilder {
             extractor,
             rscript,
             app_dir,
+            quarto,
+            qmd,
         })
     }
 }
@@ -172,7 +191,9 @@ pub struct FaucetServerConfig {
     pub workdir: &'static Path,
     pub extractor: load_balancing::IpExtractor,
     pub rscript: &'static OsStr,
+    pub quarto: &'static OsStr,
     pub app_dir: Option<&'static str>,
+    pub qmd: Option<&'static Path>,
 }
 
 impl FaucetServerConfig {
@@ -183,12 +204,10 @@ impl FaucetServerConfig {
         let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
 
         let load_balancer = load_balancer.clone();
-        let service: &'static _ = Box::leak(Box::new(
-            ServiceBuilder::new(ProxyService)
-                .layer(logging::LogLayer)
-                .layer(AddStateLayer::new(load_balancer))
-                .build(),
-        ));
+        let service: &'static _ = leak!(ServiceBuilder::new(ProxyService)
+            .layer(logging::LogLayer)
+            .layer(AddStateLayer::new(load_balancer))
+            .build());
 
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(bind).await?;
@@ -222,12 +241,10 @@ impl FaucetServerConfig {
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
 
         let load_balancer = load_balancer.clone();
-        let service: &'static _ = Box::leak(Box::new(
-            ServiceBuilder::new(ProxyService)
-                .layer(logging::LogLayer)
-                .layer(AddStateLayer::new(load_balancer))
-                .build(),
-        ));
+        let service: &'static _ = leak!(ServiceBuilder::new(ProxyService)
+            .layer(logging::LogLayer)
+            .layer(AddStateLayer::new(load_balancer))
+            .build());
 
         Ok(FaucetServerService { inner: service })
     }

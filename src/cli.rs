@@ -24,6 +24,7 @@ fn is_shiny(dir: &Path) -> bool {
 enum ServerType {
     Plumber,
     Shiny,
+    QuartoShiny,
     Auto,
 }
 
@@ -74,9 +75,17 @@ pub struct StartArgs {
     #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
     rscript: OsString,
 
+    /// Command, path, or executable to run quarto.
+    #[arg(long, short, env = "FAUCET_QUARTO", default_value = "quarto")]
+    quarto: OsString,
+
     /// Argument passed on to `appDir` when running Shiny.
     #[arg(long, short, env = "FAUCET_APP_DIR", default_value = None)]
     app_dir: Option<String>,
+
+    /// Quarto Shiny file path.
+    #[arg(long, short, env = "FAUCET_QMD", default_value = None)]
+    qmd: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]
@@ -93,6 +102,10 @@ pub struct RouterArgs {
     /// Command, path, or executable to run Rscript.
     #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
     rscript: OsString,
+
+    /// Command, path, or executable to run quarto.
+    #[arg(long, short, env = "FAUCET_QUARTO", default_value = "quarto")]
+    quarto: OsString,
 
     /// Router config file.
     #[arg(
@@ -145,6 +158,7 @@ impl StartArgs {
         match self.type_ {
             ServerType::Plumber => WorkerType::Plumber,
             ServerType::Shiny => WorkerType::Shiny,
+            ServerType::QuartoShiny => WorkerType::QuartoShiny,
             ServerType::Auto => {
                 if is_plumber(&self.dir) {
                     WorkerType::Plumber
@@ -173,6 +187,12 @@ impl StartArgs {
     pub fn rscript(&self) -> &OsStr {
         &self.rscript
     }
+    pub fn quarto(&self) -> &OsStr {
+        &self.quarto
+    }
+    pub fn qmd(&self) -> Option<&Path> {
+        self.qmd.as_deref()
+    }
     pub fn app_dir(&self) -> Option<&str> {
         self.app_dir.as_deref()
     }
@@ -194,5 +214,8 @@ impl RouterArgs {
     }
     pub fn rscript(&self) -> &OsStr {
         self.rscript.as_os_str()
+    }
+    pub fn quarto(&self) -> &OsStr {
+        &self.quarto
     }
 }
