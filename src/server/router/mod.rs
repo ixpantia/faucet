@@ -27,7 +27,7 @@ struct ReducedServerConfig {
     pub strategy: Option<Strategy>,
     #[serde(default = "default_workdir")]
     pub workdir: PathBuf,
-    pub app_dir: String,
+    pub app_dir: Option<String>,
     pub workers: NonZeroUsize,
     pub server_type: WorkerType,
 }
@@ -118,7 +118,7 @@ impl RouterConfig {
                 .rscript(&rscript)
                 .workers(route_conf.config.workers.get())
                 .extractor(ip_from)
-                .app_dir(Some(route_conf.config.app_dir))
+                .app_dir(route_conf.config.app_dir)
                 .build()?
                 .extract_service(&format!("[{route}]::"))
                 .await?;
