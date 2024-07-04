@@ -20,7 +20,12 @@ async fn create_http_client(config: WorkerConfig) -> FaucetResult<ConnectionHand
     let stream = TokioIo::new(TcpStream::connect(config.addr).await?);
     let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
     tokio::spawn(async move {
-        conn.await.expect("client conn");
+        match conn.await {
+            Ok(_) => (),
+            Err(err) => {
+                log::debug!(target: "faucet", "{err}");
+            }
+        }
     });
     log::debug!(target: "faucet", "Established TCP connection to {}", config.target);
     Ok(ConnectionHandle { sender })
