@@ -1,12 +1,10 @@
 use std::{
-    collections::HashSet, ffi::OsStr, io::Write, net::SocketAddr, num::NonZeroUsize, path::PathBuf,
-    pin::pin,
+    collections::HashSet, ffi::OsStr, net::SocketAddr, num::NonZeroUsize, path::PathBuf, pin::pin,
 };
 
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Uri};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
-use tokio_tungstenite::tungstenite::http::uri::PathAndQuery;
 
 use super::{onion::Service, FaucetServerBuilder, FaucetServerService};
 use crate::{
