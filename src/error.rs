@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn test_faucet_error_debug() {
         let err = FaucetError::unknown("test");
-        assert_eq!(format!("{:?}", err), r#"Unknown error: "test""#);
+        assert_eq!(format!("{:?}", err), r#"Unknown error: test"#);
     }
 
     #[test]
