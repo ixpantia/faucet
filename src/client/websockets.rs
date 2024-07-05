@@ -52,14 +52,10 @@ async fn server_upgraded_io(upgraded: Upgraded, mut upgrade_info: UpgradeInfo) -
     // Use tokio-tungstenite to do the websocket handshake
     let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
     std::mem::swap(request.headers_mut(), &mut upgrade_info.headers);
-    let (mut ws_tx, _) = tokio_tungstenite::connect_async(request)
-        .await
-        .expect("Failed to connect");
+    let (mut ws_tx, _) = tokio_tungstenite::connect_async(request).await?;
 
     // Bridge the websocket stream to the upgraded connection
-    tokio::io::copy_bidirectional(&mut upgraded, ws_tx.get_mut())
-        .await
-        .expect("Failed to copy");
+    tokio::io::copy_bidirectional(&mut upgraded, ws_tx.get_mut()).await?;
 
     Ok(())
 }

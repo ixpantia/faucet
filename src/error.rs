@@ -5,6 +5,9 @@ use crate::client::ExclusiveBody;
 pub enum BadRequestReason {
     MissingHeader(&'static str),
     InvalidHeader(&'static str),
+    NoPathOrQuery,
+    NoHostName,
+    UnsupportedUrlScheme,
 }
 
 pub type FaucetResult<T> = std::result::Result<T, FaucetError>;
@@ -15,6 +18,7 @@ pub enum FaucetError {
     PoolPostCreateHook,
     PoolClosed,
     PoolNoRuntimeSpecified,
+    ConnectionClosed,
     Io(std::io::Error),
     Unknown(String),
     HostParseError(std::net::AddrParseError),
@@ -24,6 +28,41 @@ pub enum FaucetError {
     Http(hyper::http::Error),
     MissingArgument(&'static str),
     DuplicateRoute(&'static str),
+    Utf8Coding,
+    BufferCapacity(tokio_tungstenite::tungstenite::error::CapacityError),
+    ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
+    WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
+    AttackAttempt,
+}
+
+impl From<tokio_tungstenite::tungstenite::Error> for FaucetError {
+    fn from(value: tokio_tungstenite::tungstenite::Error) -> Self {
+        use tokio_tungstenite::tungstenite::error::UrlError;
+        use tokio_tungstenite::tungstenite::Error;
+        match value {
+            Error::Io(err) => FaucetError::Io(err),
+            Error::Url(err) => match err {
+                UrlError::NoPathOrQuery => FaucetError::BadRequest(BadRequestReason::NoPathOrQuery),
+                UrlError::NoHostName | UrlError::EmptyHostName => {
+                    FaucetError::BadRequest(BadRequestReason::NoHostName)
+                }
+                UrlError::TlsFeatureNotEnabled => panic!("TLS Not enabled"),
+                UrlError::UnableToConnect(err) => FaucetError::Unknown(err),
+                UrlError::UnsupportedUrlScheme => {
+                    FaucetError::BadRequest(BadRequestReason::UnsupportedUrlScheme)
+                }
+            },
+            Error::Tls(err) => FaucetError::Unknown(err.to_string()),
+            Error::Utf8 => FaucetError::Utf8Coding,
+            Error::Http(_) => FaucetError::Unknown("Unknown HTTP error".to_string()),
+            Error::Capacity(err) => FaucetError::BufferCapacity(err),
+            Error::HttpFormat(err) => FaucetError::Http(err),
+            Error::Protocol(err) => FaucetError::ProtocolViolation(err),
+            Error::AlreadyClosed | Error::ConnectionClosed => FaucetError::ConnectionClosed,
+            Error::AttackAttempt => FaucetError::AttackAttempt,
+            Error::WriteBufferFull(msg) => FaucetError::WSWriteBufferFull(msg),
+        }
+    }
 }
 
 impl From<hyper::header::InvalidHeaderValue> for FaucetError {
@@ -95,14 +134,25 @@ impl std::fmt::Display for FaucetError {
             Self::Http(e) => write!(f, "Http error: {}", e),
             Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {}", e),
             Self::MissingArgument(s) => write!(f, "Missing argument: {}", s),
-            Self::DuplicateRoute(route) => writeln!(f, "Route '{route}' is duplicated"),
+            Self::DuplicateRoute(route) => write!(f, "Route '{route}' is duplicated"),
+            Self::AttackAttempt => write!(f, "Attack attempt detected"),
+            Self::ConnectionClosed => write!(f, "Connection closed"),
+            Self::ProtocolViolation(e) => write!(f, "Protocol violation: {e}"),
+            Self::Utf8Coding => write!(f, "Utf8 Coding error"),
+            Self::BufferCapacity(cap_err) => write!(f, "Buffer Capacity: {cap_err}"),
+            Self::WSWriteBufferFull(buf) => write!(f, "Web Socket Write buffer full, {buf}"),
             Self::BadRequest(r) => match r {
+                BadRequestReason::UnsupportedUrlScheme => {
+                    write!(f, "UnsupportedUrlScheme use ws:// os wss://")
+                }
+                BadRequestReason::NoHostName => write!(f, "No Host Name"),
                 BadRequestReason::MissingHeader(header) => {
                     write!(f, "Missing header: {}", header)
                 }
                 BadRequestReason::InvalidHeader(header) => {
                     write!(f, "Invalid header: {}", header)
                 }
+                BadRequestReason::NoPathOrQuery => write!(f, "No path and/or query"),
             },
         }
     }
@@ -110,29 +160,7 @@ impl std::fmt::Display for FaucetError {
 
 impl std::fmt::Debug for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::MissingArgument(s) => write!(f, "Missing argument: {}", s),
-            Self::PoolTimeout(e) => write!(f, "Pool timeout error: {:?}", e),
-            Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
-            Self::PoolClosed => write!(f, "Pool closed error"),
-            Self::PoolNoRuntimeSpecified => write!(f, "Pool no runtime specified error"),
-            Self::PoolBuild(e) => write!(f, "Pool build error: {:?}", e),
-            Self::Io(e) => write!(f, "IO error: {:?}", e),
-            Self::Unknown(e) => write!(f, "Unknown error: {:?}", e),
-            Self::HostParseError(e) => write!(f, "Error parsing host address: {:?}", e),
-            Self::Hyper(e) => write!(f, "Hyper error: {:?}", e),
-            Self::Http(e) => write!(f, "Http error: {:?}", e),
-            Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {:?}", e),
-            Self::DuplicateRoute(route) => writeln!(f, "Route '{route}' is duplicated"),
-            Self::BadRequest(r) => match r {
-                BadRequestReason::MissingHeader(header) => {
-                    write!(f, "Missing header: {}", header)
-                }
-                BadRequestReason::InvalidHeader(header) => {
-                    write!(f, "Invalid header: {}", header)
-                }
-            },
-        }
+        write!(f, "{}", self)
     }
 }
 
