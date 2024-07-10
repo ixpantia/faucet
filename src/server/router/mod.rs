@@ -5,6 +5,7 @@ use std::{
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Uri};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
+use tokio_tungstenite::tungstenite::http::uri::PathAndQuery;
 
 use super::{onion::Service, FaucetServerBuilder, FaucetServerService};
 use crate::{
@@ -49,17 +50,36 @@ struct RouterService {
     clients: &'static [FaucetServerService],
 }
 
-fn strip_prefix(uri: &Uri, prefix: &str) -> Option<Uri> {
-    let path_and_query = uri.path_and_query()?;
+fn strip_prefix_exact(path_and_query: &PathAndQuery, prefix: &str) -> Option<PathAndQuery> {
+    if path_and_query.path() == prefix {
+        return Some(match path_and_query.query() {
+            Some(query) => format!("/?{query}").parse().unwrap(),
+            None => "/".parse().unwrap(),
+        });
+    }
+    None
+}
 
+fn strip_prefix_relative(path_and_query: &PathAndQuery, prefix: &str) -> Option<PathAndQuery> {
     // Try to strip the prefix. It is fails we short-circuit.
     let after_prefix = path_and_query.path().strip_prefix(prefix)?;
 
-    let new_path_and_query = match (after_prefix.starts_with('/'), path_and_query.query()) {
+    let start_slash = after_prefix.starts_with('/');
+
+    Some(match (start_slash, path_and_query.query()) {
         (true, None) => after_prefix.parse().unwrap(),
         (true, Some(query)) => format!("{after_prefix}?{query}").parse().unwrap(),
         (false, None) => format!("/{after_prefix}").parse().unwrap(),
         (false, Some(query)) => format!("/{after_prefix}?{query}").parse().unwrap(),
+    })
+}
+
+fn strip_prefix(uri: &Uri, prefix: &str) -> Option<Uri> {
+    let path_and_query = uri.path_and_query()?;
+
+    let new_path_and_query = match prefix.ends_with('/') {
+        true => strip_prefix_relative(path_and_query, prefix)?,
+        false => strip_prefix_exact(path_and_query, prefix)?,
     };
 
     let mut parts = uri.clone().into_parts();
