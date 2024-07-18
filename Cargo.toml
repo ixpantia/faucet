@@ -37,4 +37,4 @@ tower = "^0.4.13"
 ctrlc = "3"
 serde = { version = "1.0.204", features = ["derive"] }
 fxhash = "0.2.1"
-toml = "0.8.14"
+toml = "0.8.15"
