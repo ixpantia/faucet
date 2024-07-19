@@ -24,9 +24,17 @@ Bienvenido a faucet, tu solución de alto rendimiento para desplegar APIs de Plu
 
 Para opciones de instalación, consulta [Instalación](./install.md).
 
-## Uso
+## Modos de Uso
 
-Para instrucciones detalladas de uso, consulta [Cómo Empezar](./getting_started.md).
+### Single Server: 
+
+El modo Single Server es adecuado cuando tienes una sola aplicación que deseas desplegar. Este modo permite iniciar y gestionar una única "instancia" de una aplicación Plumber o Shiny.
+
+### Router: 
+
+El modo Router es ideal cuando tienes varias aplicaciones (Shiny, Quarto, Plumber) por desplegar y deseas que cada aplicación este en un mismo puerto pero en diferentes rutas. El Router se encarga de gestionar las rutas y dirigir las solicitudes a la aplicación correspondiente.
+
+Para instrucciones detalladas de los modos de uso, consulta [Cómo Empezar](./getting_started.md).
 
 ## Con Docker / en Contenedores
 
