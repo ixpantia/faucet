@@ -6,7 +6,7 @@ Once installed, use the following command to start faucet with default settings:
 
 ```bash
 # Start faucet
-faucet
+faucet start
 ```
 
 faucet will bind to `127.0.0.1:3838` and automatically determine the number of worker threads based on the number of CPUs on the host machine.
@@ -39,7 +39,7 @@ shinyApp(ui, server)
 3. Start faucet in the same directory as your Shiny app:
 
 ```bash
-faucet
+faucet start
 ```
 
 faucet will automatically detect the Shiny app and deploy it.
@@ -57,14 +57,14 @@ a worker for each core.
 You can customize the number of workers by using the `--workers` flag:
 
 ```bash
-faucet --workers 4
+faucet start --workers 4
 ```
 
 Or by setting the `FAUCET_WORKERS` environment variable:
 
 ```bash
 export FAUCET_WORKERS=4
-faucet
+faucet start
 ```
 
 In both cases, faucet will create 4 workers on random available ports.
