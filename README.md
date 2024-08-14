@@ -38,19 +38,19 @@ faucet --help
 To start a plumber API, you will simply need to specify the directory containing the `'plumber.R'` file. faucet will automatically detect the file and start the API.
 
 ```bash
-faucet --dir /path/to/plumber/api
+faucet start --dir /path/to/plumber/api
 ```
 
 The server will automatically listen on port `3838` by default. To change the host and port, use the `--host` flag to specify the socket address to bind to the service.
 
 ```bash
-faucet --dir /path/to/plumber/api --host 0.0.0.0:3000
+faucet start --dir /path/to/plumber/api --host 0.0.0.0:3000
 ```
 
 By default faucet will start as many workers as there are logical cores on the machine. To specify the number of workers, use the `--workers` flag.
 
 ```bash
-faucet --dir /path/to/plumber/api --workers 4
+faucet start --dir /path/to/plumber/api --workers 4
 ```
 
 ### Start a Shiny Application
@@ -58,19 +58,19 @@ faucet --dir /path/to/plumber/api --workers 4
 To start a Shiny Application, you will simply need to specify the directory containing the `'app.R'` file. faucet will automatically detect the file and start the application.
 
 ```bash
-faucet --dir /path/to/shiny/app
+faucet start --dir /path/to/shiny/app
 ```
 
 The server will automatically listen on port `3838` by default. To change the host and port, use the `--host` flag to specify the socket address to bind to the service.
 
 ```bash
-faucet --dir /path/to/shiny/app --host 0.0.0.0:3000
+faucet start --dir /path/to/shiny/app --host 0.0.0.0:3000
 ```
 
 By default faucet will start as many workers as there are logical cores on the machine. To specify the number of workers, use the `--workers` flag.
 
 ```bash
-faucet --dir /path/to/shiny/app --workers 4
+faucet start --dir /path/to/shiny/app --workers 4
 ```
 
 > **Note:** On Shiny applications, faucet will be forced to use IP Hash load balancing. This is because Shiny applications require a persistent connection between the client and the server. If Round Robin load balancing is used, the client will be redirected to a different instance on each request, causing the connection to be lost.
@@ -81,7 +81,7 @@ faucet supports two load balancing strategies for Plumber APIs: Round Robin and 
 By default, faucet will use Round Robin load balancing. To change the strategy, use the `--strategy` flag.
 
 ```bash
-faucet --dir /path/to/plumber/api --strategy ip-hash
+faucet start --dir /path/to/plumber/api --strategy ip-hash
 ```
 
 ### Explicitly set the type of application
@@ -89,11 +89,11 @@ faucet --dir /path/to/plumber/api --strategy ip-hash
 By default, faucet will try to detect the type of application based on the files in the specified directory. If you want to explicitly set the type of application, use the `--type` flag.
 
 ```bash
-faucet --dir /path/to/plumber/api --type plumber
+faucet start --dir /path/to/plumber/api --type plumber
 ```
 
 ```bash
-faucet --dir /path/to/shiny/app --type shiny
+faucet start --dir /path/to/shiny/app --type shiny
 ```
 
 ## With Nginx / Reverse Proxy
@@ -123,7 +123,7 @@ flat to either `x-forwarded-for` or `x-real-ip` depending on which header you
 set in Nginx.
 
 ```bash
-faucet --dir /path/to/plumber/api --ip-from x-forwarded-for
+faucet start --dir /path/to/plumber/api --ip-from x-forwarded-for
 ```
 
 ## Environment Variables
@@ -148,7 +148,7 @@ for example when using Docker.
 Download the latest release of faucet for Linux from the [GitHub Releases page](https://github.com/ixpantia/faucet/releases). This should work with most Linux distributions.
 
 ```bash
-FAUCET_VERSION="v0.5.2"
+FAUCET_VERSION="v0.6.0"
 
 wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
@@ -172,7 +172,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Install faucet with Cargo.
 
 ```bash
-cargo install faucet-server --version ^0.5
+cargo install faucet-server --version ^0.6
 ```
 
 ### Option 3: Build from Source (Linux, macOS, Windows)
