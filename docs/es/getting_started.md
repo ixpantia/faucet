@@ -8,7 +8,7 @@ Una vez instalado, utiliza el siguiente comando para iniciar faucet con la confi
 
 ```bash
 # Iniciar faucet
-faucet
+faucet start
 ```
 
 faucet se vinculará a `127.0.0.1:3838` y determinará automáticamente el número de hilos de trabajo según el número de CPU en la máquina host.
@@ -41,7 +41,7 @@ shinyApp(ui, server)
 3. Inicia faucet en el mismo directorio que tu aplicación Shiny:
 
 ```bash
-faucet
+faucet start
 ```
 
 faucet detectará automáticamente la aplicación Shiny y la desplegará.
@@ -68,14 +68,14 @@ Get-WmiObject -Class Win32_Processor | Select-Object NumberOfCores,NumberOfLogic
 Puedes personalizar el número de trabajadores utilizando la bandera `--workers`:
 
 ```bash
-faucet --workers 4
+faucet start --workers 4
 ```
 
 O configurando la variable de entorno `FAUCET_WORKERS`:
 
 ```bash
 export FAUCET_WORKERS=4
-faucet
+faucet start
 ```
 
 En ambos casos, faucet creará 4 trabajadores en puertos aleatorios disponibles. El tráfico se equilibrará entre todos los trabajadores según la dirección IP de la solicitud entrante. Esto significa que si tienes 4 trabajadores, podrás manejar 4 veces más solicitudes concurrentes que un solo trabajador.
