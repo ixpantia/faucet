@@ -48,6 +48,24 @@ faucet detectará automáticamente la aplicación Shiny y la desplegará.
 
 4. Abre tu navegador web y dirígete a [http://127.0.0.1:3838](http://127.0.0.1:3838) para ver tu aplicación Shiny en acción.
 
+## Ejecutar una Aplicación de Quarto
+
+Para ejecutar una aplicación de Quarto usando faucet, sigue estos pasos:
+
+1. Asegúrate de tener un archivo de documento Quarto, por ejemplo, `example.qmd`.
+
+2. En el mismo directorio que tu documento Quarto, inicia faucet con la configuración de Quarto:
+
+```bash
+faucet start --qmd example.qmd --type quarto-shiny
+```
+
+Todos los demás argumentos aún persisten y se pueden personalizar según sea necesario.
+
+faucet desplegará el documento Quarto como una aplicación Shiny.
+
+3. Abre tu navegador web y navega a [http://127.0.0.1:3838](http://127.0.0.1:3838) para ver tu aplicación Quarto en acción.
+
 #### Añadir más trabajadores
 
 Si tu computadora tiene más de un núcleo de CPU, probablemente hayas visto que se crearon muchos trabajadores al iniciar faucet. Esto se debe a que faucet detecta automáticamente el número de núcleos de CPU en tu computadora y crea un trabajador por cada núcleo.

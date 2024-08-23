@@ -46,6 +46,23 @@ faucet will automatically detect the Shiny app and deploy it.
 
 4. Open your web browser and navigate to [http://127.0.0.1:3838](http://127.0.0.1:3838) to see your Shiny app in action.
 
+## Running a Quarto Application
+
+To run a Quarto application using faucet, follow these steps:
+
+1. Ensure you have a Quarto document file, e.g., `example.qmd`.
+
+2. In the same directory as your Quarto document, start faucet with the Quarto settings:
+
+```bash
+faucet start --qmd example.qmd --type quarto-shiny
+```
+
+All other arguments still persist and can be customized as needed.
+
+faucet will deploy the Quarto document as a Shiny application.
+
+3. Open your web browser and navigate to [http://127.0.0.1:3838](http://127.0.0.1:3838) to see your Quarto app in action.
 
 ### Adding more workers
 
