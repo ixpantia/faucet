@@ -54,6 +54,18 @@ many workers were created when you started faucet. This is because faucet
 automatically detects the number of CPU cores on your computer and creates
 a worker for each core.
 
+To know how many CPU cores you have, you can run the following commands:
+
+- On Linux:
+```bash
+lscpu
+```
+
+- On Windows Powershell
+```bash
+Get-WmiObject -Class Win32_Processor | Select-Object NumberOfCores, NumberOfLogicalProcessors
+```
+
 You can customize the number of workers by using the `--workers` flag:
 
 ```bash
@@ -71,6 +83,113 @@ In both cases, faucet will create 4 workers on random available ports.
 Traffic will be load balanced across all workers according to the
 IP address of the incoming request. This means that if you have 4 workers,
 then you can handle 4 times as many concurrent requests as a single worker.
+
+### Router Mode
+
+**When to use Router?**
+
+- **Multiple Applications:** Use Router mode when you need to deploy and manage multiple applications on different routes but on the same port.
+
+- **Centralized Management:** If you desire a centralized configuration to route requests to the corresponding applications based on the route, Router is the appropriate option.
+
+- **Resource Optimization:** Router facilitates the management and scalability of various applications by allowing an efficient distribution of requests.
+
+To start faucet in Router mode, we first need a configuration file where the router logic `frouter.toml` will be placed. The configuration file must be in the root of the repository.
+
+*Note: Remember that faucet router automatically detects the app.R (Shiny) file, so if there are many Shiny applications, we must specify the folder where that app.R file is located.*
+
+To better explain the configuration, we have an example repository called [faucet-router-example](https://github.com/ixpantia/faucet-router-example). This repository has different applications (Quarto, Shiny, and Plumber) in separate folders.
+
+```bash
+│   .gitignore
+│   faucet-router-example.Rproj
+│   frouter.toml
+│   README.md
+│   
+│   
+│   app.R
+│
+├───sliders
+│       app.R
+│
+└───text
+│        app.R
+├───api
+│       plumber.R
+│
+├───qmd
+│   │   old_faithful.qmd
+│
+```
+
+Example `frouter.toml`:
+
+```sh
+# By default, the `workdir` and `app_dir`
+# is `.` (Here). If not specified,
+# runs the application in the current directory.
+[[route]]
+route = "/"
+workers = 1
+server_type = "Shiny"
+
+
+# In this route, we use `workdir` to start the secondary
+# R session in a different working directory.
+[[route]]
+route = "/sliders/"
+workers = 1
+server_type = "Shiny"
+workdir = "./sliders"
+
+
+# In this route, we use `app_dir` to start the R session
+# in the current working directory but use an application in
+# a directory.
+[[route]]
+route = "/text/"
+workers = 1
+server_type = "Shiny"
+app_dir = "./text"
+
+
+# Demonstration of how to serve a Plumber API
+[[route]]
+route = "/api/"
+workers = 1
+server_type = "Plumber"
+workdir = "./api"
+
+
+# Demonstration of how to serve a Quarto Shiny application
+[[route]]
+route = "/qmd/"
+workers = 1
+server_type = "QuartoShiny"
+workdir = "./qmd"
+qmd = "old_faithful.qmd"
+```
+
+The `server_type` argument defines the type of application you want to deploy; currently, we have: `QuartoShiny`, `Shiny`, and `Plumber`.
+
+In the same configuration file `frouter.toml`, we can define the number of `workers` that each application needs.
+
+Now, to start faucet in Router mode:
+
+```sh
+faucet router
+```
+
+#### Routes:
+
+All the applications will be on the same port but with different routes, according to the configuration file.
+
+- Hello Shiny [`/`]: [`http://localhost:3838`](http://localhost:3838)
+- Sliders Shiny [`/sliders/`]: [`http://localhost:3838/sliders/`](http://localhost:3838/sliders/)
+- Text Shiny [`/text/`]: [`http://localhost:3838/text/`](http://localhost:3838/text/)
+- Plumber API [`/api/`]: [`http://localhost:3838/api/__docs__/`](http://localhost:3838/api/__docs__/)
+- Quarto Shiny App [`/qmd/`]: [`http://localhost:3838/qmd/`](http://localhost:3838/qmd/)
+
 
 ## Conclusion
 
