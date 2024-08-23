@@ -84,17 +84,26 @@ By default, faucet will use Round Robin load balancing. To change the strategy, 
 faucet start --dir /path/to/plumber/api --strategy ip-hash
 ```
 
-### Explicitly set the type of application
+### Explicitly Set the Type of Application
 
 By default, faucet will try to detect the type of application based on the files in the specified directory. If you want to explicitly set the type of application, use the `--type` flag.
 
+For Plumber applications:
 ```bash
 faucet start --dir /path/to/plumber/api --type plumber
 ```
 
+For Shiny applications:
 ```bash
 faucet start --dir /path/to/shiny/app --type shiny
 ```
+
+For Quarto applications:
+```bash
+faucet start --qmd /path/to/example.qmd --type quarto-shiny
+```
+
+If you are working with a Quarto document, it must be explicitly specified using the `--qmd` flag and the `--type quarto-shiny` option.
 
 ## With Nginx / Reverse Proxy
 
