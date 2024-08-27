@@ -194,3 +194,9 @@ git clone https://github.com/ixpantia/faucet.git
 ```bash
 cargo install --path .
 ```
+
+## Contributing
+
+If you want to contribute to `faucet` please read the
+[CONTRIBUTING.md](./CONTRIBUTING.md) document.
+
