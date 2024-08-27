@@ -76,7 +76,7 @@ pub struct StartArgs {
     rscript: OsString,
 
     /// Command, path, or executable to run quarto.
-    #[arg(long, short, env = "FAUCET_QUARTO", default_value = "quarto")]
+    #[arg(long, env = "FAUCET_QUARTO", default_value = "quarto")]
     quarto: OsString,
 
     /// Argument passed on to `appDir` when running Shiny.
