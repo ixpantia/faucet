@@ -48,22 +48,35 @@ faucet detectará automáticamente la aplicación Shiny y la desplegará.
 
 4. Abre tu navegador web y dirígete a [http://127.0.0.1:3838](http://127.0.0.1:3838) para ver tu aplicación Shiny en acción.
 
+## Ejecutar una Aplicación de Quarto
+
+Para ejecutar una aplicación de Quarto usando faucet, sigue estos pasos:
+
+1. Asegúrate de tener un archivo de documento Quarto, por ejemplo, `example.qmd`.
+
+2. En el mismo directorio que tu documento Quarto, inicia faucet con la configuración de Quarto:
+
+```bash
+faucet start --qmd example.qmd --type quarto-shiny
+```
+
+Todos los demás argumentos aún persisten y se pueden personalizar según sea necesario.
+
+faucet desplegará el documento Quarto como una aplicación Shiny.
+
+3. Abre tu navegador web y navega a [http://127.0.0.1:3838](http://127.0.0.1:3838) para ver tu aplicación Quarto en acción.
+
 #### Añadir más trabajadores
 
 Si tu computadora tiene más de un núcleo de CPU, probablemente hayas visto que se crearon muchos trabajadores al iniciar faucet. Esto se debe a que faucet detecta automáticamente el número de núcleos de CPU en tu computadora y crea un trabajador por cada núcleo.
 
-Para saber cuantos núcleos de CPU tienes, puedes ejecutar los siguientes comandos:
-
-- En Linux:
-```bash
-lscpu
-```
-
-- En windows Powershell
+Para saber cuántos núcleos de CPU tienes, puedes ejecutar:
 
 ```bash
-Get-WmiObject -Class Win32_Processor | Select-Object NumberOfCores,NumberOfLogicalProcessors
+faucet start --help
 ```
+
+En la salida, busca la opción -w, --workers <WORKERS>. El número predeterminado (default) se establece en la cantidad de núcleos de CPU detectados por Faucet.
 
 Puedes personalizar el número de trabajadores utilizando la bandera `--workers`:
 
@@ -90,7 +103,7 @@ En ambos casos, faucet creará 4 trabajadores en puertos aleatorios disponibles.
 
 - **Optimización de Recursos:** Router facilita la gestión y escalabilidad de varias aplicaciones al permitir una distribución eficiente de las solicitudes.
 
-Para iniciar el modo Router de faucet, necesitamos primero un archivo de configuración en el cual estará la lógica del router `frouter.toml`. El archivo de configuración debe estar en la raíz del repositorio. 
+Para iniciar el modo Router de faucet, necesitamos primero un archivo de configuración en el cual estará la lógica del router `frouter.toml`. El archivo de configuración debe estar en la raíz del directorio de trabajo donde deseas ejecutar las aplicaciones. 
 
 *Nota: Recuerda que faucet router detecta automáticamente el archivo app.R (Shiny), por este motivo, si existen muchas aplicaciones Shiny debemos especificarle la carpeta en donde se encuentra ese archivo app.R.*
 
