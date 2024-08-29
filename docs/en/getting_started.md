@@ -71,17 +71,13 @@ many workers were created when you started faucet. This is because faucet
 automatically detects the number of CPU cores on your computer and creates
 a worker for each core.
 
-To know how many CPU cores you have, you can run the following commands:
+To know how many CPU cores you have, you can run:
 
-- On Linux:
 ```bash
-lscpu
+faucet start -- help
 ```
 
-- On Windows Powershell
-```bash
-Get-WmiObject -Class Win32_Processor | Select-Object NumberOfCores, NumberOfLogicalProcessors
-```
+In the output, look for the flag -w, --workers <WORKERS>. The default number is set to the number of CPU cores detected by Faucet.
 
 You can customize the number of workers by using the `--workers` flag:
 
@@ -111,7 +107,7 @@ then you can handle 4 times as many concurrent requests as a single worker.
 
 - **Resource Optimization:** Router facilitates the management and scalability of various applications by allowing an efficient distribution of requests.
 
-To start faucet in Router mode, we first need a configuration file where the router logic `frouter.toml` will be placed. The configuration file must be in the root of the repository.
+To start faucet in Router mode, we first need a configuration file where the router logic `frouter.toml` will be placed. The configuration file must be in the root of the working directory where you want to run the applications.
 
 *Note: Remember that faucet router automatically detects the app.R (Shiny) file, so if there are many Shiny applications, we must specify the folder where that app.R file is located.*
 
