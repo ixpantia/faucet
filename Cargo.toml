@@ -35,6 +35,6 @@ sha1 = "0.10"
 futures-util = "0.3"
 tower = "^0.4.13"
 ctrlc = "3"
-serde = { version = "1.0.204", features = ["derive"] }
+serde = { version = "1.0.210", features = ["derive"] }
 fxhash = "0.2.1"
 toml = "0.8.19"
