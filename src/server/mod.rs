@@ -1,4 +1,5 @@
 mod logging;
+pub use logging::logger;
 mod onion;
 mod router;
 mod service;
