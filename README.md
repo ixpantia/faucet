@@ -5,11 +5,14 @@
 [![test](https://github.com/ixpantia/faucet/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/ixpantia/faucet/actions/workflows/test.yaml)
 <!-- badges: end -->
 
-Scale and deploy Plumber APIs and Shiny applications with ease and efficiency.
+Scale, deploy and route Plumber APIs and Shiny applications with ease and efficiency.
 
 ## Summary
 
-Welcome to faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. faucet is a high-performance server built with Rust, offering Round Robin and IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively.
+
+Welcome to faucet, the most feature complete Shiny Application and Plumber API deployment
+platform. faucet features load balancing, routing, logging, replication, and more
+all in one place; unifying your workflow for deploying R based applications.
 
 ## Features
 
@@ -22,6 +25,8 @@ Welcome to faucet, your go-to solution for deploying Plumber APIs and Shiny Appl
 - **Simplified Deployment:** faucet simplifies the deployment process, making it a breeze to get your R applications up and running quickly.
 
 - **Asynchronous & Concurrent:** faucet leverages asynchronous and concurrent processing, ensuring optimal utilization of resources and responsive handling of requests.
+
+- **Routing**: Run multiple Shiny Applications, Plumber APIs, Quarto Documents on a single server with our easy to configure router.
 
 ## Usage
 
