@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn test_faucet_error_from_pool_post_create_hook_error() {
         let err = deadpool::managed::PoolError::<FaucetError>::PostCreateHook(
-            deadpool::managed::HookError::StaticMessage("test"),
+            deadpool::managed::HookError::message("test"),
         );
 
         let err: FaucetError = From::from(err);

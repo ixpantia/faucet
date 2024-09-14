@@ -2,7 +2,6 @@ use super::LoadBalancingStrategy;
 use super::WorkerConfig;
 use crate::leak;
 use crate::{client::Client, error::FaucetResult};
-use async_trait::async_trait;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
@@ -56,7 +55,6 @@ fn calculate_exponential_backoff(retries: u32) -> Duration {
     BASE_BACKOFF * 2u32.pow(retries)
 }
 
-#[async_trait]
 impl LoadBalancingStrategy for IpHash {
     async fn entry(&self, ip: IpAddr) -> Client {
         let mut retries = 0;

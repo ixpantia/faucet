@@ -4,6 +4,7 @@ pub mod round_robin;
 use super::worker::WorkerConfig;
 use crate::client::Client;
 use crate::error::FaucetResult;
+use crate::leak;
 use hyper::Request;
 pub use ip_extractor::IpExtractor;
 use std::net::IpAddr;
@@ -13,7 +14,6 @@ use std::sync::Arc;
 use self::ip_hash::IpHash;
 use self::round_robin::RoundRobin;
 
-#[async_trait::async_trait]
 trait LoadBalancingStrategy {
     async fn entry(&self, ip: IpAddr) -> Client;
 }
@@ -36,7 +36,20 @@ impl FromStr for Strategy {
     }
 }
 
-type DynLoadBalancer = Arc<dyn LoadBalancingStrategy + Send + Sync>;
+#[derive(Copy, Clone)]
+enum DynLoadBalancer {
+    IpHash(&'static ip_hash::IpHash),
+    RoundRobin(&'static round_robin::RoundRobin),
+}
+
+impl LoadBalancingStrategy for DynLoadBalancer {
+    async fn entry(&self, ip: IpAddr) -> Client {
+        match self {
+            DynLoadBalancer::RoundRobin(rr) => rr.entry(ip).await,
+            DynLoadBalancer::IpHash(ih) => ih.entry(ip).await,
+        }
+    }
+}
 
 pub(crate) struct LoadBalancer {
     strategy: DynLoadBalancer,
@@ -50,8 +63,8 @@ impl LoadBalancer {
         workers: &[WorkerConfig],
     ) -> FaucetResult<Self> {
         let strategy: DynLoadBalancer = match strategy {
-            Strategy::RoundRobin => Arc::new(RoundRobin::new(workers)?),
-            Strategy::IpHash => Arc::new(IpHash::new(workers)?),
+            Strategy::RoundRobin => DynLoadBalancer::RoundRobin(leak!(RoundRobin::new(workers)?)),
+            Strategy::IpHash => DynLoadBalancer::IpHash(leak!(IpHash::new(workers)?)),
         };
         Ok(Self {
             strategy,
@@ -73,7 +86,7 @@ impl LoadBalancer {
 impl Clone for LoadBalancer {
     fn clone(&self) -> Self {
         Self {
-            strategy: Arc::clone(&self.strategy),
+            strategy: self.strategy,
             extractor: self.extractor,
         }
     }
