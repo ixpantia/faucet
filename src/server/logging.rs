@@ -4,6 +4,70 @@ use super::onion::{Layer, Service};
 use crate::server::service::State;
 use std::{net::IpAddr, time};
 
+pub mod logger {
+    use std::{io::BufWriter, io::Write, path::PathBuf};
+
+    use hyper::body::Bytes;
+
+    pub enum Target {
+        Stderr,
+        File(PathBuf),
+    }
+
+    struct LogFileWriter {
+        sender: std::sync::mpsc::Sender<Bytes>,
+    }
+
+    impl std::io::Write for LogFileWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            let _ = self.sender.send(Bytes::copy_from_slice(buf));
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn start_log_writer_thread(path: PathBuf) -> LogFileWriter {
+        let file = std::fs::File::options()
+            .create(true)
+            .append(true)
+            .truncate(false)
+            .open(&path)
+            .expect("Unable to open or create log file");
+        let mut writer = BufWriter::new(file);
+        let (sender, receiver) = std::sync::mpsc::channel::<Bytes>();
+        std::thread::spawn(move || {
+            let mut stderr = std::io::stderr();
+            while let Ok(bytes) = receiver.recv() {
+                if let Err(e) = stderr.write_all(bytes.as_ref()) {
+                    eprintln!("Unable to write to stderr: {e}");
+                };
+                if let Err(e) = writer.write_all(bytes.as_ref()) {
+                    eprintln!("Unable to write to {path:?}: {e}");
+                };
+            }
+        });
+        LogFileWriter { sender }
+    }
+
+    pub fn build_logger(target: Target) {
+        let target = match target {
+            Target::File(path) => {
+                let writer = start_log_writer_thread(path);
+                env_logger::Target::Pipe(Box::new(writer))
+            }
+            Target::Stderr => env_logger::Target::Stderr,
+        };
+
+        let mut env_builder = env_logger::Builder::new();
+        env_builder
+            .parse_env(env_logger::Env::new().filter_or("FAUCET_LOG", "info"))
+            .target(target)
+            .init();
+    }
+}
+
 trait StateLogData: Send + Sync + 'static {
     fn get_state_data(&self) -> (IpAddr, &'static str);
 }

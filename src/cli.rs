@@ -29,33 +29,52 @@ enum ServerType {
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy)]
-enum Strategy {
+pub enum Strategy {
     /// Sends requests to workers in a round-robin fashion.
     RoundRobin,
     /// Hashes the IP address of the client to determine which worker to send the request to.
     IpHash,
 }
 
+impl From<Strategy> for load_balancing::Strategy {
+    fn from(value: Strategy) -> Self {
+        match value {
+            Strategy::RoundRobin => load_balancing::Strategy::RoundRobin,
+            Strategy::IpHash => load_balancing::Strategy::IpHash,
+        }
+    }
+}
+
 #[derive(clap::ValueEnum, Debug, Clone, Copy)]
-enum IpFrom {
+pub enum IpFrom {
     Client,
     XForwardedFor,
     XRealIp,
+}
+
+impl From<IpFrom> for load_balancing::IpExtractor {
+    fn from(value: IpFrom) -> Self {
+        match value {
+            IpFrom::Client => load_balancing::IpExtractor::ClientAddr,
+            IpFrom::XForwardedFor => load_balancing::IpExtractor::XForwardedFor,
+            IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
+        }
+    }
 }
 
 #[derive(Parser, Debug)]
 pub struct StartArgs {
     /// The host to bind to.
     #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]
-    host: String,
+    pub host: String,
 
     /// The number of threads to use to handle requests.
     #[arg(short, long, env = "FAUCET_WORKERS", default_value_t = num_cpus::get())]
-    workers: usize,
+    pub workers: usize,
 
     /// The load balancing strategy to use.
     #[arg(short, long, env = "FAUCET_STRATEGY", default_value = "round-robin")]
-    strategy: Strategy,
+    pub strategy: Strategy,
 
     /// The type of workers to spawn.
     #[arg(short, long, env = "FAUCET_TYPE", default_value = "auto")]
@@ -64,48 +83,56 @@ pub struct StartArgs {
     /// The directory to spawn workers in.
     /// Defaults to the current directory.
     #[arg(short, long, env = "FAUCET_DIR", default_value = ".")]
-    dir: PathBuf,
+    pub dir: PathBuf,
 
     /// The IP address to extract from.
     /// Defaults to client address.
     #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
-    ip_from: IpFrom,
+    pub ip_from: IpFrom,
 
     /// Command, path, or executable to run Rscript.
     #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
-    rscript: OsString,
+    pub rscript: OsString,
 
     /// Command, path, or executable to run quarto.
     #[arg(long, env = "FAUCET_QUARTO", default_value = "quarto")]
-    quarto: OsString,
+    pub quarto: OsString,
 
     /// Argument passed on to `appDir` when running Shiny.
     #[arg(long, short, env = "FAUCET_APP_DIR", default_value = None)]
-    app_dir: Option<String>,
+    pub app_dir: Option<String>,
 
     /// Quarto Shiny file path.
     #[arg(long, short, env = "FAUCET_QMD", default_value = None)]
-    qmd: Option<PathBuf>,
+    pub qmd: Option<PathBuf>,
+
+    /// Save logs to a file. Will disable colors!
+    #[arg(long, short, env = "FAUCET_LOG_FILE", default_value = None)]
+    pub log_file: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]
 pub struct RouterArgs {
     /// The host to bind to.
     #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]
-    host: String,
+    pub host: String,
 
     /// The IP address to extract from.
     /// Defaults to client address.
     #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
-    ip_from: IpFrom,
+    pub ip_from: IpFrom,
 
     /// Command, path, or executable to run Rscript.
     #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
-    rscript: OsString,
+    pub rscript: OsString,
 
     /// Command, path, or executable to run quarto.
     #[arg(long, short, env = "FAUCET_QUARTO", default_value = "quarto")]
-    quarto: OsString,
+    pub quarto: OsString,
+
+    /// Save logs to a file. Will disable colors!
+    #[arg(long, short, env = "FAUCET_LOG_FILE", default_value = None)]
+    pub log_file: Option<PathBuf>,
 
     /// Router config file.
     #[arg(
@@ -114,7 +141,7 @@ pub struct RouterArgs {
         env = "FAUCET_ROUTER_CONF",
         default_value = "./frouter.toml"
     )]
-    conf: PathBuf,
+    pub conf: PathBuf,
 }
 
 #[derive(Subcommand, Debug)]
@@ -144,16 +171,6 @@ pub struct Args {
 }
 
 impl StartArgs {
-    pub fn strategy(&self) -> load_balancing::Strategy {
-        use Strategy::*;
-        match self.strategy {
-            RoundRobin => load_balancing::Strategy::RoundRobin,
-            IpHash => load_balancing::Strategy::IpHash,
-        }
-    }
-    pub fn workers(&self) -> usize {
-        self.workers
-    }
     pub fn server_type(&self) -> WorkerType {
         match self.type_ {
             ServerType::Plumber => WorkerType::Plumber,
@@ -170,52 +187,5 @@ impl StartArgs {
                 }
             }
         }
-    }
-    pub fn host(&self) -> &str {
-        &self.host
-    }
-    pub fn dir(&self) -> &Path {
-        &self.dir
-    }
-    pub fn ip_extractor(&self) -> load_balancing::IpExtractor {
-        match self.ip_from {
-            IpFrom::Client => load_balancing::IpExtractor::ClientAddr,
-            IpFrom::XForwardedFor => load_balancing::IpExtractor::XForwardedFor,
-            IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
-        }
-    }
-    pub fn rscript(&self) -> &OsStr {
-        &self.rscript
-    }
-    pub fn quarto(&self) -> &OsStr {
-        &self.quarto
-    }
-    pub fn qmd(&self) -> Option<&Path> {
-        self.qmd.as_deref()
-    }
-    pub fn app_dir(&self) -> Option<&str> {
-        self.app_dir.as_deref()
-    }
-}
-
-impl RouterArgs {
-    pub fn host(&self) -> &str {
-        self.host.as_str()
-    }
-    pub fn conf(&self) -> &Path {
-        self.conf.as_path()
-    }
-    pub fn ip_extractor(&self) -> load_balancing::IpExtractor {
-        match self.ip_from {
-            IpFrom::Client => load_balancing::IpExtractor::ClientAddr,
-            IpFrom::XForwardedFor => load_balancing::IpExtractor::XForwardedFor,
-            IpFrom::XRealIp => load_balancing::IpExtractor::XRealIp,
-        }
-    }
-    pub fn rscript(&self) -> &OsStr {
-        self.rscript.as_os_str()
-    }
-    pub fn quarto(&self) -> &OsStr {
-        &self.quarto
     }
 }
