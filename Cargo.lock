@@ -323,7 +323,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "toml",
- "tower",
+ "tower 0.5.1",
 ]
 
 [[package]]
@@ -546,7 +546,7 @@ dependencies = [
  "pin-project-lite",
  "socket2",
  "tokio",
- "tower",
+ "tower 0.4.13",
  "tower-service",
  "tracing",
 ]
@@ -1044,7 +1044,16 @@ dependencies = [
  "tokio",
  "tower-layer",
  "tower-service",
- "tracing",
+]
+
+[[package]]
+name = "tower"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2873938d487c3cfb9aed7546dc9f2711d867c9f90c46b889989a2cb84eba6b4f"
+dependencies = [
+ "tower-layer",
+ "tower-service",
 ]
 
 [[package]]
@@ -1065,7 +1074,6 @@ version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
 dependencies = [
- "log",
  "pin-project-lite",
  "tracing-core",
 ]
