@@ -56,3 +56,12 @@ By default, faucet logs at the `INFO` level, which means that `ERROR`,
 > if you want to see those errors, you will need to set the log level to
 > `INFO` or lower. Shiny on the other hand prints errors to `stderr`, so
 > you will need to set the log level to `WARN` or lower to see those errors.
+
+## Writing logs a file
+
+faucet allows you to redirect log output to a file. This will disable colors
+on `stderr`.
+
+You can redirect to a file by specifying the path on the `FAUCET_LOG_FILE`
+environment variable or by passing the `--log-file` argument to `faucet start`
+or `faucet router`.
