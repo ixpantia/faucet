@@ -132,6 +132,15 @@ _nginx_, you should use `x-forwarded-for` or `x-real-ip`.
 The logging level to use. Refer to the [logging](./logging.md) section for more
 information.
 
+## Redirect logging to a file
+
+- CLI: `--log-file`
+- Environment: `FAUCET_LOG_FILE`
+- Default: `None`
+
+If you set this variable it will disable colors on `stderr` and save all output
+to the specified path. This will append, not overwrite previously existing files.
+
 ## Define a custom `Rscript` binary/executable
 
 - CLI: `--rscript` or `-r`

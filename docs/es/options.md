@@ -139,6 +139,15 @@ ejecutando faucet detrás de un proxy inverso como _nginx_, debe utilizar
 El nivel de logging a utilizar. Consulte la sección [logging](./logging.md)
 para obtener más información.
 
+## Redirigir logging a un archivo
+
+- CLI: `--log-file`
+- Environment: `FAUCET_LOG_FILE`
+- Default: `None`
+
+Si utilizas esta varible se deshabilitará el color en la consola y todo el output
+será redirigido al archivo especificado.
+
 ## Definir el binario/ejecutable de `Rscript`
 
 - CLI: `--rscript` o `-r`
