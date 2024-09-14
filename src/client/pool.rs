@@ -1,7 +1,6 @@
 use super::body::ExclusiveBody;
 use super::worker::WorkerConfig;
 use crate::error::{FaucetError, FaucetResult};
-use async_trait::async_trait;
 use deadpool::managed::{self, Object, Pool, RecycleError};
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
@@ -41,7 +40,6 @@ impl ConnectionManager {
     }
 }
 
-#[async_trait]
 impl managed::Manager for ConnectionManager {
     type Type = ConnectionHandle;
     type Error = FaucetError;
@@ -56,7 +54,7 @@ impl managed::Manager for ConnectionManager {
         _: &managed::Metrics,
     ) -> managed::RecycleResult<FaucetError> {
         if conn.sender.is_closed() {
-            Err(RecycleError::StaticMessage("Connection closed"))
+            Err(RecycleError::message("Connection closed"))
         } else {
             log::debug!(target: "faucet", "Recycling TCP connection to {}", self.config.target);
             Ok(())

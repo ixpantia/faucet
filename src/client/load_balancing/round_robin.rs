@@ -3,7 +3,6 @@ use crate::{
     client::{worker::WorkerConfig, Client},
     error::FaucetResult,
 };
-use async_trait::async_trait;
 use std::{net::IpAddr, sync::atomic::AtomicUsize};
 
 struct Targets {
@@ -46,7 +45,6 @@ impl RoundRobin {
     }
 }
 
-#[async_trait]
 impl LoadBalancingStrategy for RoundRobin {
     async fn entry(&self, _ip: IpAddr) -> Client {
         let mut client = self.targets.next();
