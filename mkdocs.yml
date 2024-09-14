@@ -30,6 +30,7 @@ plugins:
             - Logging: logging.md
             - With Reverse Proxy: reverse_proxy.md
             - Examples: examples.md
+            - FAQ: faq.md
         - locale: es
           default: false
           name: Español
