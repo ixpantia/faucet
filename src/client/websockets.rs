@@ -28,11 +28,14 @@ const SEC_WEBSOCKET_APPEND: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const SEC_WEBSOCKET_KEY: &str = "Sec-WebSocket-Key";
 const SEC_WEBSOCKET_ACCEPT: &str = "Sec-WebSocket-Accept";
 
-fn calculate_sec_websocket_accept(key: &[u8]) -> String {
+fn calculate_sec_websocket_accept<'buffer>(key: &[u8], buffer: &'buffer mut [u8]) -> &'buffer [u8] {
     let mut hasher = Sha1::new();
     hasher.update(key);
     hasher.update(SEC_WEBSOCKET_APPEND);
-    base64::engine::general_purpose::STANDARD.encode(hasher.finalize())
+    let len = base64::engine::general_purpose::STANDARD
+        .encode_slice(hasher.finalize(), buffer)
+        .expect("Should always write the internal buffer");
+    &buffer[..len]
 }
 
 fn build_uri(socket_addr: SocketAddr, path: Option<&PathAndQuery>) -> FaucetResult<Uri> {
@@ -97,10 +100,12 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
         hyper::header::CONNECTION,
         HeaderValue::from_static("Upgrade"),
     );
+    let mut buffer = [0u8; 32];
     res.headers_mut().insert(
         SEC_WEBSOCKET_ACCEPT,
-        HeaderValue::from_str(&calculate_sec_websocket_accept(
+        HeaderValue::from_bytes(calculate_sec_websocket_accept(
             sec_websocket_key.as_bytes(),
+            &mut buffer,
         ))?,
     );
     Ok(res)
@@ -138,8 +143,9 @@ mod tests {
     #[test]
     fn test_calculate_sec_websocket_accept() {
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
-        let accept = calculate_sec_websocket_accept(key.as_bytes());
-        assert_eq!(accept, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+        let mut buffer = [0u8; 32];
+        let accept = calculate_sec_websocket_accept(key.as_bytes(), &mut buffer);
+        assert_eq!(accept, b"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
     }
 
     #[test]
