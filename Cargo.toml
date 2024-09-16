@@ -28,7 +28,7 @@ num_cpus = "1"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tokio-util = { version = "^0.7", features = ["codec"] }
-tokio-tungstenite = "^0.23"
+tokio-tungstenite = "^0.24"
 base64 = "0.22"
 sha1 = "0.10"
 futures-util = "0.3"
