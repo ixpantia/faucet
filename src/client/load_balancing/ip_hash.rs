@@ -2,7 +2,6 @@ use super::LoadBalancingStrategy;
 use super::WorkerConfig;
 use crate::leak;
 use crate::{client::Client, error::FaucetResult};
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
 use std::time::Duration;
@@ -37,14 +36,22 @@ impl IpHash {
     }
 }
 
-fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
+fn calculate_hash(ip: IpAddr) -> u64 {
+    let mut hash_value = match ip {
+        IpAddr::V4(ip) => ip.to_bits() as u64,
+        IpAddr::V6(ip) => ip.to_bits() as u64,
+    };
+    hash_value ^= hash_value >> 33;
+    hash_value = hash_value.wrapping_mul(0xff51afd7ed558ccd);
+    hash_value ^= hash_value >> 33;
+    hash_value = hash_value.wrapping_mul(0xc4ceb9fe1a85ec53);
+    hash_value ^= hash_value >> 33;
+
+    hash_value
 }
 
-fn hash_to_index(value: impl Hash, length: usize) -> usize {
-    let hash = calculate_hash(&value);
+fn hash_to_index(value: IpAddr, length: usize) -> usize {
+    let hash = calculate_hash(value);
     (hash % length as u64) as usize
 }
 
@@ -89,30 +96,159 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_hash_to_index() {
-        let index = hash_to_index("test", 10);
-        assert!(index < 10);
+    fn ip_v4_test_distribution_of_hash_function_len_4() {
+        const N_IP: usize = 100_000;
+
+        // Generate 10_000 ip address and see the
+        // distribution over diferent lengths
+        let ips: Vec<IpAddr> = (0..N_IP)
+            .map(|_| IpAddr::V4(std::net::Ipv4Addr::from_bits(rand::random::<u32>())))
+            .collect();
+
+        // Counts when length == 4
+        let mut counts = [0; 4];
+
+        ips.iter().for_each(|ip| {
+            let index = hash_to_index(*ip, 4);
+            counts[index] += 1;
+        });
+
+        let percent_0 = counts[0] as f64 / N_IP as f64;
+        let percent_1 = counts[1] as f64 / N_IP as f64;
+        let percent_2 = counts[2] as f64 / N_IP as f64;
+        let percent_3 = counts[3] as f64 / N_IP as f64;
+        assert!((0.24..=0.26).contains(&percent_0));
+        assert!((0.24..=0.26).contains(&percent_1));
+        assert!((0.24..=0.26).contains(&percent_2));
+        assert!((0.24..=0.26).contains(&percent_3));
     }
 
     #[test]
-    fn test_hash_to_index_same() {
-        let index = hash_to_index("test", 10);
-        let index2 = hash_to_index("test", 10);
-        assert_eq!(index, index2);
+    fn ip_v4_test_distribution_of_hash_function_len_3() {
+        const N_IP: usize = 100_000;
+
+        // Generate 10_000 ip address and see the
+        // distribution over diferent lengths
+        let ips: Vec<IpAddr> = (0..N_IP)
+            .map(|_| IpAddr::V4(std::net::Ipv4Addr::from_bits(rand::random::<u32>())))
+            .collect();
+
+        // Counts when length == 4
+        let mut counts = [0; 3];
+
+        ips.iter().for_each(|ip| {
+            let index = hash_to_index(*ip, 3);
+            counts[index] += 1;
+        });
+
+        let percent_0 = counts[0] as f64 / N_IP as f64;
+        let percent_1 = counts[1] as f64 / N_IP as f64;
+        let percent_2 = counts[2] as f64 / N_IP as f64;
+        assert!((0.32..=0.34).contains(&percent_0));
+        assert!((0.32..=0.34).contains(&percent_1));
+        assert!((0.32..=0.34).contains(&percent_2));
     }
 
     #[test]
-    fn test_hash_to_index_different() {
-        let index = hash_to_index("test", 10);
-        let index2 = hash_to_index("test2", 10);
-        assert_ne!(index, index2);
+    fn ip_v4_test_distribution_of_hash_function_len_2() {
+        const N_IP: usize = 100_000;
+
+        // Generate 10_000 ip address and see the
+        // distribution over diferent lengths
+        let ips: Vec<IpAddr> = (0..N_IP)
+            .map(|_| IpAddr::V4(std::net::Ipv4Addr::from_bits(rand::random::<u32>())))
+            .collect();
+
+        // Counts when length == 4
+        let mut counts = [0; 2];
+
+        ips.iter().for_each(|ip| {
+            let index = hash_to_index(*ip, 2);
+            counts[index] += 1;
+        });
+
+        let percent_0 = counts[0] as f64 / N_IP as f64;
+        let percent_1 = counts[1] as f64 / N_IP as f64;
+        assert!((0.49..=0.51).contains(&percent_0));
+        assert!((0.49..=0.51).contains(&percent_1));
     }
 
     #[test]
-    fn test_hash_to_index_different_length() {
-        let index = hash_to_index("test", 10);
-        let index2 = hash_to_index("test", 3);
-        assert_ne!(index, index2);
+    fn ip_v6_test_distribution_of_hash_function_len_4() {
+        const N_IP: usize = 100_000;
+
+        // Generate 10_000 ip address and see the
+        // distribution over diferent lengths
+        let ips: Vec<IpAddr> = (0..N_IP)
+            .map(|_| IpAddr::V6(std::net::Ipv6Addr::from_bits(rand::random::<u128>())))
+            .collect();
+
+        // Counts when length == 4
+        let mut counts = [0; 4];
+
+        ips.iter().for_each(|ip| {
+            let index = hash_to_index(*ip, 4);
+            counts[index] += 1;
+        });
+
+        let percent_0 = counts[0] as f64 / N_IP as f64;
+        let percent_1 = counts[1] as f64 / N_IP as f64;
+        let percent_2 = counts[2] as f64 / N_IP as f64;
+        let percent_3 = counts[3] as f64 / N_IP as f64;
+        assert!((0.24..=0.26).contains(&percent_0));
+        assert!((0.24..=0.26).contains(&percent_1));
+        assert!((0.24..=0.26).contains(&percent_2));
+        assert!((0.24..=0.26).contains(&percent_3));
+    }
+
+    #[test]
+    fn ip_v6_test_distribution_of_hash_function_len_3() {
+        const N_IP: usize = 100_000;
+
+        // Generate 10_000 ip address and see the
+        // distribution over diferent lengths
+        let ips: Vec<IpAddr> = (0..N_IP)
+            .map(|_| IpAddr::V6(std::net::Ipv6Addr::from_bits(rand::random::<u128>())))
+            .collect();
+
+        // Counts when length == 4
+        let mut counts = [0; 3];
+
+        ips.iter().for_each(|ip| {
+            let index = hash_to_index(*ip, 3);
+            counts[index] += 1;
+        });
+
+        let percent_0 = counts[0] as f64 / N_IP as f64;
+        let percent_1 = counts[1] as f64 / N_IP as f64;
+        let percent_2 = counts[2] as f64 / N_IP as f64;
+        assert!((0.32..=0.34).contains(&percent_0));
+        assert!((0.32..=0.34).contains(&percent_1));
+        assert!((0.32..=0.34).contains(&percent_2));
+    }
+
+    #[test]
+    fn ip_v6_test_distribution_of_hash_function_len_2() {
+        const N_IP: usize = 100_000;
+
+        // Generate 10_000 ip address and see the
+        // distribution over diferent lengths
+        let ips: Vec<IpAddr> = (0..N_IP)
+            .map(|_| IpAddr::V6(std::net::Ipv6Addr::from_bits(rand::random::<u128>())))
+            .collect();
+
+        // Counts when length == 4
+        let mut counts = [0; 2];
+
+        ips.iter().for_each(|ip| {
+            let index = hash_to_index(*ip, 2);
+            counts[index] += 1;
+        });
+
+        let percent_0 = counts[0] as f64 / N_IP as f64;
+        let percent_1 = counts[1] as f64 / N_IP as f64;
+        assert!((0.49..=0.51).contains(&percent_0));
+        assert!((0.49..=0.51).contains(&percent_1));
     }
 
     #[test]
@@ -156,10 +292,11 @@ mod tests {
         assert_eq!(client1.socket_addr(), client2.socket_addr());
 
         // This IP address should hash to a different index
-        let client3 = ip_hash.entry("192.168.0.43".parse().unwrap()).await;
-        let client4 = ip_hash.entry("192.168.0.43".parse().unwrap()).await;
+        let client3 = ip_hash.entry("192.168.0.10".parse().unwrap()).await;
+        let client4 = ip_hash.entry("192.168.0.10".parse().unwrap()).await;
 
         assert_eq!(client3.socket_addr(), client4.socket_addr());
+        assert_eq!(client1.socket_addr(), client2.socket_addr());
 
         assert_ne!(client1.socket_addr(), client3.socket_addr());
     }

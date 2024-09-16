@@ -10,7 +10,7 @@ readme = "README.md"
 homepage = "https://github.com/ixpantia/faucet"
 repository = "https://github.com/ixpantia/faucet"
 keywords = ["R", "loadbalancer", "server", "plumber", "shiny"]
-rust-version = "1.75"
+rust-version = "1.80"
 
 [[bin]]
 name = "faucet"
@@ -37,3 +37,6 @@ ctrlc = "3"
 serde = { version = "1.0.204", features = ["derive"] }
 fxhash = "0.2.1"
 toml = "0.8.19"
+
+[dev-dependencies]
+rand = "0.8.5"

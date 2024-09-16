@@ -303,6 +303,7 @@ dependencies = [
  "hyper-util",
  "log",
  "num_cpus",
+ "rand",
  "serde",
  "sha1",
  "tokio",
