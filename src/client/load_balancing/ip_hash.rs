@@ -2,7 +2,6 @@ use super::LoadBalancingStrategy;
 use super::WorkerConfig;
 use crate::leak;
 use crate::{client::Client, error::FaucetResult};
-use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
 use std::time::Duration;
 
