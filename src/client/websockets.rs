@@ -1,5 +1,8 @@
 use super::{pool::ExtractSocketAddr, Client, ExclusiveBody};
-use crate::error::{FaucetError, FaucetResult};
+use crate::{
+    error::{FaucetError, FaucetResult},
+    global_conn::{add_connection, remove_connection},
+};
 use base64::Engine;
 use hyper::{
     header::UPGRADE,
@@ -89,9 +92,11 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
         .cloned()
         .ok_or(FaucetError::no_sec_web_socket_key())?;
     tokio::task::spawn(async move {
+        add_connection();
         if let Err(e) = upgrade_connection_from_request(req, client).await {
             log::error!("upgrade error: {:?}", e);
         }
+        remove_connection();
     });
     *res.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
     res.headers_mut()

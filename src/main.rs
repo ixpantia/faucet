@@ -1,14 +1,35 @@
+use std::sync::OnceLock;
+
 use clap::Parser;
 use faucet_server::cli::{Args, Commands};
 use faucet_server::error::FaucetResult;
+use faucet_server::global_conn::current_connections;
 use faucet_server::server::logger::build_logger;
 use faucet_server::server::{FaucetServerBuilder, RouterConfig};
+
+static STOP_THREAD: OnceLock<std::thread::JoinHandle<()>> = OnceLock::new();
+const WAIT_STOP_PRINT: std::time::Duration = std::time::Duration::from_secs(5);
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
     ctrlc::set_handler(|| {
         log::info!(target: "faucet", "Ctrl-C received, shutting down...");
-        std::process::exit(0);
+        STOP_THREAD.get_or_init(|| {
+            std::thread::spawn(|| {
+                let mut last_5_sec = std::time::Instant::now();
+                while current_connections() > 0 {
+                    std::thread::yield_now();
+                    if last_5_sec.elapsed() > WAIT_STOP_PRINT {
+                        log::warn!(
+                            "Active connections = {}, waiting for all connections to stop.",
+                            current_connections()
+                        );
+                        last_5_sec = std::time::Instant::now();
+                    }
+                }
+                std::process::exit(0);
+            })
+        });
     })
     .expect("Error setting Ctrl-C handler");
 
