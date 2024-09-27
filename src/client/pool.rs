@@ -1,6 +1,7 @@
 use super::body::ExclusiveBody;
 use super::worker::WorkerConfig;
 use crate::error::{FaucetError, FaucetResult};
+use crate::global_conn::{add_connection, remove_connection};
 use deadpool::managed::{self, Object, Pool, RecycleError};
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
@@ -71,9 +72,16 @@ impl HttpConnection {
         mut self,
         request: Request<Incoming>,
     ) -> FaucetResult<Response<ExclusiveBody>> {
+        add_connection();
         let (parts, body) = self.inner.sender.send_request(request).await?.into_parts();
         let body = ExclusiveBody::new(body.map_err(Into::into), Some(self));
         Ok(Response::from_parts(parts, body))
+    }
+}
+
+impl Drop for HttpConnection {
+    fn drop(&mut self) {
+        remove_connection();
     }
 }
 

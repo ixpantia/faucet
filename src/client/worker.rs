@@ -108,9 +108,10 @@ fn spawn_child_rscript_process(
     config: WorkerConfig,
     command: impl AsRef<str>,
 ) -> FaucetResult<Child> {
-    tokio::process::Command::new(config.rscript)
-        // Set the current directory to the directory containing the entrypoint
-        .current_dir(config.workdir)
+    let mut cmd = tokio::process::Command::new(config.rscript);
+
+    // Set the current directory to the directory containing the entrypoint
+    cmd.current_dir(config.workdir)
         .arg("-e")
         .arg(command.as_ref())
         .stdin(std::process::Stdio::null())
@@ -118,9 +119,18 @@ fn spawn_child_rscript_process(
         .stderr(std::process::Stdio::piped())
         .env("FAUCET_WORKER_ID", config.worker_id.to_string())
         // This is needed to make sure the child process is killed when the parent is dropped
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(Into::into)
+        .kill_on_drop(true);
+
+    #[cfg(unix)]
+    unsafe {
+        cmd.pre_exec(|| {
+            // Create a new process group for the child process
+            nix::libc::setpgid(0, 0);
+            Ok(())
+        });
+    }
+
+    cmd.spawn().map_err(Into::into)
 }
 
 fn spawn_plumber_worker(config: WorkerConfig) -> FaucetResult<Child> {
@@ -151,9 +161,9 @@ fn spawn_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
 }
 
 fn spawn_quarto_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
-    let child = tokio::process::Command::new(config.quarto)
-        // Set the current directory to the directory containing the entrypoint
-        .current_dir(config.workdir)
+    let mut cmd = tokio::process::Command::new(config.quarto);
+    // Set the current directory to the directory containing the entrypoint
+    cmd.current_dir(config.workdir)
         .arg("serve")
         .args(["--port", config.addr.port().to_string().as_str()])
         .arg(config.qmd.ok_or(FaucetError::MissingArgument("qmd"))?)
@@ -162,8 +172,18 @@ fn spawn_quarto_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
         .stderr(std::process::Stdio::piped())
         .env("FAUCET_WORKER_ID", config.worker_id.to_string())
         // This is needed to make sure the child process is killed when the parent is dropped
-        .kill_on_drop(true)
-        .spawn()?;
+        .kill_on_drop(true);
+
+    #[cfg(unix)]
+    unsafe {
+        cmd.pre_exec(|| {
+            // Create a new process group for the child process
+            nix::libc::setpgid(0, 0);
+            Ok(())
+        });
+    }
+
+    let child = cmd.spawn()?;
 
     log_stdio(child, config.target)
 }

@@ -10,6 +10,7 @@ use crate::{
         ExclusiveBody,
     },
     error::{FaucetError, FaucetResult},
+    global_conn::add_connection,
     leak,
 };
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
@@ -22,6 +23,7 @@ use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
     pin::pin,
+    sync::{atomic::AtomicI64, OnceLock},
 };
 use tokio::net::TcpListener;
 

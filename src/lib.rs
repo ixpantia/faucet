@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod client;
 pub mod error;
+pub mod global_conn;
 pub(crate) mod networking;
 pub mod server;
 
