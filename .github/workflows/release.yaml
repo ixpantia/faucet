@@ -62,8 +62,8 @@ jobs:
           TAG_R: ixpantia/faucet:r4.4
           TAG_LATEST: ixpantia/faucet:latest
         run: |
-          # Extract the minor version (e.g., from 1.2.3 to 1.2)
           TAG_MINOR=$(echo "${{ github.ref_name }}" | cut -d'.' -f1-2)
+          TAG_MINOR="ixpantia/faucet:$TAG_MINOR-r4.4"
 
           docker buildx build \
             --platform $PLATFORM \
@@ -97,15 +97,14 @@ jobs:
           TAG_R: ixpantia/faucet:r4.3
           TAG_LATEST: ixpantia/faucet:latest
         run: |
-          # Extract the minor version (e.g., from 1.2.3 to 1.2)
           TAG_MINOR=$(echo "${{ github.ref_name }}" | cut -d'.' -f1-2)
+          TAG_MINOR="ixpantia/faucet:$TAG_MINOR-r4.3"
 
           docker buildx build \
             --platform $PLATFORM \
             --push \
             -t $TAG_V \
             -t $TAG_R \
-            -t $TAG_LATEST \
             -t $TAG_MINOR \
             --build-arg R_VERSION=4.3 \
             .
@@ -131,15 +130,14 @@ jobs:
           TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.2
           TAG_R: ixpantia/faucet:r4.2
         run: |
-          # Extract the minor version (e.g., from 1.2.3 to 1.2)
           TAG_MINOR=$(echo "${{ github.ref_name }}" | cut -d'.' -f1-2)
+          TAG_MINOR="ixpantia/faucet:$TAG_MINOR-r4.2"
 
           docker buildx build \
             --platform $PLATFORM \
             --push \
             -t $TAG_V \
             -t $TAG_R \
-            -t $TAG_LATEST \
             -t $TAG_MINOR \
             --build-arg R_VERSION=4.2 \
             .
@@ -165,15 +163,14 @@ jobs:
           TAG_V: ixpantia/faucet:${{  github.ref_name }}-r4.1
           TAG_R: ixpantia/faucet:r4.1
         run: |
-          # Extract the minor version (e.g., from 1.2.3 to 1.2)
           TAG_MINOR=$(echo "${{ github.ref_name }}" | cut -d'.' -f1-2)
+          TAG_MINOR="ixpantia/faucet:$TAG_MINOR-r4.1"
 
           docker buildx build \
             --platform $PLATFORM \
             --push \
             -t $TAG_V \
             -t $TAG_R \
-            -t $TAG_LATEST \
             -t $TAG_MINOR \
             --build-arg R_VERSION=4.1 \
             .
