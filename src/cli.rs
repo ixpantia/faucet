@@ -62,6 +62,14 @@ impl From<IpFrom> for load_balancing::IpExtractor {
     }
 }
 
+#[cfg(unix)]
+#[derive(clap::ValueEnum, Debug, Clone, Copy, Default)]
+pub enum Shutdown {
+    Graceful,
+    #[default]
+    Immediate,
+}
+
 #[derive(Parser, Debug)]
 pub struct StartArgs {
     /// The host to bind to.
@@ -168,6 +176,11 @@ pub enum Commands {
 pub struct Args {
     #[command(subcommand)]
     pub command: Commands,
+
+    /// The strategy for shutting down faucet
+    #[cfg(unix)]
+    #[arg(long, env = "FAUCET_SHUTDOWN", default_value = "immediate")]
+    pub shutdown: Shutdown,
 }
 
 impl StartArgs {
