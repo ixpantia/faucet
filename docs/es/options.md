@@ -160,3 +160,15 @@ aplicación. También puede ser útil en plataformas como _Windows_ donde el
 ejecutable de `Rscript` no está en el `PATH`.
 
 
+## Apagado
+
+- CLI: `--shutdown`
+- Entorno: `FAUCET_SHUTDOWN`
+- Por defecto: `immediate`
+- Valores posibles:
+    - `immediate`
+    - `graceful`
+
+La estrategia que debería utilizar faucet para apagarse. `immediate`
+apaga el servidor interrumpiendo cualquier conexión active. `graceful`
+espera a que no existan conexiones activas para apagarse.

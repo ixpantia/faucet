@@ -140,21 +140,6 @@ set in Nginx.
 faucet start --dir /path/to/plumber/api --ip-from x-forwarded-for
 ```
 
-## Environment Variables
-
-Every option / flag can also be set using an environment variable, this is useful
-for example when using Docker.
-
-| Option / Flag | Environment Variable | Description                                    |
-| ------------- | -------------------- | ---------------------------------------------- |
-| `--dir`         | `FAUCET_DIR`           | Path to application                            |
-| `--host`        | `FAUCET_HOST`          | Host and port to bind the server to            |
-| `--workers`     | `FAUCET_WORKERS`       | Number of workers to spawn                     |
-| `--strategy`    | `FAUCET_STRATEGY`      | Load balancing strategy                        |
-| `--type`        | `FAUCET_TYPE`          | Type of application (shiny or plumber)         |
-| `--ip-from`     | `FAUCET_IP_FROM`       | Header or method to get the client IP address  |
-| `--rscript`     | `FAUCET_RSCRIPT`       | Path to Rscript executable                     |
-
 ## Installation
 
 ### Option 1: Binary Download (Linux)
@@ -162,7 +147,7 @@ for example when using Docker.
 Download the latest release of faucet for Linux from the [GitHub Releases page](https://github.com/ixpantia/faucet/releases). This should work with most Linux distributions.
 
 ```bash
-FAUCET_VERSION="v1.0.0"
+FAUCET_VERSION="v1.1.0"
 
 wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
@@ -186,7 +171,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Install faucet with Cargo.
 
 ```bash
-cargo install faucet-server --version ^1.0
+cargo install faucet-server --version ^1.1
 ```
 
 ### Option 3: Build from Source (Linux, macOS, Windows)

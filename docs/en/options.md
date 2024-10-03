@@ -152,3 +152,16 @@ multiple versions of R installed on your system. This should be the full path
 to the `Rscript` binary/executable or an alias that is available in your
 `$PATH`. This is also useful in platforms like _Windows_ where the `Rscript`
 binary/executable may not be available in the `$PATH`.
+
+## Shutdown
+
+- CLI: `--shutdown`
+- Environment: `FAUCET_SHUTDOWN`
+- Default: `immediate`
+- Possible values:
+    - `immediate`
+    - `graceful`
+
+The strategy used for shutting down faucet. `immediate` kills every
+active connection and shutdown the process. `graceful` waits
+for all connections to close before shutting down.
