@@ -62,7 +62,6 @@ impl From<IpFrom> for load_balancing::IpExtractor {
     }
 }
 
-#[cfg(unix)]
 #[derive(clap::ValueEnum, Debug, Clone, Copy, Default)]
 pub enum Shutdown {
     Graceful,
@@ -178,7 +177,6 @@ pub struct Args {
     pub command: Commands,
 
     /// The strategy for shutting down faucet
-    #[cfg(unix)]
     #[arg(long, env = "FAUCET_SHUTDOWN", default_value = "immediate")]
     pub shutdown: Shutdown,
 }

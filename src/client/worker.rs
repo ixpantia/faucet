@@ -4,14 +4,8 @@ use crate::{
     networking::get_available_sockets,
     server::FaucetServerConfig,
 };
-use std::{
-    ffi::OsStr,
-    net::SocketAddr,
-    path::Path,
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
-use tokio::{process::Child, sync::Mutex, task::JoinHandle};
+use std::{ffi::OsStr, net::SocketAddr, path::Path, sync::atomic::AtomicBool, time::Duration};
+use tokio::{process::Child, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
@@ -60,17 +54,17 @@ fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) struct WorkerConfig {
-    pub(crate) wtype: WorkerType,
-    pub(crate) app_dir: Option<&'static str>,
-    pub(crate) rscript: &'static OsStr,
-    pub(crate) quarto: &'static OsStr,
-    pub(crate) workdir: &'static Path,
-    pub(crate) addr: SocketAddr,
-    pub(crate) target: &'static str,
-    pub(crate) worker_id: usize,
-    pub(crate) is_online: &'static AtomicBool,
-    pub(crate) qmd: Option<&'static Path>,
+pub struct WorkerConfig {
+    pub wtype: WorkerType,
+    pub app_dir: Option<&'static str>,
+    pub rscript: &'static OsStr,
+    pub quarto: &'static OsStr,
+    pub workdir: &'static Path,
+    pub addr: SocketAddr,
+    pub target: &'static str,
+    pub worker_id: usize,
+    pub is_online: &'static AtomicBool,
+    pub qmd: Option<&'static Path>,
 }
 
 impl WorkerConfig {
@@ -227,7 +221,7 @@ async fn check_if_online(addr: SocketAddr) -> bool {
 const RECHECK_INTERVAL: Duration = Duration::from_millis(250);
 
 pub struct WorkerChild {
-    handle: JoinHandle<FaucetResult<()>>,
+    _handle: JoinHandle<FaucetResult<()>>,
     stopper: tokio::sync::mpsc::Sender<()>,
 }
 
@@ -275,7 +269,10 @@ fn spawn_worker_task(config: WorkerConfig) -> WorkerChild {
             log::error!(target: "faucet", "{target}'s process ({}) exited with status {}", pid, status, target = config.target);
         }
     });
-    WorkerChild { handle, stopper }
+    WorkerChild {
+        _handle: handle,
+        stopper,
+    }
 }
 
 impl Worker {
@@ -285,7 +282,7 @@ impl Worker {
     }
 }
 
-pub(crate) struct Workers {
+pub struct Workers {
     pub workers: Box<[Worker]>,
 }
 
