@@ -4,8 +4,14 @@ use crate::{
     networking::get_available_sockets,
     server::FaucetServerConfig,
 };
-use std::{ffi::OsStr, net::SocketAddr, path::Path, sync::atomic::AtomicBool, time::Duration};
-use tokio::{process::Child, task::JoinHandle};
+use std::{
+    ffi::OsStr,
+    net::SocketAddr,
+    path::Path,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
+};
+use tokio::{process::Child, sync::Mutex, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
@@ -206,11 +212,11 @@ impl WorkerConfig {
     }
 }
 
-struct Worker {
+pub struct Worker {
     /// Whether the worker should be stopped
-    _worker_task: JoinHandle<FaucetResult<()>>,
+    pub child: WorkerChild,
     /// The address of the worker's socket.
-    config: WorkerConfig,
+    pub config: WorkerConfig,
 }
 
 async fn check_if_online(addr: SocketAddr) -> bool {
@@ -220,8 +226,20 @@ async fn check_if_online(addr: SocketAddr) -> bool {
 
 const RECHECK_INTERVAL: Duration = Duration::from_millis(250);
 
-fn spawn_worker_task(config: WorkerConfig) -> JoinHandle<FaucetResult<()>> {
-    tokio::spawn(async move {
+pub struct WorkerChild {
+    handle: JoinHandle<FaucetResult<()>>,
+    stopper: tokio::sync::mpsc::Sender<()>,
+}
+
+impl WorkerChild {
+    pub fn kill(&self) {
+        let _ = self.stopper.try_send(());
+    }
+}
+
+fn spawn_worker_task(config: WorkerConfig) -> WorkerChild {
+    let (stopper, mut rx) = tokio::sync::mpsc::channel(1);
+    let handle = tokio::spawn(async move {
         loop {
             let mut child = config.spawn_process(config);
             let pid = child.id().expect("Failed to get plumber worker PID");
@@ -246,27 +264,29 @@ fn spawn_worker_task(config: WorkerConfig) -> JoinHandle<FaucetResult<()>> {
                 tokio::time::sleep(RECHECK_INTERVAL).await;
             }
 
+            tokio::select! {
+                _ = child.wait() => (),
+                _ = rx.recv() => return FaucetResult::Ok(()),
+            }
             let status = child.wait().await?;
             config
                 .is_online
                 .store(false, std::sync::atomic::Ordering::SeqCst);
             log::error!(target: "faucet", "{target}'s process ({}) exited with status {}", pid, status, target = config.target);
         }
-    })
+    });
+    WorkerChild { handle, stopper }
 }
 
 impl Worker {
     pub fn from_config(config: WorkerConfig) -> FaucetResult<Self> {
-        let worker_task = spawn_worker_task(config);
-        Ok(Self {
-            _worker_task: worker_task,
-            config,
-        })
+        let child = spawn_worker_task(config);
+        Ok(Self { child, config })
     }
 }
 
 pub(crate) struct Workers {
-    workers: Box<[Worker]>,
+    pub workers: Box<[Worker]>,
 }
 
 impl Workers {

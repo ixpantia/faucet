@@ -11,6 +11,7 @@ use crate::{
     },
     error::{FaucetError, FaucetResult},
     leak,
+    shutdown::ShutdownSignal,
 };
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
@@ -198,7 +199,7 @@ pub struct FaucetServerConfig {
 }
 
 impl FaucetServerConfig {
-    pub async fn run(self) -> FaucetResult<()> {
+    pub async fn run(self, shutdown: ShutdownSignal) -> FaucetResult<()> {
         let workers = Workers::new(self, "").await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
@@ -213,41 +214,59 @@ impl FaucetServerConfig {
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(bind).await?;
         log::info!(target: "faucet", "Listening on http://{}", bind);
-        loop {
-            let (tcp, client_addr) = listener.accept().await?;
-            let tcp = TokioIo::new(tcp);
-            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
+        let main_loop = || async {
+            loop {
+                let (tcp, client_addr) = listener.accept().await?;
+                let tcp = TokioIo::new(tcp);
+                log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
-            tokio::task::spawn(async move {
-                let mut conn = http1::Builder::new()
-                    .serve_connection(
-                        tcp,
-                        service_fn(|req: Request<Incoming>| {
-                            service.call(req, Some(client_addr.ip()))
-                        }),
-                    )
-                    .with_upgrades();
+                tokio::task::spawn(async move {
+                    let mut conn = http1::Builder::new()
+                        .serve_connection(
+                            tcp,
+                            service_fn(|req: Request<Incoming>| {
+                                service.call(req, Some(client_addr.ip()))
+                            }),
+                        )
+                        .with_upgrades();
 
-                let conn = pin!(&mut conn);
+                    let conn = pin!(&mut conn);
 
-                if let Err(e) = conn.await {
-                    log::error!(target: "faucet", "Connection error: {}", e);
-                }
-            });
+                    if let Err(e) = conn.await {
+                        log::error!(target: "faucet", "Connection error: {}", e);
+                    }
+                });
+            }
+            FaucetResult::Ok(())
+        };
+
+        // Race the shutdown vs the main loop
+        tokio::select! {
+            _ = shutdown.wait() => (),
+            _ = main_loop() => (),
         }
+
+        // Kill child process
+        workers.workers.iter().for_each(|w| {
+            log::info!(target: w.config.target, "Killing child process");
+            w.child.kill()
+        });
+
+        FaucetResult::Ok(())
     }
-    pub async fn extract_service(self, prefix: &str) -> FaucetResult<FaucetServerService> {
+    pub async fn extract_service(
+        self,
+        prefix: &str,
+    ) -> FaucetResult<(FaucetServerService, Workers)> {
         let workers = Workers::new(self, prefix).await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
-
-        let load_balancer = load_balancer.clone();
         let service: &'static _ = leak!(ServiceBuilder::new(ProxyService)
             .layer(logging::LogLayer)
             .layer(AddStateLayer::new(load_balancer))
             .build());
 
-        Ok(FaucetServerService { inner: service })
+        Ok((FaucetServerService { inner: service }, workers))
     }
 }
 

@@ -3,19 +3,17 @@ use faucet_server::cli::{Args, Commands};
 use faucet_server::error::FaucetResult;
 use faucet_server::server::logger::build_logger;
 use faucet_server::server::{FaucetServerBuilder, RouterConfig};
-
-#[cfg(unix)]
 use faucet_server::{cli::Shutdown, shutdown};
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
     let cli_args = Args::parse();
 
-    #[cfg(unix)]
-    match cli_args.shutdown {
-        Shutdown::Graceful => shutdown::graceful(),
+    let signal = match cli_args.shutdown {
         Shutdown::Immediate => shutdown::immediate(),
-    }
+        #[cfg(unix)]
+        Shutdown::Graceful => shutdown::graceful(),
+    };
 
     match cli_args.command {
         Commands::Start(start_args) => {
@@ -42,7 +40,7 @@ pub async fn main() -> FaucetResult<()> {
                 .quarto(start_args.quarto)
                 .qmd(start_args.qmd)
                 .build()?
-                .run()
+                .run(signal)
                 .await?;
         }
         Commands::Router(router_args) => {
@@ -64,6 +62,7 @@ pub async fn main() -> FaucetResult<()> {
                     router_args.quarto,
                     router_args.ip_from.into(),
                     router_args.host.parse()?,
+                    signal,
                 )
                 .await?;
         }
