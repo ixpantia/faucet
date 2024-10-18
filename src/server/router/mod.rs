@@ -11,10 +11,11 @@ use super::{onion::Service, FaucetServerBuilder, FaucetServerService};
 use crate::{
     client::{
         load_balancing::{IpExtractor, Strategy},
-        worker::WorkerType,
+        worker::{WorkerType, Workers},
         ExclusiveBody,
     },
     error::{FaucetError, FaucetResult},
+    shutdown::ShutdownSignal,
 };
 
 fn default_workdir() -> PathBuf {
@@ -121,7 +122,8 @@ impl RouterConfig {
         rscript: impl AsRef<OsStr>,
         quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
-    ) -> FaucetResult<RouterService> {
+    ) -> FaucetResult<(RouterService, Vec<Workers>)> {
+        let mut all_workers = Vec::with_capacity(self.route.len());
         let mut routes = Vec::with_capacity(self.route.len());
         let mut clients = Vec::with_capacity(self.route.len());
         let mut routes_set = HashSet::with_capacity(self.route.len());
@@ -131,7 +133,7 @@ impl RouterConfig {
                 return Err(FaucetError::DuplicateRoute(route));
             }
             routes.push(route);
-            let client = FaucetServerBuilder::new()
+            let (client, workers) = FaucetServerBuilder::new()
                 .workdir(route_conf.config.workdir)
                 .server_type(route_conf.config.server_type)
                 .strategy(route_conf.config.strategy)
@@ -144,12 +146,13 @@ impl RouterConfig {
                 .build()?
                 .extract_service(&format!("[{route}]::"))
                 .await?;
+            all_workers.push(workers);
             clients.push(client);
         }
         let routes = routes.leak();
         let clients = clients.leak();
         let service = RouterService { clients, routes };
-        Ok(service)
+        Ok((service, all_workers))
     }
 }
 
@@ -160,32 +163,52 @@ impl RouterConfig {
         quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
         addr: SocketAddr,
+        shutdown: ShutdownSignal,
     ) -> FaucetResult<()> {
-        let service = self.into_service(rscript, quarto, ip_from).await?;
+        let (service, all_workers) = self.into_service(rscript, quarto, ip_from).await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;
         log::info!(target: "faucet", "Listening on http://{}", addr);
-        loop {
-            let (tcp, client_addr) = listener.accept().await?;
-            let tcp = TokioIo::new(tcp);
-            log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
+        let main_loop = || async {
+            loop {
+                let (tcp, client_addr) = listener.accept().await?;
+                let tcp = TokioIo::new(tcp);
+                log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
-            tokio::task::spawn(async move {
-                let mut conn = http1::Builder::new()
-                    .serve_connection(
-                        tcp,
-                        service_fn(|req: Request<Incoming>| {
-                            service.call(req, Some(client_addr.ip()))
-                        }),
-                    )
-                    .with_upgrades();
+                tokio::task::spawn(async move {
+                    let mut conn = http1::Builder::new()
+                        .serve_connection(
+                            tcp,
+                            service_fn(|req: Request<Incoming>| {
+                                service.call(req, Some(client_addr.ip()))
+                            }),
+                        )
+                        .with_upgrades();
 
-                let conn = pin!(&mut conn);
+                    let conn = pin!(&mut conn);
 
-                if let Err(e) = conn.await {
-                    log::error!(target: "faucet", "Connection error: {}", e);
-                }
-            });
+                    if let Err(e) = conn.await {
+                        log::error!(target: "faucet", "Connection error: {}", e);
+                    }
+                });
+            }
+            FaucetResult::Ok(())
+        };
+
+        // Race the shutdown vs the main loop
+        tokio::select! {
+            _ = shutdown.wait() => (),
+            _ = main_loop() => (),
         }
+
+        // Kill child process
+        all_workers.iter().for_each(|workers| {
+            workers.workers.iter().for_each(|w| {
+                log::info!(target: w.config.target, "Killing child process");
+                w.child.kill();
+            });
+        });
+
+        FaucetResult::Ok(())
     }
 }
