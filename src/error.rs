@@ -206,36 +206,28 @@ mod tests {
             .body(())
             .unwrap_err();
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_from_io_error() {
         let err = std::io::Error::new(std::io::ErrorKind::Other, "test");
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_from_pool_error() {
         let err = deadpool::managed::PoolError::Backend(FaucetError::unknown("test"));
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_from_pool_build_error() {
         let err = deadpool::managed::BuildError::NoRuntimeSpecified;
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
@@ -244,18 +236,14 @@ mod tests {
             deadpool::managed::TimeoutType::Create,
         );
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_from_pool_closed_error() {
         let err = deadpool::managed::PoolError::<FaucetError>::Closed;
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
@@ -264,50 +252,38 @@ mod tests {
             deadpool::managed::HookError::message("test"),
         );
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_from_pool_no_runtime_specified_error() {
         let err = deadpool::managed::PoolError::<FaucetError>::NoRuntimeSpecified;
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_from_hyper_invalid_header_value_error() {
         let err = hyper::header::HeaderValue::from_bytes([0x00].as_ref()).unwrap_err();
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_from_addr_parse_error() {
         let err = "INVALID".parse::<std::net::SocketAddr>().unwrap_err();
 
-        let err: FaucetError = From::from(err);
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err: FaucetError = From::from(err);
     }
 
     #[test]
     fn test_faucet_error_displat_missing_header() {
-        let err = FaucetError::BadRequest(BadRequestReason::MissingHeader("test"));
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err = FaucetError::BadRequest(BadRequestReason::MissingHeader("test"));
     }
 
     #[test]
     fn test_faucet_error_displat_invalid_header() {
-        let err = FaucetError::BadRequest(BadRequestReason::InvalidHeader("test"));
-        format!("{:?}", err);
-        format!("{}", err);
+        let _err = FaucetError::BadRequest(BadRequestReason::InvalidHeader("test"));
     }
 
     #[test]

@@ -1,11 +1,3 @@
-use std::sync::OnceLock;
-
-use signal_hook::{
-    consts::{SIGINT, SIGTERM},
-    iterator::Signals,
-};
-
-static STOP_THREAD: OnceLock<std::thread::JoinHandle<()>> = OnceLock::new();
 const WAIT_STOP_PRINT: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub struct ShutdownSignal(tokio::sync::mpsc::Receiver<()>);
@@ -20,7 +12,6 @@ impl ShutdownSignal {
     }
 }
 
-#[cfg(unix)]
 pub fn graceful() -> ShutdownSignal {
     use crate::global_conn::current_connections;
 
@@ -41,7 +32,8 @@ pub fn graceful() -> ShutdownSignal {
             }
         }
         let _ = tx.blocking_send(());
-    });
+    })
+    .expect("Unable to set term handler. This is a bug");
 
     signal
 }
@@ -51,6 +43,7 @@ pub fn immediate() -> ShutdownSignal {
     ctrlc::set_handler(move || {
         log::info!(target: "faucet", "Starting immediate shutdown handle");
         let _ = tx.blocking_send(());
-    });
+    })
+    .expect("Unable to set term handler. This is a bug");
     signal
 }

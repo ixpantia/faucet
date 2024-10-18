@@ -171,28 +171,34 @@ impl RouterConfig {
         log::info!(target: "faucet", "Listening on http://{}", addr);
         let main_loop = || async {
             loop {
-                let (tcp, client_addr) = listener.accept().await?;
-                let tcp = TokioIo::new(tcp);
-                log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
-
-                tokio::task::spawn(async move {
-                    let mut conn = http1::Builder::new()
-                        .serve_connection(
-                            tcp,
-                            service_fn(|req: Request<Incoming>| {
-                                service.call(req, Some(client_addr.ip()))
-                            }),
-                        )
-                        .with_upgrades();
-
-                    let conn = pin!(&mut conn);
-
-                    if let Err(e) = conn.await {
-                        log::error!(target: "faucet", "Connection error: {}", e);
+                match listener.accept().await {
+                    Err(e) => {
+                        log::error!(target: "faucet", "Unable to accept TCP connection: {e}");
+                        return;
                     }
-                });
+                    Ok((tcp, client_addr)) => {
+                        let tcp = TokioIo::new(tcp);
+                        log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
+
+                        tokio::task::spawn(async move {
+                            let mut conn = http1::Builder::new()
+                                .serve_connection(
+                                    tcp,
+                                    service_fn(|req: Request<Incoming>| {
+                                        service.call(req, Some(client_addr.ip()))
+                                    }),
+                                )
+                                .with_upgrades();
+
+                            let conn = pin!(&mut conn);
+
+                            if let Err(e) = conn.await {
+                                log::error!(target: "faucet", "Connection error: {}", e);
+                            }
+                        });
+                    }
+                }
             }
-            FaucetResult::Ok(())
         };
 
         // Race the shutdown vs the main loop

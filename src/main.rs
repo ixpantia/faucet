@@ -11,7 +11,6 @@ pub async fn main() -> FaucetResult<()> {
 
     let signal = match cli_args.shutdown {
         Shutdown::Immediate => shutdown::immediate(),
-        #[cfg(unix)]
         Shutdown::Graceful => shutdown::graceful(),
     };
 
