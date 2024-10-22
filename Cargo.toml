@@ -33,7 +33,7 @@ base64 = "0.22"
 sha1 = "0.10"
 futures-util = "0.3"
 tower = "^0.5.1"
-serde = { version = "1.0.204", features = ["derive"] }
+serde = { version = "1.0.211", features = ["derive"] }
 fxhash = "0.2.1"
 toml = "0.8.19"
 nix = "0.29.0"
