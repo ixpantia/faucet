@@ -27,7 +27,7 @@ pub enum FaucetError {
     InvalidHeaderValues(hyper::header::InvalidHeaderValue),
     Http(hyper::http::Error),
     MissingArgument(&'static str),
-    DuplicateRoute(&'static str),
+    DuplicateRoute(String),
     Utf8Coding,
     BufferCapacity(tokio_tungstenite::tungstenite::error::CapacityError),
     ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),

@@ -34,16 +34,16 @@ fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> St
     match server_type {
         WorkerType::Plumber =>
             strategy.unwrap_or_else(|| {
-                log::info!(target: "faucet", "No load balancing strategy specified. Defaulting to round robin for plumber.");
+                log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to round robin for plumber.");
                 Strategy::RoundRobin
             }),
         WorkerType::Shiny | WorkerType::QuartoShiny => match strategy {
             None => {
-                log::info!(target: "faucet", "No load balancing strategy specified. Defaulting to IP hash for shiny.");
+                log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to IP hash for shiny.");
                 Strategy::IpHash
             },
             Some(Strategy::RoundRobin) => {
-                log::info!(target: "faucet", "Round robin load balancing strategy specified for shiny, switching to IP hash.");
+                log::debug!(target: "faucet", "Round robin load balancing strategy specified for shiny, switching to IP hash.");
                 Strategy::IpHash
             },
             Some(Strategy::IpHash) => Strategy::IpHash,
@@ -84,22 +84,22 @@ impl FaucetServerBuilder {
         self
     }
     pub fn strategy(mut self, strategy: Option<Strategy>) -> Self {
-        log::info!(target: "faucet", "Using load balancing strategy: {:?}", strategy);
+        log::debug!(target: "faucet", "Using load balancing strategy: {:?}", strategy);
         self.strategy = strategy;
         self
     }
     pub fn bind(mut self, bind: SocketAddr) -> Self {
-        log::info!(target: "faucet", "Will bind to: {}", bind);
+        log::debug!(target: "faucet", "Will bind to: {}", bind);
         self.bind = Some(bind);
         self
     }
     pub fn extractor(mut self, extractor: load_balancing::IpExtractor) -> Self {
-        log::info!(target: "faucet", "Using IP extractor: {:?}", extractor);
+        log::debug!(target: "faucet", "Using IP extractor: {:?}", extractor);
         self.extractor = Some(extractor);
         self
     }
     pub fn workers(mut self, n: usize) -> Self {
-        log::info!(target: "faucet", "Will spawn {} workers", n);
+        log::debug!(target: "faucet", "Will spawn {} workers", n);
         self.n_workers = match n.try_into() {
             Ok(n) => Some(n),
             Err(_) => {
@@ -110,22 +110,22 @@ impl FaucetServerBuilder {
         self
     }
     pub fn server_type(mut self, server_type: WorkerType) -> Self {
-        log::info!(target: "faucet", "Using worker type: {:?}", server_type);
+        log::debug!(target: "faucet", "Using worker type: {:?}", server_type);
         self.server_type = Some(server_type);
         self
     }
     pub fn workdir(mut self, workdir: impl AsRef<Path>) -> Self {
-        log::info!(target: "faucet", "Using workdir: {:?}", workdir.as_ref());
+        log::debug!(target: "faucet", "Using workdir: {:?}", workdir.as_ref());
         self.workdir = Some(workdir.as_ref().into());
         self
     }
     pub fn rscript(mut self, rscript: impl AsRef<OsStr>) -> Self {
-        log::info!(target: "faucet", "Using Rscript command: {:?}", rscript.as_ref());
+        log::debug!(target: "faucet", "Using Rscript command: {:?}", rscript.as_ref());
         self.rscript = Some(rscript.as_ref().into());
         self
     }
     pub fn quarto(mut self, quarto: impl AsRef<OsStr>) -> Self {
-        log::info!(target: "faucet", "Using quarto command: {:?}", quarto.as_ref());
+        log::debug!(target: "faucet", "Using quarto command: {:?}", quarto.as_ref());
         self.quarto = Some(quarto.as_ref().into());
         self
     }
@@ -140,27 +140,27 @@ impl FaucetServerBuilder {
         let strategy = determine_strategy(server_type, self.strategy);
         let bind = self.bind;
         let n_workers = self.n_workers.unwrap_or_else(|| {
-            log::info!(target: "faucet", "No number of workers specified. Defaulting to the number of logical cores.");
+            log::debug!(target: "faucet", "No number of workers specified. Defaulting to the number of logical cores.");
             num_cpus::get().try_into().expect("num_cpus::get() returned 0")
         });
         let workdir = self.workdir
             .map(|wd| leak!(wd, Path))
             .unwrap_or_else(|| {
-                log::info!(target: "faucet", "No workdir specified. Defaulting to the current directory.");
+                log::debug!(target: "faucet", "No workdir specified. Defaulting to the current directory.");
                 Path::new(".")
             });
         let rscript = self.rscript.map(|wd| leak!(wd, OsStr)).unwrap_or_else(|| {
-            log::info!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
+            log::debug!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
             OsStr::new("Rscript")
         });
         let extractor = self.extractor.unwrap_or_else(|| {
-            log::info!(target: "faucet", "No IP extractor specified. Defaulting to client address.");
+            log::debug!(target: "faucet", "No IP extractor specified. Defaulting to client address.");
             load_balancing::IpExtractor::ClientAddr
         });
         let app_dir = self.app_dir.map(|app_dir| leak!(app_dir, str));
         let qmd = self.qmd.map(|qmd| leak!(qmd, Path));
         let quarto = self.quarto.map(|qmd| leak!(qmd, OsStr)).unwrap_or_else(|| {
-            log::info!(target: "faucet", "No quarto command specified. Defaulting to `quarto`.");
+            log::debug!(target: "faucet", "No quarto command specified. Defaulting to `quarto`.");
             OsStr::new("quarto")
         });
         Ok(FaucetServerConfig {
@@ -200,7 +200,7 @@ pub struct FaucetServerConfig {
 
 impl FaucetServerConfig {
     pub async fn run(self, shutdown: ShutdownSignal) -> FaucetResult<()> {
-        let workers = Workers::new(self, "").await?;
+        let mut workers = Workers::new(self, "").await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
         let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
@@ -253,10 +253,10 @@ impl FaucetServerConfig {
         }
 
         // Kill child process
-        workers.workers.iter().for_each(|w| {
+        for w in &mut workers.workers {
             log::info!(target: w.config.target, "Killing child process");
-            w.child.kill()
-        });
+            w.child.kill().await;
+        }
 
         FaucetResult::Ok(())
     }
