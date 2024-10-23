@@ -47,7 +47,7 @@ pub struct RouterConfig {
 
 #[derive(Copy, Clone)]
 struct RouterService {
-    routes: &'static [&'static str],
+    routes: &'static [String],
     clients: &'static [FaucetServerService],
 }
 
@@ -99,7 +99,7 @@ impl Service<hyper::Request<Incoming>> for RouterService {
     ) -> Result<Self::Response, Self::Error> {
         let mut client = None;
         for i in 0..self.routes.len() {
-            let route = self.routes[i];
+            let route = &self.routes[i];
             if let Some(new_uri) = strip_prefix(req.uri(), route) {
                 client = Some(&self.clients[i]);
                 *req.uri_mut() = new_uri;
@@ -128,11 +128,10 @@ impl RouterConfig {
         let mut clients = Vec::with_capacity(self.route.len());
         let mut routes_set = HashSet::with_capacity(self.route.len());
         for route_conf in self.route.into_iter() {
-            let route: &'static str = route_conf.route.leak();
-            if !routes_set.insert(route) {
-                return Err(FaucetError::DuplicateRoute(route));
+            let route = route_conf.route.as_str();
+            if !routes_set.insert(route.to_owned()) {
+                return Err(FaucetError::DuplicateRoute(route_conf.route));
             }
-            routes.push(route);
             let (client, workers) = FaucetServerBuilder::new()
                 .workdir(route_conf.config.workdir)
                 .server_type(route_conf.config.server_type)
@@ -146,6 +145,7 @@ impl RouterConfig {
                 .build()?
                 .extract_service(&format!("[{route}]::"))
                 .await?;
+            routes.push(route_conf.route);
             all_workers.push(workers);
             clients.push(client);
         }
@@ -165,7 +165,7 @@ impl RouterConfig {
         addr: SocketAddr,
         shutdown: ShutdownSignal,
     ) -> FaucetResult<()> {
-        let (service, all_workers) = self.into_service(rscript, quarto, ip_from).await?;
+        let (service, mut all_workers) = self.into_service(rscript, quarto, ip_from).await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;
         log::info!(target: "faucet", "Listening on http://{}", addr);
@@ -208,12 +208,9 @@ impl RouterConfig {
         }
 
         // Kill child process
-        all_workers.iter().for_each(|workers| {
-            workers.workers.iter().for_each(|w| {
-                log::info!(target: w.config.target, "Killing child process");
-                w.child.kill();
-            });
-        });
+        for w in all_workers.iter_mut().flat_map(|ws| &mut ws.workers) {
+            w.child.kill().await;
+        }
 
         FaucetResult::Ok(())
     }

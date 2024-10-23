@@ -4,7 +4,13 @@ use crate::{
     networking::get_available_sockets,
     server::FaucetServerConfig,
 };
-use std::{ffi::OsStr, net::SocketAddr, path::Path, sync::atomic::AtomicBool, time::Duration};
+use std::{
+    ffi::OsStr,
+    net::SocketAddr,
+    path::Path,
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    time::Duration,
+};
 use tokio::{process::Child, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
@@ -221,56 +227,74 @@ async fn check_if_online(addr: SocketAddr) -> bool {
 const RECHECK_INTERVAL: Duration = Duration::from_millis(250);
 
 pub struct WorkerChild {
-    _handle: JoinHandle<FaucetResult<()>>,
+    handle: Option<JoinHandle<FaucetResult<()>>>,
     stopper: tokio::sync::mpsc::Sender<()>,
 }
 
 impl WorkerChild {
-    pub fn kill(&self) {
+    pub async fn kill(&mut self) {
         let _ = self.stopper.try_send(());
+        self.wait_until_done().await;
+    }
+    pub async fn wait_until_done(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.await;
+        }
     }
 }
 
 fn spawn_worker_task(config: WorkerConfig) -> WorkerChild {
     let (stopper, mut rx) = tokio::sync::mpsc::channel(1);
     let handle = tokio::spawn(async move {
+        let pid = AtomicU32::new(0);
         loop {
-            let mut child = config.spawn_process(config);
-            let pid = child.id().expect("Failed to get plumber worker PID");
-            log::info!(target: "faucet", "Starting process {pid} for {target} on port {port}", port = config.addr.port(), target = config.target);
-            loop {
-                // Try to connect to the socket
-                let check_status = check_if_online(config.addr).await;
-                // If it's online, we can break out of the loop and start serving connections
-                if check_status {
-                    log::info!(target: "faucet", "{target} is online and ready to serve connections", target = config.target);
-                    config
-                        .is_online
-                        .store(check_status, std::sync::atomic::Ordering::SeqCst);
-                    break;
-                }
-                // If it's not online but the child process has exited, we should break out of the loop
-                // and restart the process
-                if child.try_wait()?.is_some() {
-                    break;
-                }
+            let child_manage_closure = || async {
+                let mut child = config.spawn_process(config);
+                pid.store(
+                    child.id().expect("Failed to get plumber worker PID"),
+                    Ordering::SeqCst,
+                );
+                log::info!(target: "faucet", "Starting process {pid} for {target} on port {port}", port = config.addr.port(), target = config.target, pid = pid.load(Ordering::SeqCst));
+                loop {
+                    // Try to connect to the socket
+                    let check_status = check_if_online(config.addr).await;
+                    // If it's online, we can break out of the loop and start serving connections
+                    if check_status {
+                        log::info!(target: "faucet", "{target} is online and ready to serve connections", target = config.target);
+                        config.is_online.store(check_status, Ordering::SeqCst);
+                        break;
+                    }
+                    // If it's not online but the child process has exited, we should break out of the loop
+                    // and restart the process
+                    if child.try_wait()?.is_some() {
+                        break;
+                    }
 
-                tokio::time::sleep(RECHECK_INTERVAL).await;
-            }
+                    tokio::time::sleep(RECHECK_INTERVAL).await;
+                }
+                child.wait().await
+            };
 
             tokio::select! {
-                _ = child.wait() => (),
-                _ = rx.recv() => return FaucetResult::Ok(()),
+                status = child_manage_closure() => {
+                    config
+                        .is_online
+                        .store(false, std::sync::atomic::Ordering::SeqCst);
+                    log::error!(target: "faucet", "{target}'s process ({}) exited with status {}", pid.load(Ordering::SeqCst), status?, target = config.target);
+                },
+                _ = rx.recv() => break,
             }
-            let status = child.wait().await?;
-            config
-                .is_online
-                .store(false, std::sync::atomic::Ordering::SeqCst);
-            log::error!(target: "faucet", "{target}'s process ({}) exited with status {}", pid, status, target = config.target);
         }
+        match pid.load(Ordering::SeqCst) {
+            0 => (), // If PID is 0 that means the process has not even started
+            pid => {
+                log::info!(target: "faucet", "{target}'s process ({pid}) killed", target = config.target)
+            }
+        }
+        FaucetResult::Ok(())
     });
     WorkerChild {
-        _handle: handle,
+        handle: Some(handle),
         stopper,
     }
 }
