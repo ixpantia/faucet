@@ -59,9 +59,12 @@ impl TelemetryManager {
                 let types = &[
                     PgType::TEXT,        // Namespace
                     PgType::TEXT,        // Target
+                    PgType::TEXT,        // Worker Route
+                    PgType::INT4,        // Worker ID
                     PgType::INET,        // IpAddr
                     PgType::TEXT,        // Method
                     PgType::TEXT,        // Path
+                    PgType::TEXT,        // Query Params
                     PgType::TEXT,        // Version
                     PgType::INT2,        // Status
                     PgType::TEXT,        // User Agent
@@ -70,6 +73,7 @@ impl TelemetryManager {
                 ];
                 let mut logs_buffer = Vec::with_capacity(100);
                 let mut path_buffer = Vec::<u8>::new();
+                let mut query_buffer = Vec::<u8>::new();
                 let mut version_buffer = Vec::<u8>::new();
                 let mut user_agent_buffer = Vec::<u8>::new();
 
@@ -102,11 +106,20 @@ impl TelemetryManager {
                             );
 
                             'write: for (timespamp, log_data) in logs_buffer.drain(..) {
-                                let target = &log_data.target;
-                                let ip = &log_data.ip;
+                                let target = &log_data.state_data.target;
+                                let worker_id = log_data.state_data.worker_id as i32;
+                                let worker_route = log_data.state_data.worker_route;
+                                let ip = &log_data.state_data.ip;
                                 let method = &log_data.method.as_str();
-                                let _ = write!(path_buffer, "{}", log_data.path);
+                                let _ = write!(path_buffer, "{}", log_data.path.path());
                                 let path = &std::str::from_utf8(&path_buffer).unwrap_or_default();
+                                let _ = write!(
+                                    query_buffer,
+                                    "{}",
+                                    log_data.path.query().unwrap_or_default()
+                                );
+                                let query = &std::str::from_utf8(&query_buffer).unwrap_or_default();
+                                let query = if query.is_empty() { None } else { Some(query) };
                                 let _ = write!(version_buffer, "{:?}", log_data.version);
                                 let version =
                                     &std::str::from_utf8(&version_buffer).unwrap_or_default();
@@ -122,9 +135,12 @@ impl TelemetryManager {
                                     .write(&[
                                         &namespace,
                                         target,
+                                        &worker_route,
+                                        &worker_id,
                                         ip,
                                         method,
                                         path,
+                                        &query,
                                         version,
                                         status,
                                         &user_agent,
@@ -136,6 +152,7 @@ impl TelemetryManager {
                                 path_buffer.clear();
                                 version_buffer.clear();
                                 user_agent_buffer.clear();
+                                query_buffer.clear();
 
                                 if let Err(e) = copy_result {
                                     log::error!("Error writing to PostgreSQL: {e}");

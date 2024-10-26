@@ -70,25 +70,21 @@ pub struct WorkerConfig {
     pub addr: SocketAddr,
     pub target: &'static str,
     pub worker_id: usize,
+    pub worker_route: Option<&'static str>,
     pub is_online: &'static AtomicBool,
     pub qmd: Option<&'static Path>,
 }
 
 impl WorkerConfig {
-    fn new(
-        worker_id: usize,
-        addr: SocketAddr,
-        server_config: &FaucetServerConfig,
-        target_prefix: &str,
-    ) -> Self {
+    fn new(worker_id: usize, addr: SocketAddr, server_config: &FaucetServerConfig) -> Self {
         Self {
             addr,
             worker_id,
             is_online: leak!(AtomicBool::new(false)),
             workdir: server_config.workdir,
-            target: leak!(format!("{}Worker::{}", target_prefix, worker_id)),
+            worker_route: server_config.route,
+            target: leak!(format!("Worker::{}", worker_id)),
             app_dir: server_config.app_dir,
-
             wtype: server_config.server_type,
             rscript: server_config.rscript,
             quarto: server_config.quarto,
@@ -102,6 +98,7 @@ impl WorkerConfig {
             is_online: leak!(AtomicBool::new(online)),
             addr: addr.parse().unwrap(),
             app_dir: None,
+            worker_route: None,
             rscript: OsStr::new(""),
             wtype: crate::client::worker::WorkerType::Shiny,
             worker_id: 1,
@@ -256,7 +253,7 @@ fn spawn_worker_task(config: WorkerConfig, shutdown: ShutdownSignal) -> WorkerCh
                     let check_status = check_if_online(config.addr).await;
                     // If it's online, we can break out of the loop and start serving connections
                     if check_status {
-                        log::info!(target: "faucet", "{target} is online and ready to serve connections", target = config.target);
+                        log::info!(target: "faucet", "{target} is online and ready to serve connections at {route}", target = config.target, route = config.worker_route.unwrap_or("/"));
                         config.is_online.store(check_status, Ordering::SeqCst);
                         break;
                     }
@@ -309,15 +306,12 @@ pub struct Workers {
 impl Workers {
     pub(crate) async fn new(
         server_config: FaucetServerConfig,
-        target_prefix: &str,
         shutdown: ShutdownSignal,
     ) -> FaucetResult<Self> {
         let workers = get_available_sockets(server_config.n_workers.get())
             .await
             .enumerate()
-            .map(|(id, socket_addr)| {
-                WorkerConfig::new(id + 1, socket_addr, &server_config, target_prefix)
-            })
+            .map(|(id, socket_addr)| WorkerConfig::new(id + 1, socket_addr, &server_config))
             .map(|config| Worker::from_config(config, shutdown.clone()))
             .collect::<FaucetResult<Box<[Worker]>>>()?;
         Ok(Self { workers })

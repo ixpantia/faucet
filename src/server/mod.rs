@@ -64,6 +64,7 @@ pub struct FaucetServerBuilder {
     app_dir: Option<String>,
     quarto: Option<OsString>,
     qmd: Option<PathBuf>,
+    route: Option<String>,
     telemetry: Option<TelemetrySender>,
 }
 
@@ -78,6 +79,7 @@ impl FaucetServerBuilder {
             extractor: None,
             rscript: None,
             app_dir: None,
+            route: None,
             quarto: None,
             qmd: None,
             telemetry: None,
@@ -141,6 +143,10 @@ impl FaucetServerBuilder {
         self.telemetry = telemetry_manager.map(|m| m.sender.clone());
         self
     }
+    pub fn route(mut self, route: String) -> Self {
+        self.route = Some(route);
+        self
+    }
     pub fn build(self) -> FaucetResult<FaucetServerConfig> {
         let server_type = self
             .server_type
@@ -172,6 +178,7 @@ impl FaucetServerBuilder {
             OsStr::new("quarto")
         });
         let telemetry = self.telemetry;
+        let route = self.route.map(|r| -> &'static _ { leak!(r) });
         Ok(FaucetServerConfig {
             strategy,
             bind,
@@ -181,6 +188,7 @@ impl FaucetServerBuilder {
             extractor,
             rscript,
             app_dir,
+            route,
             quarto,
             telemetry,
             qmd,
@@ -206,13 +214,14 @@ pub struct FaucetServerConfig {
     pub quarto: &'static OsStr,
     pub telemetry: Option<TelemetrySender>,
     pub app_dir: Option<&'static str>,
+    pub route: Option<&'static str>,
     pub qmd: Option<&'static Path>,
 }
 
 impl FaucetServerConfig {
     pub async fn run(self, shutdown: ShutdownSignal) -> FaucetResult<()> {
         let telemetry = self.telemetry.clone();
-        let mut workers = Workers::new(self.clone(), "", shutdown.clone()).await?;
+        let mut workers = Workers::new(self.clone(), shutdown.clone()).await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
         let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
@@ -282,11 +291,10 @@ impl FaucetServerConfig {
     }
     pub async fn extract_service(
         self,
-        prefix: &str,
         shutdown: ShutdownSignal,
     ) -> FaucetResult<(FaucetServerService, Workers)> {
         let telemetry = self.telemetry.clone();
-        let workers = Workers::new(self.clone(), prefix, shutdown).await?;
+        let workers = Workers::new(self.clone(), shutdown).await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
         let service = Arc::new(

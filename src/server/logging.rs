@@ -70,16 +70,31 @@ pub mod logger {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct StateData {
+    pub ip: IpAddr,
+    pub worker_route: Option<&'static str>,
+    pub worker_id: usize,
+    pub target: &'static str,
+}
+
 trait StateLogData: Send + Sync + 'static {
-    fn get_state_data(&self) -> (IpAddr, &'static str);
+    fn get_state_data(&self) -> StateData;
 }
 
 impl StateLogData for State {
     #[inline(always)]
-    fn get_state_data(&self) -> (IpAddr, &'static str) {
+    fn get_state_data(&self) -> StateData {
         let ip = self.remote_addr;
+        let worker_id = self.client.config.worker_id;
+        let worker_route = self.client.config.worker_route;
         let target = self.client.config.target;
-        (ip, target)
+        StateData {
+            ip,
+            worker_id,
+            worker_route,
+            target,
+        }
     }
 }
 
@@ -123,8 +138,7 @@ where
 }
 
 pub struct LogData {
-    pub target: &'static str,
-    pub ip: IpAddr,
+    pub state_data: StateData,
     pub method: Method,
     pub path: Uri,
     pub version: Version,
@@ -136,9 +150,10 @@ pub struct LogData {
 impl LogData {
     fn log(&self) {
         log::info!(
-            target: self.target,
-            r#"{ip} "{method} {path} {version:?}" {status} {user_agent:?} {elapsed}"#,
-            ip = self.ip,
+            target: self.state_data.target,
+            r#"{ip} "{method} {route}{path} {version:?}" {status} {user_agent:?} {elapsed}"#,
+            route = self.state_data.worker_route.map(|r| r.trim_end_matches('/')).unwrap_or_default(),
+            ip = self.state_data.ip,
             method = self.method,
             path = self.path,
             version = self.version,
@@ -158,7 +173,7 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
 
     // Extract request info for logging
     let state = req.extensions().get::<State>().expect("State not found");
-    let (ip, target) = state.get_state_data();
+    let state_data = state.get_state_data();
     let method = req.method().clone();
     let path = req.uri().clone();
     let version = req.version();
@@ -172,8 +187,7 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
     let elapsed = start.elapsed().as_millis() as i64;
 
     let log_data = LogData {
-        target,
-        ip,
+        state_data,
         method,
         path,
         version,
@@ -239,8 +253,13 @@ mod tests {
         struct MockState;
 
         impl StateLogData for MockState {
-            fn get_state_data(&self) -> (IpAddr, &'static str) {
-                (IpAddr::V4([127, 0, 0, 1].into()), "test")
+            fn get_state_data(&self) -> StateData {
+                StateData {
+                    ip: IpAddr::V4([127, 0, 0, 1].into()),
+                    target: "test",
+                    worker_id: 1,
+                    worker_route: None,
+                }
             }
         }
 
@@ -272,7 +291,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(log_data.ip, IpAddr::V4([127, 0, 0, 1].into()));
+        assert_eq!(log_data.state_data.ip, IpAddr::V4([127, 0, 0, 1].into()));
         assert_eq!(log_data.method, Method::GET);
         assert_eq!(log_data.path, "https://example.com/");
         assert_eq!(log_data.version, Version::HTTP_11);
@@ -282,7 +301,7 @@ mod tests {
             LogOption::Some(HeaderValue::from_static("test"))
         );
         assert!(log_data.elapsed > 0);
-        assert_eq!(log_data.target, "test");
+        assert_eq!(log_data.state_data.target, "test");
     }
 
     #[test]
@@ -332,8 +351,12 @@ mod tests {
         }
 
         let log_data = LogData {
-            target: "test",
-            ip: IpAddr::V4([127, 0, 0, 1].into()),
+            state_data: StateData {
+                target: "test",
+                ip: IpAddr::V4([127, 0, 0, 1].into()),
+                worker_route: None,
+                worker_id: 1,
+            },
             method: Method::GET,
             path: "https://example.com/".parse().unwrap(),
             version: Version::HTTP_11,

@@ -132,9 +132,9 @@ impl RouterConfig {
         let mut clients = Vec::with_capacity(self.route.len());
         let mut routes_set = HashSet::with_capacity(self.route.len());
         for route_conf in self.route.into_iter() {
-            let route = route_conf.route.as_str();
-            if !routes_set.insert(route.to_owned()) {
-                return Err(FaucetError::DuplicateRoute(route_conf.route));
+            let route = route_conf.route;
+            if !routes_set.insert(route.clone()) {
+                return Err(FaucetError::DuplicateRoute(route));
             }
             let (client, workers) = FaucetServerBuilder::new()
                 .workdir(route_conf.config.workdir)
@@ -147,10 +147,11 @@ impl RouterConfig {
                 .extractor(ip_from)
                 .app_dir(route_conf.config.app_dir)
                 .telemetry(telemetry)
+                .route(route.clone())
                 .build()?
-                .extract_service(&format!("[{route}]::"), shutdown.clone())
+                .extract_service(shutdown.clone())
                 .await?;
-            routes.push(route_conf.route);
+            routes.push(route);
             all_workers.push(workers);
             clients.push(client);
         }
