@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet, ffi::OsStr, net::SocketAddr, num::NonZeroUsize, path::PathBuf, pin::pin,
+    sync::Arc,
 };
 
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Uri};
@@ -16,6 +17,7 @@ use crate::{
     },
     error::{FaucetError, FaucetResult},
     shutdown::ShutdownSignal,
+    telemetry::TelemetryManager,
 };
 
 fn default_workdir() -> PathBuf {
@@ -45,10 +47,10 @@ pub struct RouterConfig {
     route: Vec<RouteConfig>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 struct RouterService {
     routes: &'static [String],
-    clients: &'static [FaucetServerService],
+    clients: Arc<[FaucetServerService]>,
 }
 
 fn strip_prefix_exact(path_and_query: &PathAndQuery, prefix: &str) -> Option<PathAndQuery> {
@@ -122,6 +124,8 @@ impl RouterConfig {
         rscript: impl AsRef<OsStr>,
         quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
+        telemetry: Option<&TelemetryManager>,
+        shutdown: ShutdownSignal,
     ) -> FaucetResult<(RouterService, Vec<Workers>)> {
         let mut all_workers = Vec::with_capacity(self.route.len());
         let mut routes = Vec::with_capacity(self.route.len());
@@ -142,15 +146,16 @@ impl RouterConfig {
                 .workers(route_conf.config.workers.get())
                 .extractor(ip_from)
                 .app_dir(route_conf.config.app_dir)
+                .telemetry(telemetry)
                 .build()?
-                .extract_service(&format!("[{route}]::"))
+                .extract_service(&format!("[{route}]::"), shutdown.clone())
                 .await?;
             routes.push(route_conf.route);
             all_workers.push(workers);
             clients.push(client);
         }
         let routes = routes.leak();
-        let clients = clients.leak();
+        let clients = clients.into();
         let service = RouterService { clients, routes };
         Ok((service, all_workers))
     }
@@ -164,8 +169,11 @@ impl RouterConfig {
         ip_from: IpExtractor,
         addr: SocketAddr,
         shutdown: ShutdownSignal,
+        telemetry: Option<&TelemetryManager>,
     ) -> FaucetResult<()> {
-        let (service, mut all_workers) = self.into_service(rscript, quarto, ip_from).await?;
+        let (service, mut all_workers) = self
+            .into_service(rscript, quarto, ip_from, telemetry, shutdown.clone())
+            .await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;
         log::info!(target: "faucet", "Listening on http://{}", addr);
@@ -180,6 +188,9 @@ impl RouterConfig {
                         let tcp = TokioIo::new(tcp);
                         log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
+                        let service = service.clone();
+                        let shutdown = shutdown.clone();
+
                         tokio::task::spawn(async move {
                             let mut conn = http1::Builder::new()
                                 .serve_connection(
@@ -192,8 +203,13 @@ impl RouterConfig {
 
                             let conn = pin!(&mut conn);
 
-                            if let Err(e) = conn.await {
-                                log::error!(target: "faucet", "Connection error: {}", e);
+                            tokio::select! {
+                                result = conn => {
+                                    if let Err(e) = result {
+                                        log::error!(target: "faucet", "Connection error: {}", e);
+                                    }
+                                }
+                                _ = shutdown.wait() => ()
                             }
                         });
                     }
@@ -209,7 +225,7 @@ impl RouterConfig {
 
         // Kill child process
         for w in all_workers.iter_mut().flat_map(|ws| &mut ws.workers) {
-            w.child.kill().await;
+            w.child.wait_until_done().await;
         }
 
         FaucetResult::Ok(())

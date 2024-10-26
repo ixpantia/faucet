@@ -32,7 +32,14 @@ pub enum FaucetError {
     BufferCapacity(tokio_tungstenite::tungstenite::error::CapacityError),
     ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
     WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
+    PostgreSQL(tokio_postgres::Error),
     AttackAttempt,
+}
+
+impl From<tokio_postgres::Error> for FaucetError {
+    fn from(value: tokio_postgres::Error) -> Self {
+        Self::PostgreSQL(value)
+    }
 }
 
 impl From<tokio_tungstenite::tungstenite::Error> for FaucetError {
@@ -141,6 +148,7 @@ impl std::fmt::Display for FaucetError {
             Self::Utf8Coding => write!(f, "Utf8 Coding error"),
             Self::BufferCapacity(cap_err) => write!(f, "Buffer Capacity: {cap_err}"),
             Self::WSWriteBufferFull(buf) => write!(f, "Web Socket Write buffer full, {buf}"),
+            Self::PostgreSQL(value) => write!(f, "PostgreSQL error: {value}"),
             Self::BadRequest(r) => match r {
                 BadRequestReason::UnsupportedUrlScheme => {
                     write!(f, "UnsupportedUrlScheme use ws:// os wss://")

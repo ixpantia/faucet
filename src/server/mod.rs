@@ -1,5 +1,5 @@
 mod logging;
-pub use logging::logger;
+pub use logging::{logger, LogData, LogOption};
 mod onion;
 mod router;
 mod service;
@@ -12,6 +12,7 @@ use crate::{
     error::{FaucetError, FaucetResult},
     leak,
     shutdown::ShutdownSignal,
+    telemetry::{TelemetryManager, TelemetrySender},
 };
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
@@ -23,6 +24,7 @@ use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
     pin::pin,
+    sync::Arc,
 };
 use tokio::net::TcpListener;
 
@@ -62,6 +64,7 @@ pub struct FaucetServerBuilder {
     app_dir: Option<String>,
     quarto: Option<OsString>,
     qmd: Option<PathBuf>,
+    telemetry: Option<TelemetrySender>,
 }
 
 impl FaucetServerBuilder {
@@ -77,6 +80,7 @@ impl FaucetServerBuilder {
             app_dir: None,
             quarto: None,
             qmd: None,
+            telemetry: None,
         }
     }
     pub fn app_dir(mut self, app_dir: Option<impl AsRef<str>>) -> Self {
@@ -133,6 +137,10 @@ impl FaucetServerBuilder {
         self.qmd = qmd.map(|s| s.as_ref().into());
         self
     }
+    pub fn telemetry(mut self, telemetry_manager: Option<&TelemetryManager>) -> Self {
+        self.telemetry = telemetry_manager.map(|m| m.sender.clone());
+        self
+    }
     pub fn build(self) -> FaucetResult<FaucetServerConfig> {
         let server_type = self
             .server_type
@@ -163,6 +171,7 @@ impl FaucetServerBuilder {
             log::debug!(target: "faucet", "No quarto command specified. Defaulting to `quarto`.");
             OsStr::new("quarto")
         });
+        let telemetry = self.telemetry;
         Ok(FaucetServerConfig {
             strategy,
             bind,
@@ -173,6 +182,7 @@ impl FaucetServerBuilder {
             rscript,
             app_dir,
             quarto,
+            telemetry,
             qmd,
         })
     }
@@ -184,7 +194,7 @@ impl Default for FaucetServerBuilder {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct FaucetServerConfig {
     pub strategy: Strategy,
     pub bind: Option<SocketAddr>,
@@ -194,22 +204,26 @@ pub struct FaucetServerConfig {
     pub extractor: load_balancing::IpExtractor,
     pub rscript: &'static OsStr,
     pub quarto: &'static OsStr,
+    pub telemetry: Option<TelemetrySender>,
     pub app_dir: Option<&'static str>,
     pub qmd: Option<&'static Path>,
 }
 
 impl FaucetServerConfig {
     pub async fn run(self, shutdown: ShutdownSignal) -> FaucetResult<()> {
-        let mut workers = Workers::new(self, "").await?;
+        let telemetry = self.telemetry.clone();
+        let mut workers = Workers::new(self.clone(), "", shutdown.clone()).await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
         let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
 
         let load_balancer = load_balancer.clone();
-        let service: &'static _ = leak!(ServiceBuilder::new(ProxyService)
-            .layer(logging::LogLayer)
-            .layer(AddStateLayer::new(load_balancer))
-            .build());
+        let service = Arc::new(
+            ServiceBuilder::new(ProxyService)
+                .layer(logging::LogLayer { telemetry })
+                .layer(AddStateLayer::new(load_balancer))
+                .build(),
+        );
 
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(bind).await?;
@@ -225,6 +239,9 @@ impl FaucetServerConfig {
                         let tcp = TokioIo::new(tcp);
                         log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
+                        let service = service.clone();
+                        let shutdown = shutdown.clone();
+
                         tokio::task::spawn(async move {
                             let mut conn = http1::Builder::new()
                                 .serve_connection(
@@ -237,8 +254,13 @@ impl FaucetServerConfig {
 
                             let conn = pin!(&mut conn);
 
-                            if let Err(e) = conn.await {
-                                log::error!(target: "faucet", "Connection error: {}", e);
+                            tokio::select! {
+                                result = conn => {
+                                    if let Err(e) = result {
+                                        log::error!(target: "faucet", "Connection error: {}", e);
+                                    }
+                                }
+                                _ = shutdown.wait() => ()
                             }
                         });
                     }
@@ -252,10 +274,8 @@ impl FaucetServerConfig {
             _ = main_loop() => (),
         }
 
-        // Kill child process
-        for w in &mut workers.workers {
-            log::info!(target: w.config.target, "Killing child process");
-            w.child.kill().await;
+        for worker in &mut workers.workers {
+            worker.child.wait_until_done().await;
         }
 
         FaucetResult::Ok(())
@@ -263,21 +283,33 @@ impl FaucetServerConfig {
     pub async fn extract_service(
         self,
         prefix: &str,
+        shutdown: ShutdownSignal,
     ) -> FaucetResult<(FaucetServerService, Workers)> {
-        let workers = Workers::new(self, prefix).await?;
+        let telemetry = self.telemetry.clone();
+        let workers = Workers::new(self.clone(), prefix, shutdown).await?;
         let targets = workers.get_workers_config();
         let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
-        let service: &'static _ = leak!(ServiceBuilder::new(ProxyService)
-            .layer(logging::LogLayer)
-            .layer(AddStateLayer::new(load_balancer))
-            .build());
+        let service = Arc::new(
+            ServiceBuilder::new(ProxyService)
+                .layer(logging::LogLayer { telemetry })
+                .layer(AddStateLayer::new(load_balancer))
+                .build(),
+        );
 
         Ok((FaucetServerService { inner: service }, workers))
     }
 }
 
 pub struct FaucetServerService {
-    inner: &'static AddStateService<LogService<ProxyService>>,
+    inner: Arc<AddStateService<LogService<ProxyService>>>,
+}
+
+impl Clone for FaucetServerService {
+    fn clone(&self) -> Self {
+        FaucetServerService {
+            inner: Arc::clone(&self.inner),
+        }
+    }
 }
 
 impl Service<hyper::Request<Incoming>> for FaucetServerService {

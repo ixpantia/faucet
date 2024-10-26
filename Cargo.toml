@@ -38,6 +38,12 @@ fxhash = "0.2.1"
 toml = "0.8.19"
 nix = "0.29.0"
 ctrlc = { version = "3.4.5", features = ["termination"] }
+tokio-postgres = { version = "0.7.12", features = ["with-chrono-0_4"] }
+deadpool-postgres = { version = "0.14.0", features = ["rt_tokio_1"] }
+bytes = "1.8.0"
+tokio-postgres-rustls = "0.13.0"
+rustls = "0.23.15"
+chrono = "0.4.38"
 
 [dev-dependencies]
 rand = "0.8.5"

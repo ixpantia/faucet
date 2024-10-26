@@ -3,6 +3,7 @@ use faucet_server::cli::{Args, Commands};
 use faucet_server::error::FaucetResult;
 use faucet_server::server::logger::build_logger;
 use faucet_server::server::{FaucetServerBuilder, RouterConfig};
+use faucet_server::telemetry::TelemetryManager;
 use faucet_server::{cli::Shutdown, shutdown};
 
 #[tokio::main]
@@ -13,6 +14,16 @@ pub async fn main() -> FaucetResult<()> {
         Shutdown::Immediate => shutdown::immediate(),
         Shutdown::Graceful => shutdown::graceful(),
     };
+
+    let telemetry = cli_args.pg_con_string.map(|pg_con| {
+        match TelemetryManager::start(cli_args.telemetry_namespace, pg_con) {
+            Ok(telemetry) => telemetry,
+            Err(e) => {
+                eprintln!("Unable to start telemetry manager: {e}");
+                std::process::exit(1);
+            }
+        }
+    });
 
     match cli_args.command {
         Commands::Start(start_args) => {
@@ -38,6 +49,7 @@ pub async fn main() -> FaucetResult<()> {
                 .app_dir(start_args.app_dir)
                 .quarto(start_args.quarto)
                 .qmd(start_args.qmd)
+                .telemetry(telemetry.as_ref())
                 .build()?
                 .run(signal)
                 .await?;
@@ -62,9 +74,16 @@ pub async fn main() -> FaucetResult<()> {
                     router_args.ip_from.into(),
                     router_args.host.parse()?,
                     signal,
+                    telemetry.as_ref(),
                 )
                 .await?;
         }
+    }
+
+    if let Some(telemetry) = telemetry {
+        log::debug!("Waiting to stop DB writes");
+        drop(telemetry.sender);
+        let _ = telemetry.join_handle.await;
     }
 
     Ok(())

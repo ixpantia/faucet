@@ -1,7 +1,7 @@
 use hyper::{http::HeaderValue, Method, Request, Response, Uri, Version};
 
 use super::onion::{Layer, Service};
-use crate::server::service::State;
+use crate::{server::service::State, telemetry::TelemetrySender};
 use std::{net::IpAddr, time};
 
 pub mod logger {
@@ -36,9 +36,9 @@ pub mod logger {
             .open(&path)
             .expect("Unable to open or create log file");
         let mut writer = BufWriter::new(file);
+        let mut stderr = BufWriter::new(std::io::stderr());
         let (sender, receiver) = std::sync::mpsc::channel::<Bytes>();
         std::thread::spawn(move || {
-            let mut stderr = std::io::stderr();
             while let Ok(bytes) = receiver.recv() {
                 if let Err(e) = stderr.write_all(bytes.as_ref()) {
                     eprintln!("Unable to write to stderr: {e}");
@@ -47,6 +47,8 @@ pub mod logger {
                     eprintln!("Unable to write to {path:?}: {e}");
                 };
             }
+            let _ = writer.flush();
+            let _ = stderr.flush();
         });
         LogFileWriter { sender }
     }
@@ -82,7 +84,7 @@ impl StateLogData for State {
 }
 
 #[derive(PartialEq, Eq)]
-enum LogOption<T> {
+pub enum LogOption<T> {
     None,
     Some(T),
 }
@@ -120,15 +122,15 @@ where
     }
 }
 
-struct LogData {
-    target: &'static str,
-    ip: IpAddr,
-    method: Method,
-    path: Uri,
-    version: Version,
-    status: u16,
-    user_agent: LogOption<HeaderValue>,
-    elapsed: u128,
+pub struct LogData {
+    pub target: &'static str,
+    pub ip: IpAddr,
+    pub method: Method,
+    pub path: Uri,
+    pub version: Version,
+    pub status: i16,
+    pub user_agent: LogOption<HeaderValue>,
+    pub elapsed: i64,
 }
 
 impl LogData {
@@ -166,8 +168,8 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
     let res = inner.call(req, None).await?;
 
     // Extract response info for logging
-    let status = res.status().as_u16();
-    let elapsed = start.elapsed().as_millis();
+    let status = res.status().as_u16() as i16;
+    let elapsed = start.elapsed().as_millis() as i64;
 
     let log_data = LogData {
         target,
@@ -185,6 +187,7 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
 
 pub(super) struct LogService<S> {
     inner: S,
+    telemetry: Option<TelemetrySender>,
 }
 
 impl<S, Body, ResBody> Service<Request<Body>> for LogService<S>
@@ -202,17 +205,25 @@ where
         let (res, log_data) = capture_log_data::<_, _, _, State>(&self.inner, req).await?;
 
         log_data.log();
+        if let Some(telemetry) = &self.telemetry {
+            telemetry.send(log_data);
+        }
 
         Ok(res)
     }
 }
 
-pub(super) struct LogLayer;
+pub(super) struct LogLayer {
+    pub telemetry: Option<TelemetrySender>,
+}
 
 impl<S> Layer<S> for LogLayer {
     type Service = LogService<S>;
     fn layer(&self, inner: S) -> Self::Service {
-        LogService { inner }
+        LogService {
+            inner,
+            telemetry: self.telemetry.clone(),
+        }
     }
 }
 
