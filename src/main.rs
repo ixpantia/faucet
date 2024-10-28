@@ -16,7 +16,11 @@ pub async fn main() -> FaucetResult<()> {
     };
 
     let telemetry = cli_args.pg_con_string.map(|pg_con| {
-        match TelemetryManager::start(cli_args.telemetry_namespace, pg_con) {
+        match TelemetryManager::start(
+            &cli_args.telemetry_namespace,
+            cli_args.telemetry_version.as_deref(),
+            &pg_con,
+        ) {
             Ok(telemetry) => telemetry,
             Err(e) => {
                 eprintln!("Unable to start telemetry manager: {e}");
@@ -83,7 +87,7 @@ pub async fn main() -> FaucetResult<()> {
     if let Some(telemetry) = telemetry {
         log::debug!("Waiting to stop DB writes");
         drop(telemetry.sender);
-        let _ = telemetry.join_handle.await;
+        let _ = telemetry.http_events_join_handle.await;
     }
 
     Ok(())

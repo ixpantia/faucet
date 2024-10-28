@@ -1,5 +1,11 @@
 # plumber.R
 
+#* @param n Seconds to sleep
+#* @get /sleep
+function(n = 1L) {
+  Sys.sleep(as.numeric(n))
+}
+
 #* Echo the parameter that was sent in
 #* @param msg The message to echo back.
 #* @get /echo

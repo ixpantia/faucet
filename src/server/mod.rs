@@ -1,6 +1,6 @@
 mod logging;
 pub use logging::{logger, LogData, LogOption};
-mod onion;
+pub mod onion;
 mod router;
 mod service;
 use crate::{

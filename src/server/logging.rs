@@ -223,7 +223,7 @@ where
 
         log_data.log();
         if let Some(telemetry) = &self.telemetry {
-            telemetry.send(log_data);
+            telemetry.send_http_event(log_data);
         }
 
         Ok(res)

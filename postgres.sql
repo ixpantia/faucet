@@ -1,6 +1,7 @@
 CREATE TABLE faucet_http_events (
     request_uuid UUID,
     namespace TEXT,
+    version TEXT,
     target TEXT,
     worker_route TEXT,
     worker_id INT,
@@ -8,13 +9,12 @@ CREATE TABLE faucet_http_events (
     method TEXT,
     path TEXT,
     query_params TEXT,
-    version TEXT,
+    http_version TEXT,
     status SMALLINT,
     user_agent TEXT,
     elapsed BIGINT,
-    time TIMESTAMPTZ
+    time TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX faucet_http_events_request_uuid_idx 
-ON faucet_http_events USING BTREE (request_uuid);
-
+-- For use in timescale
+-- SELECT create_hypertable('faucet_http_events', by_range('time'));
