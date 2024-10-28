@@ -1,4 +1,5 @@
 CREATE TABLE faucet_http_events (
+    request_uuid UUID,
     namespace TEXT,
     target TEXT,
     worker_route TEXT,
@@ -13,4 +14,7 @@ CREATE TABLE faucet_http_events (
     elapsed BIGINT,
     time TIMESTAMPTZ
 );
+
+CREATE INDEX faucet_http_events_request_uuid_idx 
+ON faucet_http_events USING BTREE (request_uuid);
 

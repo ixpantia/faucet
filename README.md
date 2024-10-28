@@ -206,6 +206,7 @@ the following SQL query:
 
 ```sql
 CREATE TABLE faucet_http_events (
+    request_uuid UUID,
     namespace TEXT,
     target TEXT,
     worker_route TEXT,

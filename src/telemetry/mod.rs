@@ -57,6 +57,7 @@ impl TelemetryManager {
             let pool = pool.clone();
             tokio::task::spawn(async move {
                 let types = &[
+                    PgType::UUID,        // UUID
                     PgType::TEXT,        // Namespace
                     PgType::TEXT,        // Target
                     PgType::TEXT,        // Worker Route
@@ -106,6 +107,7 @@ impl TelemetryManager {
                             );
 
                             'write: for (timespamp, log_data) in logs_buffer.drain(..) {
+                                let uuid = &log_data.state_data.uuid;
                                 let target = &log_data.state_data.target;
                                 let worker_id = log_data.state_data.worker_id as i32;
                                 let worker_route = log_data.state_data.worker_route;
@@ -133,6 +135,7 @@ impl TelemetryManager {
                                 let copy_result = copy_in_writer
                                     .as_mut()
                                     .write(&[
+                                        uuid,
                                         &namespace,
                                         target,
                                         &worker_route,

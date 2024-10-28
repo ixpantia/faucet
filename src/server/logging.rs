@@ -72,6 +72,7 @@ pub mod logger {
 
 #[derive(Clone, Copy)]
 pub struct StateData {
+    pub uuid: uuid::Uuid,
     pub ip: IpAddr,
     pub worker_route: Option<&'static str>,
     pub worker_id: usize,
@@ -85,11 +86,13 @@ trait StateLogData: Send + Sync + 'static {
 impl StateLogData for State {
     #[inline(always)]
     fn get_state_data(&self) -> StateData {
+        let uuid = self.uuid;
         let ip = self.remote_addr;
         let worker_id = self.client.config.worker_id;
         let worker_route = self.client.config.worker_route;
         let target = self.client.config.target;
         StateData {
+            uuid,
             ip,
             worker_id,
             worker_route,
@@ -255,6 +258,7 @@ mod tests {
         impl StateLogData for MockState {
             fn get_state_data(&self) -> StateData {
                 StateData {
+                    uuid: uuid::Uuid::now_v7(),
                     ip: IpAddr::V4([127, 0, 0, 1].into()),
                     target: "test",
                     worker_id: 1,
@@ -352,6 +356,7 @@ mod tests {
 
         let log_data = LogData {
             state_data: StateData {
+                uuid: uuid::Uuid::now_v7(),
                 target: "test",
                 ip: IpAddr::V4([127, 0, 0, 1].into()),
                 worker_route: None,
