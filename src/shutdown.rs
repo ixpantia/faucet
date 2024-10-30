@@ -1,23 +1,62 @@
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
+use tokio::sync::Notify;
+
 const WAIT_STOP_PRINT: std::time::Duration = std::time::Duration::from_secs(5);
 
-pub struct ShutdownSignal(tokio::sync::mpsc::Receiver<()>);
+pub struct ShutdownSignal {
+    is_shutdown: Arc<AtomicBool>,
+    notify: Arc<Notify>,
+}
+
+impl Clone for ShutdownSignal {
+    fn clone(&self) -> Self {
+        ShutdownSignal {
+            is_shutdown: Arc::clone(&self.is_shutdown),
+            notify: Arc::clone(&self.notify),
+        }
+    }
+}
+
+impl Default for ShutdownSignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ShutdownSignal {
-    fn new() -> (tokio::sync::mpsc::Sender<()>, Self) {
-        let (tx, rx) = tokio::sync::mpsc::channel(1);
-        (tx, Self(rx))
+    pub fn new() -> Self {
+        ShutdownSignal {
+            is_shutdown: Arc::new(AtomicBool::new(false)),
+            notify: Arc::new(Notify::new()),
+        }
     }
-    pub async fn wait(mut self) {
-        let _ = self.0.recv().await;
+
+    pub fn shutdown(&self) {
+        self.is_shutdown.store(true, Ordering::Relaxed);
+        self.notify.notify_waiters();
+    }
+
+    pub async fn wait(&self) {
+        if self.is_shutdown.load(Ordering::Relaxed) {
+            return;
+        }
+        // Wait for notification
+        self.notify.notified().await;
     }
 }
 
 pub fn graceful() -> ShutdownSignal {
     use crate::global_conn::current_connections;
 
-    let (tx, signal) = ShutdownSignal::new();
+    let signal = ShutdownSignal::new();
 
-    ctrlc::set_handler(move || {
+    {
+        let signal = signal.clone();
+        ctrlc::set_handler(move || {
         log::info!(target: "faucet", "Received stop signal, waiting for all users to disconnect");
         let mut last_5_sec = std::time::Instant::now();
         while current_connections() > 0 {
@@ -31,19 +70,23 @@ pub fn graceful() -> ShutdownSignal {
                 last_5_sec = std::time::Instant::now();
             }
         }
-        let _ = tx.blocking_send(());
+        signal.shutdown();
     })
     .expect("Unable to set term handler. This is a bug");
+    }
 
     signal
 }
 
 pub fn immediate() -> ShutdownSignal {
-    let (tx, signal) = ShutdownSignal::new();
-    ctrlc::set_handler(move || {
-        log::info!(target: "faucet", "Starting immediate shutdown handle");
-        let _ = tx.blocking_send(());
-    })
-    .expect("Unable to set term handler. This is a bug");
+    let signal = ShutdownSignal::new();
+    {
+        let signal = signal.clone();
+        ctrlc::set_handler(move || {
+            log::info!(target: "faucet", "Starting immediate shutdown handle");
+            signal.shutdown()
+        })
+        .expect("Unable to set term handler. This is a bug");
+    }
     signal
 }

@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-pub trait Service<Request> {
+pub trait Service<Request>: Send + Sync {
     type Response;
     type Error;
     async fn call(

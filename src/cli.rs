@@ -179,6 +179,18 @@ pub struct Args {
     /// The strategy for shutting down faucet
     #[arg(long, env = "FAUCET_SHUTDOWN", default_value = "immediate")]
     pub shutdown: Shutdown,
+
+    /// Connection string to a PostgreSQL database for saving HTTP events.
+    #[arg(long, env = "FAUCET_TELEMETRY_POSTGRES_STRING", default_value = None)]
+    pub pg_con_string: Option<String>,
+
+    /// Save HTTP events on PostgreSQL under a specific namespace.
+    #[arg(long, env = "FAUCET_TELEMETRY_NAMESPACE", default_value = "faucet")]
+    pub telemetry_namespace: String,
+
+    /// Represents the source code version of the service to run. This is useful for telemetry.
+    #[arg(long, env = "FAUCET_TELEMETRY_VERSION", default_value = None)]
+    pub telemetry_version: Option<String>,
 }
 
 impl StartArgs {

@@ -5,6 +5,7 @@ pub mod global_conn;
 pub(crate) mod networking;
 pub mod server;
 pub mod shutdown;
+pub mod telemetry;
 
 macro_rules! leak {
     ($val:expr, $ty:ty) => {

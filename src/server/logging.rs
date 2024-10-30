@@ -1,7 +1,7 @@
 use hyper::{http::HeaderValue, Method, Request, Response, Uri, Version};
 
 use super::onion::{Layer, Service};
-use crate::server::service::State;
+use crate::{server::service::State, telemetry::TelemetrySender};
 use std::{net::IpAddr, time};
 
 pub mod logger {
@@ -36,9 +36,9 @@ pub mod logger {
             .open(&path)
             .expect("Unable to open or create log file");
         let mut writer = BufWriter::new(file);
+        let mut stderr = BufWriter::new(std::io::stderr());
         let (sender, receiver) = std::sync::mpsc::channel::<Bytes>();
         std::thread::spawn(move || {
-            let mut stderr = std::io::stderr();
             while let Ok(bytes) = receiver.recv() {
                 if let Err(e) = stderr.write_all(bytes.as_ref()) {
                     eprintln!("Unable to write to stderr: {e}");
@@ -47,6 +47,8 @@ pub mod logger {
                     eprintln!("Unable to write to {path:?}: {e}");
                 };
             }
+            let _ = writer.flush();
+            let _ = stderr.flush();
         });
         LogFileWriter { sender }
     }
@@ -68,21 +70,39 @@ pub mod logger {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct StateData {
+    pub uuid: uuid::Uuid,
+    pub ip: IpAddr,
+    pub worker_route: Option<&'static str>,
+    pub worker_id: usize,
+    pub target: &'static str,
+}
+
 trait StateLogData: Send + Sync + 'static {
-    fn get_state_data(&self) -> (IpAddr, &'static str);
+    fn get_state_data(&self) -> StateData;
 }
 
 impl StateLogData for State {
     #[inline(always)]
-    fn get_state_data(&self) -> (IpAddr, &'static str) {
+    fn get_state_data(&self) -> StateData {
+        let uuid = self.uuid;
         let ip = self.remote_addr;
+        let worker_id = self.client.config.worker_id;
+        let worker_route = self.client.config.worker_route;
         let target = self.client.config.target;
-        (ip, target)
+        StateData {
+            uuid,
+            ip,
+            worker_id,
+            worker_route,
+            target,
+        }
     }
 }
 
 #[derive(PartialEq, Eq)]
-enum LogOption<T> {
+pub enum LogOption<T> {
     None,
     Some(T),
 }
@@ -120,23 +140,23 @@ where
     }
 }
 
-struct LogData {
-    target: &'static str,
-    ip: IpAddr,
-    method: Method,
-    path: Uri,
-    version: Version,
-    status: u16,
-    user_agent: LogOption<HeaderValue>,
-    elapsed: u128,
+pub struct LogData {
+    pub state_data: StateData,
+    pub method: Method,
+    pub path: Uri,
+    pub version: Version,
+    pub status: i16,
+    pub user_agent: LogOption<HeaderValue>,
+    pub elapsed: i64,
 }
 
 impl LogData {
     fn log(&self) {
         log::info!(
-            target: self.target,
-            r#"{ip} "{method} {path} {version:?}" {status} {user_agent:?} {elapsed}"#,
-            ip = self.ip,
+            target: self.state_data.target,
+            r#"{ip} "{method} {route}{path} {version:?}" {status} {user_agent:?} {elapsed}"#,
+            route = self.state_data.worker_route.map(|r| r.trim_end_matches('/')).unwrap_or_default(),
+            ip = self.state_data.ip,
             method = self.method,
             path = self.path,
             version = self.version,
@@ -156,7 +176,7 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
 
     // Extract request info for logging
     let state = req.extensions().get::<State>().expect("State not found");
-    let (ip, target) = state.get_state_data();
+    let state_data = state.get_state_data();
     let method = req.method().clone();
     let path = req.uri().clone();
     let version = req.version();
@@ -166,12 +186,11 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
     let res = inner.call(req, None).await?;
 
     // Extract response info for logging
-    let status = res.status().as_u16();
-    let elapsed = start.elapsed().as_millis();
+    let status = res.status().as_u16() as i16;
+    let elapsed = start.elapsed().as_millis() as i64;
 
     let log_data = LogData {
-        target,
-        ip,
+        state_data,
         method,
         path,
         version,
@@ -185,6 +204,7 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
 
 pub(super) struct LogService<S> {
     inner: S,
+    telemetry: Option<TelemetrySender>,
 }
 
 impl<S, Body, ResBody> Service<Request<Body>> for LogService<S>
@@ -202,17 +222,25 @@ where
         let (res, log_data) = capture_log_data::<_, _, _, State>(&self.inner, req).await?;
 
         log_data.log();
+        if let Some(telemetry) = &self.telemetry {
+            telemetry.send_http_event(log_data);
+        }
 
         Ok(res)
     }
 }
 
-pub(super) struct LogLayer;
+pub(super) struct LogLayer {
+    pub telemetry: Option<TelemetrySender>,
+}
 
 impl<S> Layer<S> for LogLayer {
     type Service = LogService<S>;
     fn layer(&self, inner: S) -> Self::Service {
-        LogService { inner }
+        LogService {
+            inner,
+            telemetry: self.telemetry.clone(),
+        }
     }
 }
 
@@ -228,8 +256,14 @@ mod tests {
         struct MockState;
 
         impl StateLogData for MockState {
-            fn get_state_data(&self) -> (IpAddr, &'static str) {
-                (IpAddr::V4([127, 0, 0, 1].into()), "test")
+            fn get_state_data(&self) -> StateData {
+                StateData {
+                    uuid: uuid::Uuid::now_v7(),
+                    ip: IpAddr::V4([127, 0, 0, 1].into()),
+                    target: "test",
+                    worker_id: 1,
+                    worker_route: None,
+                }
             }
         }
 
@@ -261,7 +295,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(log_data.ip, IpAddr::V4([127, 0, 0, 1].into()));
+        assert_eq!(log_data.state_data.ip, IpAddr::V4([127, 0, 0, 1].into()));
         assert_eq!(log_data.method, Method::GET);
         assert_eq!(log_data.path, "https://example.com/");
         assert_eq!(log_data.version, Version::HTTP_11);
@@ -271,7 +305,7 @@ mod tests {
             LogOption::Some(HeaderValue::from_static("test"))
         );
         assert!(log_data.elapsed > 0);
-        assert_eq!(log_data.target, "test");
+        assert_eq!(log_data.state_data.target, "test");
     }
 
     #[test]
@@ -321,8 +355,13 @@ mod tests {
         }
 
         let log_data = LogData {
-            target: "test",
-            ip: IpAddr::V4([127, 0, 0, 1].into()),
+            state_data: StateData {
+                uuid: uuid::Uuid::now_v7(),
+                target: "test",
+                ip: IpAddr::V4([127, 0, 0, 1].into()),
+                worker_route: None,
+                worker_id: 1,
+            },
             method: Method::GET,
             path: "https://example.com/".parse().unwrap(),
             version: Version::HTTP_11,

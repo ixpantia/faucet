@@ -194,6 +194,61 @@ git clone https://github.com/ixpantia/faucet.git
 cargo install --path .
 ```
 
+## HTTP Telemetry
+
+faucet now offers the option of saving HTTP events to a PostgreSQL database.
+This can be very helpful for tracking latency, total API calls and other
+important information.
+
+In order to use this feature you will need a PostgreSQL database with a table
+called `faucet_http_events`. You can create the table using this table with
+the following SQL query:
+
+```sql
+CREATE TABLE faucet_http_events (
+    request_uuid UUID,
+    namespace TEXT,
+    version TEXT,
+    target TEXT,
+    worker_route TEXT,
+    worker_id INT,
+    ip_addr INET,
+    method TEXT,
+    path TEXT,
+    query_params TEXT,
+    http_version TEXT,
+    status SMALLINT,
+    user_agent TEXT,
+    elapsed BIGINT,
+    time TIMESTAMPTZ
+);
+```
+
+### Connection Strings
+
+In order to connect to the database you will need to pass the
+`FAUCET_TELEMETRY_POSTGRES_STRING` environment variable or the
+`--pg-con-string` CLI argument.
+
+This should include either a connection string or a URL with the `postgres://`
+protocol.
+
+#### Example connection strings
+
+```sh
+FAUCET_TELEMETRY_POSTGRES_STRING="host=localhost user=postgres connect_timeout=10 keepalives=0"
+FAUCET_TELEMETRY_POSTGRES_STRING="host=/var/lib/postgresql,localhost port=1234 user=postgres password='password with spaces'"
+FAUCET_TELEMETRY_POSTGRES_STRING="postgresql://user@localhost"
+FAUCET_TELEMETRY_POSTGRES_STRING="postgresql://user:password@127.0.0.1/mydb?connect_timeout=10"
+```
+
+### Telemetry Namespaces
+
+It is likely you want to track different services on the same database. You
+can control the column `namespace` using the environment variable
+`FAUCET_TELEMETRY_NAMESPACE` or cli argument `--telemetry-namespace`. By
+default, this value is `"faucet"`.
+
 ## Contributing
 
 If you want to contribute to `faucet` please read the
