@@ -1,6 +1,4 @@
-ARG R_VERSION
-
-FROM rocker/r-ver:${R_VERSION} AS builder
+FROM docker.io/library/ubuntu:jammy AS builder
 RUN apt-get update && \
     apt-get install -y curl build-essential && \
     apt-get clean && \
@@ -12,7 +10,24 @@ COPY Cargo.toml faucet_src/Cargo.toml
 COPY Cargo.lock faucet_src/Cargo.lock
 RUN /root/.cargo/bin/cargo install --path faucet_src
 
-FROM rocker/r-ver:${R_VERSION} AS faucet
+
+FROM docker.io/library/ubuntu:jammy AS build-r
+ARG R_VERSION
+
+ENV R_VERSION=${R_VERSION}
+ENV R_HOME="/usr/local/lib/R"
+
+COPY scripts/install_R_source.sh /rocker_scripts/install_R_source.sh
+RUN /rocker_scripts/install_R_source.sh
+
+ENV CRAN="https://p3m.dev/cran/__linux__/jammy/latest"
+ENV LANG=en_US.UTF-8
+
+COPY scripts/bin/ /rocker_scripts/bin/
+COPY scripts/setup_R.sh /rocker_scripts/setup_R.sh
+RUN /rocker_scripts/setup_R.sh
+
+FROM build-r AS faucet
 
 LABEL org.opencontainers.image.licenses="GPL-2.0-or-later" \
       org.opencontainers.image.source="https://github.com/ixpantia/faucet" \
