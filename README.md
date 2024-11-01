@@ -249,6 +249,11 @@ can control the column `namespace` using the environment variable
 `FAUCET_TELEMETRY_NAMESPACE` or cli argument `--telemetry-namespace`. By
 default, this value is `"faucet"`.
 
+
+## Useful links
+
+- [How to Run R Shiny in Docker: A Step-by-Step Guide](https://www.ixpantia.com/en/blog/how-to-run-r-shiny-in-docker-guide)
+
 ## Contributing
 
 If you want to contribute to `faucet` please read the
