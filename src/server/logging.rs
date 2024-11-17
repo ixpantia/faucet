@@ -8,6 +8,9 @@ pub mod logger {
     use std::{io::BufWriter, io::Write, path::PathBuf};
 
     use hyper::body::Bytes;
+    use tokio::task::JoinHandle;
+
+    use crate::shutdown::ShutdownSignal;
 
     pub enum Target {
         Stderr,
@@ -15,12 +18,12 @@ pub mod logger {
     }
 
     struct LogFileWriter {
-        sender: std::sync::mpsc::Sender<Bytes>,
+        sender: tokio::sync::mpsc::Sender<Bytes>,
     }
 
     impl std::io::Write for LogFileWriter {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            let _ = self.sender.send(Bytes::copy_from_slice(buf));
+            let _ = self.sender.try_send(Bytes::copy_from_slice(buf));
             Ok(buf.len())
         }
         fn flush(&mut self) -> std::io::Result<()> {
@@ -28,38 +31,86 @@ pub mod logger {
         }
     }
 
-    fn start_log_writer_thread(path: PathBuf) -> LogFileWriter {
+    fn start_log_writer_thread(
+        path: PathBuf,
+        max_file_size: Option<u64>,
+        shutdown: ShutdownSignal,
+    ) -> (LogFileWriter, JoinHandle<()>) {
+        let max_file_size = max_file_size.unwrap_or(u64::MAX);
+        let mut current_file_size = match std::fs::metadata(&path) {
+            Ok(md) => md.len(),
+            Err(_) => 0,
+        };
         let file = std::fs::File::options()
             .create(true)
             .append(true)
             .truncate(false)
             .open(&path)
             .expect("Unable to open or create log file");
+
+        // Create a file path to a backup of the previous logs with MAX file size
+        let mut copy_path = path.clone();
+        copy_path.as_mut_os_string().push(".bak");
+
         let mut writer = BufWriter::new(file);
         let mut stderr = BufWriter::new(std::io::stderr());
-        let (sender, receiver) = std::sync::mpsc::channel::<Bytes>();
-        std::thread::spawn(move || {
-            while let Ok(bytes) = receiver.recv() {
-                if let Err(e) = stderr.write_all(bytes.as_ref()) {
-                    eprintln!("Unable to write to stderr: {e}");
-                };
-                if let Err(e) = writer.write_all(bytes.as_ref()) {
-                    eprintln!("Unable to write to {path:?}: {e}");
-                };
+        let (sender, mut receiver) = tokio::sync::mpsc::channel::<Bytes>(1000);
+        let writer_thread = tokio::task::spawn(async move {
+            loop {
+                tokio::select! {
+                    bytes = receiver.recv() => {
+                        match bytes {
+                            Some(bytes) => {
+                                if let Err(e) = stderr.write_all(bytes.as_ref()) {
+                                    eprintln!("Unable to write to stderr: {e}");
+                                };
+
+                                if let Err(e) = writer.write_all(bytes.as_ref()) {
+                                    eprintln!("Unable to write to {path:?}: {e}");
+                                };
+
+                                current_file_size += bytes.len() as u64;
+                                if current_file_size > max_file_size {
+                                    // Flush the writer
+                                    let _ = writer.flush();
+                                    let file = writer.get_mut();
+
+                                    // Copy the current file to the backup
+                                    if let Err(e) = std::fs::copy(&path, &copy_path) {
+                                        log::error!("Unable to copy logs to backup file: {e}");
+                                    }
+
+                                    // Truncate the logs file
+                                    if let Err(e) = file.set_len(0) {
+                                        log::error!("Unable to truncate logs file: {e}");
+                                    }
+
+                                    current_file_size = 0;
+                                }
+                            },
+                            None => break
+                        }
+                    },
+                    _ = shutdown.wait() => break
+                }
             }
             let _ = writer.flush();
             let _ = stderr.flush();
         });
-        LogFileWriter { sender }
+        (LogFileWriter { sender }, writer_thread)
     }
 
-    pub fn build_logger(target: Target) {
-        let target = match target {
+    pub fn build_logger(
+        target: Target,
+        max_file_size: Option<u64>,
+        shutdown: ShutdownSignal,
+    ) -> Option<JoinHandle<()>> {
+        let (target, handle) = match target {
             Target::File(path) => {
-                let writer = start_log_writer_thread(path);
-                env_logger::Target::Pipe(Box::new(writer))
+                let (writer, handle) = start_log_writer_thread(path, max_file_size, shutdown);
+                (env_logger::Target::Pipe(Box::new(writer)), Some(handle))
             }
-            Target::Stderr => env_logger::Target::Stderr,
+            Target::Stderr => (env_logger::Target::Stderr, None),
         };
 
         let mut env_builder = env_logger::Builder::new();
@@ -67,6 +118,8 @@ pub mod logger {
             .parse_env(env_logger::Env::new().filter_or("FAUCET_LOG", "info"))
             .target(target)
             .init();
+
+        handle
     }
 }
 

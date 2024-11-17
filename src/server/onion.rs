@@ -3,11 +3,11 @@ use std::net::IpAddr;
 pub trait Service<Request>: Send + Sync {
     type Response;
     type Error;
-    async fn call(
+    fn call(
         &self,
         req: Request,
         ip_addr: Option<IpAddr>,
-    ) -> Result<Self::Response, Self::Error>;
+    ) -> impl std::future::Future<Output = Result<Self::Response, Self::Error>>;
 }
 
 pub trait Layer<S> {
