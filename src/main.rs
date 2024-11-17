@@ -10,7 +10,7 @@ use faucet_server::{cli::Shutdown, shutdown};
 pub async fn main() -> FaucetResult<()> {
     let cli_args = Args::parse();
 
-    let signal = match cli_args.shutdown {
+    let shutdown_signal = match cli_args.shutdown {
         Shutdown::Immediate => shutdown::immediate(),
         Shutdown::Graceful => shutdown::graceful(),
     };
@@ -29,55 +29,48 @@ pub async fn main() -> FaucetResult<()> {
         }
     });
 
+    let log_thread_handle = build_logger(
+        cli_args
+            .log_file
+            .as_ref()
+            .map_or(faucet_server::server::logger::Target::Stderr, |file| {
+                faucet_server::server::logger::Target::File(file.to_path_buf())
+            }),
+        cli_args.max_log_file_size,
+        shutdown_signal.clone(),
+    );
+
     match cli_args.command {
         Commands::Start(start_args) => {
-            build_logger(
-                start_args
-                    .log_file
-                    .as_ref()
-                    .map_or(faucet_server::server::logger::Target::Stderr, |file| {
-                        faucet_server::server::logger::Target::File(file.to_path_buf())
-                    }),
-            );
-
             log::info!(target: "faucet", "Building the faucet server...");
 
             FaucetServerBuilder::new()
                 .strategy(Some(start_args.strategy.into()))
                 .workers(start_args.workers)
                 .server_type(start_args.server_type())
-                .extractor(start_args.ip_from.into())
-                .bind(start_args.host.parse()?)
+                .extractor(cli_args.ip_from.into())
+                .bind(cli_args.host.parse()?)
                 .workdir(start_args.dir)
-                .rscript(start_args.rscript)
+                .rscript(cli_args.rscript)
                 .app_dir(start_args.app_dir)
-                .quarto(start_args.quarto)
+                .quarto(cli_args.quarto)
                 .qmd(start_args.qmd)
                 .telemetry(telemetry.as_ref())
                 .build()?
-                .run(signal)
+                .run(shutdown_signal)
                 .await?;
         }
         Commands::Router(router_args) => {
-            build_logger(
-                router_args
-                    .log_file
-                    .as_ref()
-                    .map_or(faucet_server::server::logger::Target::Stderr, |file| {
-                        faucet_server::server::logger::Target::File(file.to_path_buf())
-                    }),
-            );
-
             let config: RouterConfig =
                 toml::from_str(&std::fs::read_to_string(router_args.conf).unwrap()).unwrap();
 
             config
                 .run(
-                    router_args.rscript,
-                    router_args.quarto,
-                    router_args.ip_from.into(),
-                    router_args.host.parse()?,
-                    signal,
+                    cli_args.rscript,
+                    cli_args.quarto,
+                    cli_args.ip_from.into(),
+                    cli_args.host.parse()?,
+                    shutdown_signal,
                     telemetry.as_ref(),
                 )
                 .await?;
@@ -88,6 +81,10 @@ pub async fn main() -> FaucetResult<()> {
         log::debug!("Waiting to stop DB writes");
         drop(telemetry.sender);
         let _ = telemetry.http_events_join_handle.await;
+    }
+
+    if let Some(handle) = log_thread_handle {
+        let _ = handle.await;
     }
 
     Ok(())

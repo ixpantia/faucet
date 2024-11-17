@@ -2,3 +2,5 @@
 tarpaulin-report.html
 venv/
 .Rproj.user
+*.log
+*.log.bak

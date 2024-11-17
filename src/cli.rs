@@ -71,10 +71,6 @@ pub enum Shutdown {
 
 #[derive(Parser, Debug)]
 pub struct StartArgs {
-    /// The host to bind to.
-    #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]
-    pub host: String,
-
     /// The number of threads to use to handle requests.
     #[arg(short, long, env = "FAUCET_WORKERS", default_value_t = num_cpus::get())]
     pub workers: usize,
@@ -92,19 +88,6 @@ pub struct StartArgs {
     #[arg(short, long, env = "FAUCET_DIR", default_value = ".")]
     pub dir: PathBuf,
 
-    /// The IP address to extract from.
-    /// Defaults to client address.
-    #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
-    pub ip_from: IpFrom,
-
-    /// Command, path, or executable to run Rscript.
-    #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
-    pub rscript: OsString,
-
-    /// Command, path, or executable to run quarto.
-    #[arg(long, env = "FAUCET_QUARTO", default_value = "quarto")]
-    pub quarto: OsString,
-
     /// Argument passed on to `appDir` when running Shiny.
     #[arg(long, short, env = "FAUCET_APP_DIR", default_value = None)]
     pub app_dir: Option<String>,
@@ -112,35 +95,10 @@ pub struct StartArgs {
     /// Quarto Shiny file path.
     #[arg(long, short, env = "FAUCET_QMD", default_value = None)]
     pub qmd: Option<PathBuf>,
-
-    /// Save logs to a file. Will disable colors!
-    #[arg(long, short, env = "FAUCET_LOG_FILE", default_value = None)]
-    pub log_file: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]
 pub struct RouterArgs {
-    /// The host to bind to.
-    #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]
-    pub host: String,
-
-    /// The IP address to extract from.
-    /// Defaults to client address.
-    #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
-    pub ip_from: IpFrom,
-
-    /// Command, path, or executable to run Rscript.
-    #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
-    pub rscript: OsString,
-
-    /// Command, path, or executable to run quarto.
-    #[arg(long, short, env = "FAUCET_QUARTO", default_value = "quarto")]
-    pub quarto: OsString,
-
-    /// Save logs to a file. Will disable colors!
-    #[arg(long, short, env = "FAUCET_LOG_FILE", default_value = None)]
-    pub log_file: Option<PathBuf>,
-
     /// Router config file.
     #[arg(
         long,
@@ -175,6 +133,31 @@ pub enum Commands {
 pub struct Args {
     #[command(subcommand)]
     pub command: Commands,
+
+    /// The host to bind to.
+    #[arg(long, env = "FAUCET_HOST", default_value = "127.0.0.1:3838")]
+    pub host: String,
+
+    /// The IP address to extract from.
+    /// Defaults to client address.
+    #[arg(short, long, env = "FAUCET_IP_FROM", default_value = "client")]
+    pub ip_from: IpFrom,
+
+    /// Command, path, or executable to run Rscript.
+    #[arg(long, short, env = "FAUCET_RSCRIPT", default_value = "Rscript")]
+    pub rscript: OsString,
+
+    /// Command, path, or executable to run quarto.
+    #[arg(long, short, env = "FAUCET_QUARTO", default_value = "quarto")]
+    pub quarto: OsString,
+
+    /// Save logs to a file. Will disable colors!
+    #[arg(long, short, env = "FAUCET_LOG_FILE", default_value = None)]
+    pub log_file: Option<PathBuf>,
+
+    #[arg(long, short, env = "FAUCET_MAX_LOG_FILE_SIZE", default_value = None, value_parser = |s: &str| parse_size::parse_size(s))]
+    /// The maximum size of the log file. (Ex. 10M, 1GB)
+    pub max_log_file_size: Option<u64>,
 
     /// The strategy for shutting down faucet
     #[arg(long, env = "FAUCET_SHUTDOWN", default_value = "immediate")]
