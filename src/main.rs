@@ -8,6 +8,9 @@ use faucet_server::{cli::Shutdown, shutdown};
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
+    dotenv::from_filename(".Renviron").ok();
+    dotenv::from_filename(".env").ok();
+
     let cli_args = Args::parse();
 
     let shutdown_signal = match cli_args.shutdown {
