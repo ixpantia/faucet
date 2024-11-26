@@ -4,3 +4,5 @@ venv/
 .Rproj.user
 *.log
 *.log.bak
+.Renviron
+.env
