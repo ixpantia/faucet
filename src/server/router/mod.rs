@@ -207,7 +207,7 @@ impl RouterConfig {
                             tokio::select! {
                                 result = conn => {
                                     if let Err(e) = result {
-                                        log::error!(target: "faucet", "Connection error: {}", e);
+                                        log::error!(target: "faucet", "Connection error: {:?}", e);
                                     }
                                 }
                                 _ = shutdown.wait() => ()

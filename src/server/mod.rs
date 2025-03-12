@@ -253,6 +253,7 @@ impl FaucetServerConfig {
 
                         tokio::task::spawn(async move {
                             let mut conn = http1::Builder::new()
+                                .half_close(true)
                                 .serve_connection(
                                     tcp,
                                     service_fn(|req: Request<Incoming>| {
@@ -266,7 +267,7 @@ impl FaucetServerConfig {
                             tokio::select! {
                                 result = conn => {
                                     if let Err(e) = result {
-                                        log::error!(target: "faucet", "Connection error: {}", e);
+                                        log::error!(target: "faucet", "Connection error: {:?}", e);
                                     }
                                 }
                                 _ = shutdown.wait() => ()
