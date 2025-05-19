@@ -47,6 +47,7 @@ chrono = "0.4.38"
 uuid = { version = "1.11.0", features = ["v7"] }
 parse-size = "1.0.0"
 dotenv = "0.15.0"
+cookie = "0.18.1"
 
 [dev-dependencies]
 rand = "0.8.5"

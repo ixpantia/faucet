@@ -34,6 +34,10 @@ pub enum Strategy {
     RoundRobin,
     /// Hashes the IP address of the client to determine which worker to send the request to.
     IpHash,
+    /// Adds a cookie to the requests to identify the worker to send the
+    /// request to. This is useful for sticky sessions from within the same
+    /// network.
+    CookieHash,
 }
 
 impl From<Strategy> for load_balancing::Strategy {
@@ -41,6 +45,7 @@ impl From<Strategy> for load_balancing::Strategy {
         match value {
             Strategy::RoundRobin => load_balancing::Strategy::RoundRobin,
             Strategy::IpHash => load_balancing::Strategy::IpHash,
+            Strategy::CookieHash => load_balancing::Strategy::CookieHash,
         }
     }
 }

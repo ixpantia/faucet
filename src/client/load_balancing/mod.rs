@@ -1,3 +1,4 @@
+pub mod cookie_hash;
 mod ip_extractor;
 pub mod ip_hash;
 pub mod round_robin;
@@ -5,16 +6,19 @@ use super::worker::WorkerConfig;
 use crate::client::Client;
 use crate::error::FaucetResult;
 use crate::leak;
+use cookie_hash::CookieHash;
 use hyper::Request;
 pub use ip_extractor::IpExtractor;
 use std::net::IpAddr;
 use std::str::FromStr;
+use uuid::Uuid;
 
 use self::ip_hash::IpHash;
 use self::round_robin::RoundRobin;
 
 trait LoadBalancingStrategy {
-    async fn entry(&self, ip: IpAddr) -> Client;
+    type Input;
+    async fn entry(&self, ip: Self::Input) -> Client;
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum, Eq, PartialEq, serde::Deserialize)]
@@ -22,6 +26,7 @@ trait LoadBalancingStrategy {
 pub enum Strategy {
     RoundRobin,
     IpHash,
+    CookieHash,
 }
 
 impl FromStr for Strategy {
@@ -30,22 +35,42 @@ impl FromStr for Strategy {
         match s {
             "round_robin" => Ok(Self::RoundRobin),
             "ip_hash" => Ok(Self::IpHash),
+            "cookie_hash" => Ok(Self::CookieHash),
             _ => Err("invalid strategy"),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum LBIdent {
+    Ip(IpAddr),
+    Uuid(Uuid),
 }
 
 #[derive(Copy, Clone)]
 enum DynLoadBalancer {
     IpHash(&'static ip_hash::IpHash),
     RoundRobin(&'static round_robin::RoundRobin),
+    CookieHash(&'static cookie_hash::CookieHash),
 }
 
 impl LoadBalancingStrategy for DynLoadBalancer {
-    async fn entry(&self, ip: IpAddr) -> Client {
-        match self {
-            DynLoadBalancer::RoundRobin(rr) => rr.entry(ip).await,
-            DynLoadBalancer::IpHash(ih) => ih.entry(ip).await,
+    type Input = LBIdent;
+    async fn entry(&self, ip: LBIdent) -> Client {
+        match ip {
+            LBIdent::Ip(ip) => match self {
+                DynLoadBalancer::RoundRobin(rr) => rr.entry(ip).await,
+                DynLoadBalancer::IpHash(ih) => ih.entry(ip).await,
+                _ => unreachable!(
+                    "This should never happen, ip should never be passed to cookie hash"
+                ),
+            },
+            LBIdent::Uuid(uuid) => match self {
+                DynLoadBalancer::CookieHash(ch) => ch.entry(uuid).await,
+                _ => unreachable!(
+                    "This should never happen, uuid should never be passed to round robin or ip hash"
+                ),
+            },
         }
     }
 }
@@ -64,14 +89,32 @@ impl LoadBalancer {
         let strategy: DynLoadBalancer = match strategy {
             Strategy::RoundRobin => DynLoadBalancer::RoundRobin(leak!(RoundRobin::new(workers)?)),
             Strategy::IpHash => DynLoadBalancer::IpHash(leak!(IpHash::new(workers)?)),
+            Strategy::CookieHash => DynLoadBalancer::CookieHash(leak!(CookieHash::new(workers)?)),
         };
         Ok(Self {
             strategy,
             extractor,
         })
     }
-    pub async fn get_client(&self, ip: IpAddr) -> FaucetResult<Client> {
-        Ok(self.strategy.entry(ip).await)
+    pub fn get_strategy(&self) -> Strategy {
+        match self.strategy {
+            DynLoadBalancer::RoundRobin(_) => Strategy::RoundRobin,
+            DynLoadBalancer::IpHash(_) => Strategy::IpHash,
+            DynLoadBalancer::CookieHash(_) => Strategy::CookieHash,
+        }
+    }
+    async fn get_client_ip(&self, ip: IpAddr) -> FaucetResult<Client> {
+        Ok(self.strategy.entry(LBIdent::Ip(ip)).await)
+    }
+    async fn get_client_uuid(&self, uuid: Uuid) -> FaucetResult<Client> {
+        Ok(self.strategy.entry(LBIdent::Uuid(uuid)).await)
+    }
+    pub async fn get_client(&self, ip: IpAddr, uuid: Option<Uuid>) -> FaucetResult<Client> {
+        if let Some(uuid) = uuid {
+            self.get_client_uuid(uuid).await
+        } else {
+            self.get_client_ip(ip).await
+        }
     }
     pub fn extract_ip<B>(
         &self,
@@ -149,13 +192,13 @@ mod tests {
                 .expect("failed to create load balancer");
         let ip = "192.168.0.1".parse().unwrap();
         let client = load_balancer
-            .get_client(ip)
+            .get_client_ip(ip)
             .await
             .expect("failed to get client");
         assert_eq!(client.socket_addr(), "127.0.0.1:9999".parse().unwrap());
 
         let client = load_balancer
-            .get_client(ip)
+            .get_client_ip(ip)
             .await
             .expect("failed to get client");
 
