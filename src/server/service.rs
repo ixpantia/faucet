@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 
 use crate::{
-    client::{Client, ExclusiveBody, UpgradeStatus},
+    client::{load_balancing::Strategy, Client, ExclusiveBody, UpgradeStatus},
     error::FaucetError,
     server::load_balancing::LoadBalancer,
 };
@@ -40,6 +40,59 @@ fn uuid_to_header_value(uuid: uuid::Uuid) -> HeaderValue {
         .expect("Unable to convert from uuid to header value, this is a bug")
 }
 
+fn extract_lb_uuid_from_req_cookies<B>(req: &hyper::Request<B>) -> Option<uuid::Uuid> {
+    req.headers().get("Cookie").and_then(|cookie| {
+        cookie.to_str().ok().and_then(|cookie_str| {
+            for cookie in cookie::Cookie::split_parse(cookie_str) {
+                match cookie {
+                    Err(e) => {
+                        log::error!(target: "faucet", "Error parsing cookie: {}", e);
+                        continue;
+                    }
+                    Ok(cookie) => {
+                        if cookie.name() == "FAUCET_LB_COOKIE" {
+                            let parse_res = cookie.value().parse::<uuid::Uuid>();
+                            return match parse_res {
+                                Ok(uuid) => Some(uuid),
+                                Err(e) => {
+                                    log::error!(target: "faucet", "Error parsing UUID from cookie: {}", e);
+                                    None
+                                }
+                            };
+                        }
+                    }
+                }
+
+            }
+            None
+        })
+    })
+}
+
+fn add_lb_cookie_to_resp(resp: &mut hyper::Response<ExclusiveBody>, lb_cookie: Option<uuid::Uuid>) {
+    if let Some(lb_cookie) = lb_cookie {
+        resp.headers_mut().append(
+            "Set-Cookie",
+            HeaderValue::from_str(&format!(
+                "FAUCET_LB_COOKIE={}; Path=/; HttpOnly; SameSite=Lax",
+                lb_cookie
+            ))
+            .expect("UUID is invalid, this is a bug! Report it please!"),
+        );
+    }
+}
+
+// Interesting behavior:
+//
+// If using a cookie hash strategy and the browser starts by sending N simultaneous requests
+// to the server, there will be a period on time where the server will send the
+// request to random workers. It will eventually settle down to the
+// Last-Used worker for the given cookie hash.
+//
+// Does this have any impact? I don't believe but just to take into account.
+//
+// Andrés
+
 impl<S, ReqBody> Service<hyper::Request<ReqBody>> for AddStateService<S>
 where
     ReqBody: hyper::body::Body + Send + Sync + 'static,
@@ -66,7 +119,15 @@ where
             }
         };
 
-        let client = self.load_balancer.get_client(remote_addr).await?;
+        let is_cookie_hash = self.load_balancer.get_strategy() == Strategy::CookieHash;
+
+        let lb_cookie = (is_cookie_hash)
+            .then_some(extract_lb_uuid_from_req_cookies(&req).unwrap_or(uuid::Uuid::now_v7()));
+
+        let client = self
+            .load_balancer
+            .get_client(remote_addr, lb_cookie)
+            .await?;
 
         let state = State::new(remote_addr, client);
 
@@ -76,7 +137,15 @@ where
             .insert("Faucet-Request-Uuid", uuid_to_header_value(state.uuid));
 
         req.extensions_mut().insert(state);
-        self.inner.call(req, Some(remote_addr)).await
+        let mut resp = self.inner.call(req, Some(remote_addr)).await;
+
+        if let Ok(resp) = &mut resp {
+            if is_cookie_hash {
+                add_lb_cookie_to_resp(resp, lb_cookie);
+            }
+        }
+
+        resp
     }
 }
 

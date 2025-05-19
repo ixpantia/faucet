@@ -46,6 +46,7 @@ impl RoundRobin {
 }
 
 impl LoadBalancingStrategy for RoundRobin {
+    type Input = IpAddr;
     async fn entry(&self, _ip: IpAddr) -> Client {
         let mut client = self.targets.next();
         loop {
