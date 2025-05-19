@@ -62,6 +62,7 @@ fn calculate_exponential_backoff(retries: u32) -> Duration {
 }
 
 impl LoadBalancingStrategy for IpHash {
+    type Input = IpAddr;
     async fn entry(&self, ip: IpAddr) -> Client {
         let mut retries = 0;
         let index = hash_to_index(ip, self.targets_len);
