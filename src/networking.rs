@@ -1,49 +1,47 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, ops::RangeInclusive};
 
-use tokio::net::TcpListener;
+use rand::Rng;
 
-use crate::error::FaucetResult;
+use tokio::{io, net::TcpListener};
 
-pub async fn get_available_sockets(n: usize) -> impl Iterator<Item = SocketAddr> {
-    let mut tcp_listeners = Vec::with_capacity(n);
-    for _ in 0..n {
-        match bind_to_random_port().await {
-            Ok(tcp_listener) => {
-                let tcp_listener = TempTcpListener(tcp_listener);
-                log::debug!(target: "faucet", "Reserving SocketAddr {}", tcp_listener.local_addr());
-                tcp_listeners.push(tcp_listener);
-            }
-            Err(e) => {
-                log::error!(target: "faucet", "Failed to bind to random port: {}", e);
-                std::process::exit(1);
-            }
+use crate::error::{FaucetError, FaucetResult};
+
+const UNSAFE_PORTS: &[u16] = &[
+    1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 77, 79, 87, 95, 101, 102, 103,
+    104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 139, 143, 179, 389, 427, 465, 512, 513, 514,
+    515, 526, 530, 531, 532, 540, 548, 556, 563, 587, 601, 636, 993, 995, 2049, 3659, 4045, 6000,
+    6665, 6666, 6667, 6668, 6669, 6697,
+];
+
+pub async fn socket_is_available(socket_addr: SocketAddr) -> FaucetResult<bool> {
+    let result = TcpListener::bind(socket_addr).await;
+    match result {
+        Ok(_) => Ok(true),
+        Err(e) => match e.kind() {
+            io::ErrorKind::AddrInUse => Ok(false),
+            _ => Err(FaucetError::Io(e)),
+        },
+    }
+}
+
+const PORT_RANGE: RangeInclusive<u16> = 1024..=49151;
+
+pub async fn get_available_socket(tries: usize) -> Result<SocketAddr, FaucetError> {
+    let mut rng = rand::thread_rng();
+
+    for _ in 0..tries {
+        let port: u16 = rng.gen_range(PORT_RANGE);
+
+        let socket_addr = SocketAddr::from(([127, 0, 0, 1], port));
+
+        if UNSAFE_PORTS.contains(&port) {
+            continue;
+        }
+
+        if socket_is_available(socket_addr).await? {
+            return Ok(socket_addr);
         }
     }
-    tcp_listeners
-        .into_iter()
-        .map(|tcp_listener| tcp_listener.local_addr())
-}
 
-pub struct TempTcpListener(TcpListener);
-
-impl Drop for TempTcpListener {
-    fn drop(&mut self) {
-        log::debug!(target: "faucet", "Dropping bind to socket {}, a child process can now bind to it", self.0.local_addr().expect("Failed to get local addr"));
-    }
-}
-
-impl TempTcpListener {
-    fn local_addr(&self) -> SocketAddr {
-        match self.0.local_addr() {
-            Ok(addr) => addr,
-            Err(e) => {
-                log::error!(target: "faucet", "Failed to get local addr: {}", e);
-                std::process::exit(1);
-            }
-        }
-    }
-}
-
-async fn bind_to_random_port() -> FaucetResult<TcpListener> {
-    TcpListener::bind("127.0.0.1:0").await.map_err(Into::into)
+    Err(FaucetError::NoSocketsAvailable)
 }
