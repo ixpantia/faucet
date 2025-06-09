@@ -141,7 +141,7 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::networking::get_available_sockets;
+    use crate::networking::get_available_socket;
 
     use super::*;
 
@@ -182,7 +182,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_sockets(1).await.next().unwrap();
+        let socket_addr = get_available_socket(20).await.unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -235,7 +235,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_sockets(1).await.next().unwrap();
+        let socket_addr = get_available_socket(20).await.unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -275,7 +275,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_sockets(1).await.next().unwrap();
+        let socket_addr = get_available_socket(20).await.unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -318,7 +318,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_sockets(1).await.next().unwrap();
+        let socket_addr = get_available_socket(20).await.unwrap();
 
         let client = MockClient { socket_addr };
 
@@ -376,7 +376,7 @@ mod tests {
             }
         }
 
-        let socket_addr = get_available_sockets(1).await.next().unwrap();
+        let socket_addr = get_available_socket(20).await.unwrap();
 
         let client = MockClient { socket_addr };
 

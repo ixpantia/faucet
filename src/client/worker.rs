@@ -1,7 +1,7 @@
 use crate::{
     error::{FaucetError, FaucetResult},
     leak,
-    networking::get_available_sockets,
+    networking::get_available_socket,
     server::FaucetServerConfig,
     shutdown::ShutdownSignal,
 };
@@ -303,17 +303,24 @@ pub struct Workers {
     pub workers: Box<[Worker]>,
 }
 
+const TRIES: usize = 20;
+
 impl Workers {
     pub(crate) async fn new(
         server_config: FaucetServerConfig,
         shutdown: ShutdownSignal,
     ) -> FaucetResult<Self> {
-        let workers = get_available_sockets(server_config.n_workers.get())
-            .await
-            .enumerate()
-            .map(|(id, socket_addr)| WorkerConfig::new(id + 1, socket_addr, &server_config))
-            .map(|config| Worker::from_config(config, shutdown.clone()))
-            .collect::<FaucetResult<Box<[Worker]>>>()?;
+        let mut workers = Vec::with_capacity(server_config.n_workers.get());
+
+        for id in 0..server_config.n_workers.get() {
+            let socket_addr = get_available_socket(TRIES).await?;
+            let config = WorkerConfig::new(id + 1, socket_addr, &server_config);
+            let worker = Worker::from_config(config, shutdown.clone())?;
+            workers.push(worker);
+        }
+
+        let workers = workers.into_boxed_slice();
+
         Ok(Self { workers })
     }
     pub(crate) fn get_workers_config(&self) -> Vec<WorkerConfig> {
