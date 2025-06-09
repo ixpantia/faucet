@@ -147,7 +147,7 @@ faucet start --dir /path/to/plumber/api --ip-from x-forwarded-for
 Download the latest release of faucet for Linux from the [GitHub Releases page](https://github.com/ixpantia/faucet/releases). This should work with most Linux distributions.
 
 ```bash
-FAUCET_VERSION="v1.1.0"
+FAUCET_VERSION="v1.2.0"
 
 wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
@@ -171,7 +171,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 2. Install faucet with Cargo.
 
 ```bash
-cargo install faucet-server --version ^1.1
+cargo install faucet-server --version ^1.2
 ```
 
 ### Option 3: Build from Source (Linux, macOS, Windows)
