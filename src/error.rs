@@ -18,6 +18,7 @@ pub enum FaucetError {
     PoolPostCreateHook,
     PoolClosed,
     PoolNoRuntimeSpecified,
+    NoSocketsAvailable,
     ConnectionClosed,
     Io(std::io::Error),
     Unknown(String),
@@ -162,6 +163,7 @@ impl std::fmt::Display for FaucetError {
                 }
                 BadRequestReason::NoPathOrQuery => write!(f, "No path and/or query"),
             },
+            Self::NoSocketsAvailable => write!(f, "No sockets available"),
         }
     }
 }
