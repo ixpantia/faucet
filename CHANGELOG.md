@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [1.2.0] - 2025-06-10
 
 ### 🚀 Features
 
@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 
 - Adds examples for use in docker
 - Adds documentation for cookie hash
+- Adds documentation for router
 
 ### ⚙️ Miscellaneous Tasks
 
