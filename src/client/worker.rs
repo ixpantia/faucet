@@ -17,10 +17,12 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, serde::Deserialize)]
-#[serde(rename = "snake_case")]
 pub enum WorkerType {
+    #[serde(alias = "plumber", alias = "Plumber")]
     Plumber,
+    #[serde(alias = "shiny", alias = "Shiny")]
     Shiny,
+    #[serde(alias = "quarto-shiny", alias = "QuartoShiny", alias = "quarto_shiny")]
     QuartoShiny,
 }
 

@@ -26,9 +26,11 @@ plugins:
             - Installation: install.md
             - Getting Started: getting_started.md
             - Options: options.md
+            - Router Mode: router.md
             - faucet in Containers: in_containers.md
             - Logging: logging.md
             - With Reverse Proxy: reverse_proxy.md
+            - Telemetry: telemetry.md
             - Examples: examples.md
             - FAQ: faq.md
         - locale: es
@@ -40,9 +42,11 @@ plugins:
             - Instalación: install.md
             - Inicio Rápido: getting_started.md
             - Opciones: options.md
+            - Modo Router: router.md
             - faucet en Contenedores: in_containers.md
             - Logging: logging.md
             - Con Proxy Inverso: reverse_proxy.md
+            - Telemetría: telemetry.md
             - Ejemplos: examples.md
 
 markdown_extensions:

@@ -24,8 +24,11 @@ trait LoadBalancingStrategy {
 #[derive(Debug, Clone, Copy, clap::ValueEnum, Eq, PartialEq, serde::Deserialize)]
 #[serde(rename = "snake_case")]
 pub enum Strategy {
+    #[serde(alias = "round_robin", alias = "RoundRobin", alias = "round-robin")]
     RoundRobin,
+    #[serde(alias = "ip_hash", alias = "IpHash", alias = "ip-hash")]
     IpHash,
+    #[serde(alias = "cookie_hash", alias = "CookieHash", alias = "cookie-hash")]
     CookieHash,
 }
 

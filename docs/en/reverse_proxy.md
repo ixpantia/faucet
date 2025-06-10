@@ -53,3 +53,5 @@ You will need to set the `FAUCET_IP_FROM` environment variable to
 header to get the IP address of the client. You can also use the
 `--ip-from` / `-i` command line option to set the `FAUCET_IP_FROM`
 environment variable.
+
+Similar to the Nginx setup, when Apache proxies WebSocket requests (as shown in the `RewriteRule` with the `ws://` scheme), Faucet will actively manage this connection. It receives the upgrade request, performs the necessary WebSocket handshake with your backend R application, and then proxies the WebSocket data.

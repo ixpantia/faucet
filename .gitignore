@@ -6,3 +6,4 @@ venv/
 *.log.bak
 .Renviron
 .env
+.venv

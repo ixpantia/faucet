@@ -1,0 +1,42 @@
+# In this route we use `workdir` to start the child
+# R session on a different working directory.
+[[route]]
+route = "/sliders/"
+workers = 1
+server_type = "shiny"
+workdir = "./sliders"
+
+# In this route we use `app_dir` to start the R session
+# in the current working directory but use an app in
+# a directory.
+[[route]]
+route = "/text/"
+workers = 1
+server_type = "shiny"
+app_dir = "./text"
+
+# Showcase on serving a quarto shiny app
+[[route]]
+route = "/qmd/"
+workers = 1
+server_type = "quarto-shiny"
+workdir = "./qmd"
+qmd = "old_faithful.qmd"
+
+# Showcase on serving a Plumber API
+[[route]]
+route = "/api/"
+workers = 1
+server_type = "plumber"
+workdir = "./api"
+strategy = "round-robin"
+
+# By default the `workdir` and `app_dir`
+# is `.` (Here). If we don't specify
+# it runs the app in the current dir.
+[[route]]
+route = "/"
+workers = 1
+server_type = "shiny"
+strategy = "cookie-hash"
+
