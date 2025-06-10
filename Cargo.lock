@@ -552,7 +552,7 @@ dependencies = [
  "nix 0.29.0",
  "num_cpus",
  "parse-size",
- "rand 0.8.5",
+ "rand 0.9.1",
  "rustls",
  "serde",
  "sha1",
