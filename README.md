@@ -49,7 +49,7 @@ faucet start --dir /path/to/plumber/api
 The server will automatically listen on port `3838` by default. To change the host and port, use the `--host` flag to specify the socket address to bind to the service.
 
 ```bash
-faucet start --dir /path/to/plumber/api --host 0.0.0.0:3000
+faucet --host 0.0.0.0:3000 start --dir /path/to/plumber/api
 ```
 
 By default faucet will start as many workers as there are logical cores on the machine. To specify the number of workers, use the `--workers` flag.
@@ -69,7 +69,7 @@ faucet start --dir /path/to/shiny/app
 The server will automatically listen on port `3838` by default. To change the host and port, use the `--host` flag to specify the socket address to bind to the service.
 
 ```bash
-faucet start --dir /path/to/shiny/app --host 0.0.0.0:3000
+faucet --host 0.0.0.0:3000 start --dir /path/to/shiny/app
 ```
 
 By default faucet will start as many workers as there are logical cores on the machine. To specify the number of workers, use the `--workers` flag.
@@ -137,7 +137,7 @@ flat to either `x-forwarded-for` or `x-real-ip` depending on which header you
 set in Nginx.
 
 ```bash
-faucet start --dir /path/to/plumber/api --ip-from x-forwarded-for
+faucet --ip-from x-forwarded-for start --dir /path/to/plumber/api
 ```
 
 ## Installation
