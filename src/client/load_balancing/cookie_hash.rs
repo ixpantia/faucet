@@ -11,14 +11,14 @@ struct Targets {
 }
 
 impl Targets {
-    fn new(configs: &[WorkerConfig]) -> FaucetResult<Self> {
+    fn new(configs: &[&'static WorkerConfig]) -> Self {
         let mut targets = Vec::new();
         for state in configs {
-            let client = Client::builder(*state).build()?;
+            let client = Client::new(state);
             targets.push(client);
         }
         let targets = leak!(targets);
-        Ok(Targets { targets })
+        Targets { targets }
     }
 }
 
@@ -28,11 +28,15 @@ pub struct CookieHash {
 }
 
 impl CookieHash {
-    pub(crate) fn new(targets: &[WorkerConfig]) -> FaucetResult<Self> {
-        Ok(Self {
-            targets_len: targets.as_ref().len(),
-            targets: Targets::new(targets)?,
-        })
+    pub(crate) async fn new(configs: &[&'static WorkerConfig]) -> Self {
+        // Start the process of each config
+        for config in configs {
+            config.spawn_worker_task().await;
+        }
+        Self {
+            targets_len: configs.as_ref().len(),
+            targets: Targets::new(configs),
+        }
     }
 }
 

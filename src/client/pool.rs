@@ -15,28 +15,12 @@ struct ConnectionHandle {
     sender: SendRequest<Incoming>,
 }
 
-async fn create_http_client(config: WorkerConfig) -> FaucetResult<ConnectionHandle> {
-    log::debug!(target: "faucet", "Establishing TCP connection to {}", config.target);
-    let stream = TokioIo::new(TcpStream::connect(config.addr).await?);
-    let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
-    tokio::spawn(async move {
-        match conn.await {
-            Ok(_) => (),
-            Err(err) => {
-                log::debug!(target: "faucet", "{err}");
-            }
-        }
-    });
-    log::debug!(target: "faucet", "Established TCP connection to {}", config.target);
-    Ok(ConnectionHandle { sender })
-}
-
 struct ConnectionManager {
-    config: WorkerConfig,
+    config: &'static WorkerConfig,
 }
 
 impl ConnectionManager {
-    fn new(config: WorkerConfig) -> Self {
+    fn new(config: &'static WorkerConfig) -> Self {
         Self { config }
     }
 }
@@ -46,7 +30,19 @@ impl managed::Manager for ConnectionManager {
     type Error = FaucetError;
 
     async fn create(&self) -> FaucetResult<Self::Type> {
-        create_http_client(self.config).await
+        log::debug!(target: "faucet", "Establishing TCP connection to {}", self.config.target);
+        let stream = TokioIo::new(TcpStream::connect(self.config.addr).await?);
+        let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
+        tokio::spawn(async move {
+            match conn.await {
+                Ok(_) => (),
+                Err(err) => {
+                    log::debug!(target: "faucet", "{err}");
+                }
+            }
+        });
+        log::debug!(target: "faucet", "Established TCP connection to {}", self.config.target);
+        Ok(ConnectionHandle { sender })
     }
 
     async fn recycle(
@@ -90,32 +86,21 @@ pub(crate) struct ClientBuilder {
     config: Option<WorkerConfig>,
 }
 
-const DEFAULT_MAX_SIZE: usize = 32;
-
-impl ClientBuilder {
-    pub fn build(self) -> FaucetResult<Client> {
-        let config = self
-            .config
-            .expect("Unable to create connection without worker state");
-        let builder = Pool::builder(ConnectionManager::new(config))
-            .max_size(self.max_size.unwrap_or(DEFAULT_MAX_SIZE));
-        let pool = builder.build()?;
-        Ok(Client { pool, config })
-    }
-}
+const DEFAULT_MAX_SIZE: usize = 1024;
 
 #[derive(Clone)]
 pub(crate) struct Client {
     pool: Pool<ConnectionManager>,
-    pub(crate) config: WorkerConfig,
+    pub(crate) config: &'static WorkerConfig,
 }
 
 impl Client {
-    pub fn builder(config: WorkerConfig) -> ClientBuilder {
-        ClientBuilder {
-            max_size: None,
-            config: Some(config),
-        }
+    pub fn new(config: &'static WorkerConfig) -> Self {
+        let builder = Pool::builder(ConnectionManager::new(config)).max_size(DEFAULT_MAX_SIZE);
+        let pool = builder
+            .build()
+            .expect("Failed to create connection pool. This is a bug");
+        Self { pool, config }
     }
 
     pub async fn get(&self) -> FaucetResult<HttpConnection> {

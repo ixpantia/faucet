@@ -40,7 +40,7 @@ pub async fn main() -> FaucetResult<()> {
                 faucet_server::server::logger::Target::File(file.to_path_buf())
             }),
         cli_args.max_log_file_size,
-        shutdown_signal.clone(),
+        shutdown_signal,
     );
 
     match cli_args.command {

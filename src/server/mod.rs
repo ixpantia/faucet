@@ -6,7 +6,7 @@ mod service;
 use crate::{
     client::{
         load_balancing::{self, LoadBalancer, Strategy},
-        worker::{WorkerType, Workers},
+        worker::{WorkerConfigs, WorkerType},
         ExclusiveBody,
     },
     error::{FaucetError, FaucetResult},
@@ -220,11 +220,11 @@ pub struct FaucetServerConfig {
 }
 
 impl FaucetServerConfig {
-    pub async fn run(self, shutdown: ShutdownSignal) -> FaucetResult<()> {
+    pub async fn run(self, shutdown: &'static ShutdownSignal) -> FaucetResult<()> {
         let telemetry = self.telemetry.clone();
-        let mut workers = Workers::new(self.clone(), shutdown.clone()).await?;
-        let targets = workers.get_workers_config();
-        let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
+        let mut workers = WorkerConfigs::new(self.clone(), shutdown).await?;
+        let load_balancer =
+            LoadBalancer::new(self.strategy, self.extractor, &workers.workers).await?;
         let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
 
         let load_balancer = load_balancer.clone();
@@ -250,7 +250,6 @@ impl FaucetServerConfig {
                         log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
                         let service = service.clone();
-                        let shutdown = shutdown.clone();
 
                         tokio::task::spawn(async move {
                             let mut conn = http1::Builder::new()
@@ -286,19 +285,19 @@ impl FaucetServerConfig {
         }
 
         for worker in &mut workers.workers {
-            worker.child.wait_until_done().await;
+            worker.wait_until_done().await;
         }
 
         FaucetResult::Ok(())
     }
     pub async fn extract_service(
         self,
-        shutdown: ShutdownSignal,
-    ) -> FaucetResult<(FaucetServerService, Workers)> {
+        shutdown: &'static ShutdownSignal,
+    ) -> FaucetResult<(FaucetServerService, WorkerConfigs)> {
         let telemetry = self.telemetry.clone();
-        let workers = Workers::new(self.clone(), shutdown).await?;
-        let targets = workers.get_workers_config();
-        let load_balancer = LoadBalancer::new(self.strategy, self.extractor, &targets)?;
+        let workers = WorkerConfigs::new(self.clone(), shutdown).await?;
+        let load_balancer =
+            LoadBalancer::new(self.strategy, self.extractor, &workers.workers).await?;
         let service = Arc::new(
             ServiceBuilder::new(ProxyService)
                 .layer(logging::LogLayer { telemetry })
