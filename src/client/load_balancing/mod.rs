@@ -84,15 +84,19 @@ pub(crate) struct LoadBalancer {
 }
 
 impl LoadBalancer {
-    pub fn new(
+    pub async fn new(
         strategy: Strategy,
         extractor: IpExtractor,
-        workers: &[WorkerConfig],
+        workers: &[&'static WorkerConfig],
     ) -> FaucetResult<Self> {
         let strategy: DynLoadBalancer = match strategy {
-            Strategy::RoundRobin => DynLoadBalancer::RoundRobin(leak!(RoundRobin::new(workers)?)),
-            Strategy::IpHash => DynLoadBalancer::IpHash(leak!(IpHash::new(workers)?)),
-            Strategy::CookieHash => DynLoadBalancer::CookieHash(leak!(CookieHash::new(workers)?)),
+            Strategy::RoundRobin => {
+                DynLoadBalancer::RoundRobin(leak!(RoundRobin::new(workers).await))
+            }
+            Strategy::IpHash => DynLoadBalancer::IpHash(leak!(IpHash::new(workers).await)),
+            Strategy::CookieHash => {
+                DynLoadBalancer::CookieHash(leak!(CookieHash::new(workers).await))
+            }
         };
         Ok(Self {
             strategy,

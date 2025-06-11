@@ -12,7 +12,7 @@ use super::{onion::Service, FaucetServerBuilder, FaucetServerService};
 use crate::{
     client::{
         load_balancing::{IpExtractor, Strategy},
-        worker::{WorkerType, Workers},
+        worker::{WorkerConfigs, WorkerType},
         ExclusiveBody,
     },
     error::{FaucetError, FaucetResult},
@@ -125,8 +125,8 @@ impl RouterConfig {
         quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
         telemetry: Option<&TelemetryManager>,
-        shutdown: ShutdownSignal,
-    ) -> FaucetResult<(RouterService, Vec<Workers>)> {
+        shutdown: &'static ShutdownSignal,
+    ) -> FaucetResult<(RouterService, Vec<WorkerConfigs>)> {
         let mut all_workers = Vec::with_capacity(self.route.len());
         let mut routes = Vec::with_capacity(self.route.len());
         let mut clients = Vec::with_capacity(self.route.len());
@@ -149,7 +149,7 @@ impl RouterConfig {
                 .telemetry(telemetry)
                 .route(route.clone())
                 .build()?
-                .extract_service(shutdown.clone())
+                .extract_service(shutdown)
                 .await?;
             routes.push(route);
             all_workers.push(workers);
@@ -169,11 +169,11 @@ impl RouterConfig {
         quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
         addr: SocketAddr,
-        shutdown: ShutdownSignal,
+        shutdown: &'static ShutdownSignal,
         telemetry: Option<&TelemetryManager>,
     ) -> FaucetResult<()> {
         let (service, mut all_workers) = self
-            .into_service(rscript, quarto, ip_from, telemetry, shutdown.clone())
+            .into_service(rscript, quarto, ip_from, telemetry, shutdown)
             .await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;
@@ -190,7 +190,6 @@ impl RouterConfig {
                         log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
 
                         let service = service.clone();
-                        let shutdown = shutdown.clone();
 
                         tokio::task::spawn(async move {
                             let mut conn = http1::Builder::new()
@@ -225,8 +224,8 @@ impl RouterConfig {
         }
 
         // Kill child process
-        for w in all_workers.iter_mut().flat_map(|ws| &mut ws.workers) {
-            w.child.wait_until_done().await;
+        for w in all_workers.iter().flat_map(|ws| &ws.workers) {
+            w.wait_until_done().await;
         }
 
         FaucetResult::Ok(())

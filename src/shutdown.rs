@@ -5,20 +5,13 @@ use std::sync::{
 
 use tokio::sync::Notify;
 
+use crate::leak;
+
 const WAIT_STOP_PRINT: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub struct ShutdownSignal {
-    is_shutdown: Arc<AtomicBool>,
-    notify: Arc<Notify>,
-}
-
-impl Clone for ShutdownSignal {
-    fn clone(&self) -> Self {
-        ShutdownSignal {
-            is_shutdown: Arc::clone(&self.is_shutdown),
-            notify: Arc::clone(&self.notify),
-        }
-    }
+    is_shutdown: AtomicBool,
+    notify: Notify,
 }
 
 impl Default for ShutdownSignal {
@@ -30,8 +23,8 @@ impl Default for ShutdownSignal {
 impl ShutdownSignal {
     pub fn new() -> Self {
         ShutdownSignal {
-            is_shutdown: Arc::new(AtomicBool::new(false)),
-            notify: Arc::new(Notify::new()),
+            is_shutdown: AtomicBool::new(false),
+            notify: Notify::new(),
         }
     }
 
@@ -49,13 +42,12 @@ impl ShutdownSignal {
     }
 }
 
-pub fn graceful() -> ShutdownSignal {
+pub fn graceful() -> &'static ShutdownSignal {
     use crate::global_conn::current_connections;
 
-    let signal = ShutdownSignal::new();
+    let signal = leak!(ShutdownSignal::new()) as &'static ShutdownSignal;
 
     {
-        let signal = signal.clone();
         ctrlc::set_handler(move || {
         log::info!(target: "faucet", "Received stop signal, waiting for all users to disconnect");
         let mut last_5_sec = std::time::Instant::now();
@@ -78,10 +70,9 @@ pub fn graceful() -> ShutdownSignal {
     signal
 }
 
-pub fn immediate() -> ShutdownSignal {
-    let signal = ShutdownSignal::new();
+pub fn immediate() -> &'static ShutdownSignal {
+    let signal = leak!(ShutdownSignal::new()) as &'static ShutdownSignal;
     {
-        let signal = signal.clone();
         ctrlc::set_handler(move || {
             log::info!(target: "faucet", "Starting immediate shutdown handle");
             signal.shutdown()

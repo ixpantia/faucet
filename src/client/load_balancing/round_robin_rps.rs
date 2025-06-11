@@ -15,17 +15,17 @@ struct Targets {
 const WAIT_TIME_UNTIL_RETRY: std::time::Duration = std::time::Duration::from_micros(500);
 
 impl Targets {
-    fn new(configs: &[&'static WorkerConfig]) -> Self {
+    fn new(configs: &[WorkerConfig]) -> FaucetResult<Self> {
         let mut targets = Vec::new();
         for state in configs {
-            let client = Client::new(state);
+            let client = Client::new(*state).build()?;
             targets.push(client);
         }
         let targets = Box::leak(targets.into_boxed_slice());
-        Targets {
+        Ok(Targets {
             targets,
             index: AtomicUsize::new(0),
-        }
+        })
     }
     fn next(&self) -> Client {
         let index = self.index.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -38,14 +38,10 @@ pub struct RoundRobin {
 }
 
 impl RoundRobin {
-    pub(crate) async fn new(configs: &[&'static WorkerConfig]) -> Self {
-        // Start the process of each config
-        for config in configs {
-            config.spawn_worker_task().await;
-        }
-        Self {
-            targets: Targets::new(configs),
-        }
+    pub(crate) fn new(targets: &[WorkerConfig]) -> FaucetResult<Self> {
+        Ok(Self {
+            targets: Targets::new(targets)?,
+        })
     }
 }
 
