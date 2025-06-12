@@ -103,6 +103,10 @@ pub struct StartArgs {
     /// Quarto Shiny file path.
     #[arg(long, short, env = "FAUCET_QMD", default_value = None)]
     pub qmd: Option<PathBuf>,
+
+    /// The maximum requests per second for the RPS autoscaler strategy.
+    #[arg(long, env = "FAUCET_MAX_RPS", default_value = None)]
+    pub max_rps: Option<f64>,
 }
 
 #[derive(Parser, Debug)]
