@@ -3,7 +3,7 @@ use tokio::sync::Mutex;
 
 use super::LoadBalancingStrategy;
 use crate::client::{worker::WorkerConfig, Client};
-use std::{net::IpAddr, sync::atomic::AtomicUsize};
+use std::net::IpAddr;
 
 struct RequestCounter {
     last_reset: std::time::Instant,
@@ -62,7 +62,6 @@ impl RequestCounter {
 struct Targets {
     targets: &'static [Client],
     request_counter: &'static [Mutex<RequestCounter>],
-    index: AtomicUsize,
     _request_counter_calculator_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -135,7 +134,6 @@ impl Targets {
         Targets {
             targets,
             request_counter,
-            index: AtomicUsize::new(0),
             _request_counter_calculator_handle: request_per_second_calculator_handle,
         }
     }

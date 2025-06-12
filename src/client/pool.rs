@@ -81,11 +81,6 @@ impl Drop for HttpConnection {
     }
 }
 
-pub(crate) struct ClientBuilder {
-    max_size: Option<usize>,
-    config: Option<WorkerConfig>,
-}
-
 const DEFAULT_MAX_SIZE: usize = 1024;
 
 #[derive(Clone)]

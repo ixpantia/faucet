@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_faucet_error_from_io_error() {
-        let err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let err = std::io::Error::other("test");
 
         let _err: FaucetError = From::from(err);
     }
