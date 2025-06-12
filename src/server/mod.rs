@@ -44,6 +44,10 @@ fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> St
                 log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to IP hash for shiny.");
                 Strategy::IpHash
             },
+            Some(Strategy::Rps) => {
+                log::debug!(target: "faucet", "RPS load balancing strategy specified for shiny, switching to IP hash.");
+                Strategy::IpHash
+            },
             Some(Strategy::CookieHash) => Strategy::CookieHash,
             Some(Strategy::RoundRobin) => {
                 log::debug!(target: "faucet", "Round robin load balancing strategy specified for shiny, switching to IP hash.");
