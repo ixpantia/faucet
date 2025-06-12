@@ -229,7 +229,14 @@ impl WorkerConfig {
         }
     }
     pub async fn spawn_worker_task(&'static self) {
-        let handle = tokio::spawn(async move {
+        let mut handle = self.handle.lock().await;
+
+        if handle.is_some() {
+            log::warn!(target: "faucet", "Worker task for {target} is already running, skipping spawn", target = self.target);
+            return;
+        }
+
+        *handle = Some(tokio::spawn(async move {
             'outer: loop {
                 let mut child = self.spawn_process();
                 let pid = child.id().expect("Failed to get plumber worker PID");
@@ -277,8 +284,7 @@ impl WorkerConfig {
                 }
             }
             FaucetResult::Ok(())
-        });
-        self.handle.lock().await.replace(handle);
+        }));
     }
 }
 

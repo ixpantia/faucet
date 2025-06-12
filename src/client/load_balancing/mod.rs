@@ -2,6 +2,8 @@ pub mod cookie_hash;
 mod ip_extractor;
 pub mod ip_hash;
 pub mod round_robin;
+pub mod round_robin_rps;
+
 use super::worker::WorkerConfig;
 use crate::client::Client;
 use crate::error::FaucetResult;
@@ -30,6 +32,8 @@ pub enum Strategy {
     IpHash,
     #[serde(alias = "cookie_hash", alias = "CookieHash", alias = "cookie-hash")]
     CookieHash,
+    #[serde(alias = "rps", alias = "Rps", alias = "rps")]
+    Rps,
 }
 
 impl FromStr for Strategy {
@@ -39,6 +43,7 @@ impl FromStr for Strategy {
             "round_robin" => Ok(Self::RoundRobin),
             "ip_hash" => Ok(Self::IpHash),
             "cookie_hash" => Ok(Self::CookieHash),
+            "rps" => Ok(Self::Rps),
             _ => Err("invalid strategy"),
         }
     }
@@ -55,6 +60,7 @@ enum DynLoadBalancer {
     IpHash(&'static ip_hash::IpHash),
     RoundRobin(&'static round_robin::RoundRobin),
     CookieHash(&'static cookie_hash::CookieHash),
+    Rps(&'static round_robin_rps::RoundRobinRps),
 }
 
 impl LoadBalancingStrategy for DynLoadBalancer {
@@ -64,6 +70,7 @@ impl LoadBalancingStrategy for DynLoadBalancer {
             LBIdent::Ip(ip) => match self {
                 DynLoadBalancer::RoundRobin(rr) => rr.entry(ip).await,
                 DynLoadBalancer::IpHash(ih) => ih.entry(ip).await,
+                DynLoadBalancer::Rps(rr) => rr.entry(ip).await,
                 _ => unreachable!(
                     "This should never happen, ip should never be passed to cookie hash"
                 ),
@@ -97,6 +104,9 @@ impl LoadBalancer {
             Strategy::CookieHash => {
                 DynLoadBalancer::CookieHash(leak!(CookieHash::new(workers).await))
             }
+            Strategy::Rps => {
+                DynLoadBalancer::Rps(leak!(round_robin_rps::RoundRobinRps::new(workers).await))
+            }
         };
         Ok(Self {
             strategy,
@@ -108,6 +118,7 @@ impl LoadBalancer {
             DynLoadBalancer::RoundRobin(_) => Strategy::RoundRobin,
             DynLoadBalancer::IpHash(_) => Strategy::IpHash,
             DynLoadBalancer::CookieHash(_) => Strategy::CookieHash,
+            DynLoadBalancer::Rps(_) => Strategy::Rps,
         }
     }
     async fn get_client_ip(&self, ip: IpAddr) -> FaucetResult<Client> {

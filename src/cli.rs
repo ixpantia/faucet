@@ -38,6 +38,8 @@ pub enum Strategy {
     /// request to. This is useful for sticky sessions from within the same
     /// network.
     CookieHash,
+    /// Round-robin with RPS (Requests Per Second) scaling.
+    Rps,
 }
 
 impl From<Strategy> for load_balancing::Strategy {
@@ -46,6 +48,7 @@ impl From<Strategy> for load_balancing::Strategy {
             Strategy::RoundRobin => load_balancing::Strategy::RoundRobin,
             Strategy::IpHash => load_balancing::Strategy::IpHash,
             Strategy::CookieHash => load_balancing::Strategy::CookieHash,
+            Strategy::Rps => load_balancing::Strategy::Rps,
         }
     }
 }
