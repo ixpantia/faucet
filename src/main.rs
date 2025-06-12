@@ -59,6 +59,7 @@ pub async fn main() -> FaucetResult<()> {
                 .quarto(cli_args.quarto)
                 .qmd(start_args.qmd)
                 .telemetry(telemetry.as_ref())
+                .max_rps(start_args.max_rps)
                 .build()?
                 .run(shutdown_signal)
                 .await?;

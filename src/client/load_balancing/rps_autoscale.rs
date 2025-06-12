@@ -10,24 +10,22 @@ struct RequestCounter {
     current_window: f64,
     previous_window_rps: f64,
     big_reset_counter: f64,
+    pub max_rps: f64,
 }
 
-impl Default for RequestCounter {
-    fn default() -> Self {
+const WINDOW_SIZE: f64 = 10.0; // seconds
+const BIG_RESET_WINDOW_SIZE: f64 = 30.0; // seconds
+
+impl RequestCounter {
+    fn new(max_rps: f64) -> Self {
         RequestCounter {
             last_reset: std::time::Instant::now(),
             current_window: 0.0,
             previous_window_rps: 0.0,
             big_reset_counter: 0.0,
+            max_rps,
         }
     }
-}
-
-const WINDOW_SIZE: f64 = 10.0; // seconds
-const BIG_RESET_WINDOW_SIZE: f64 = 30.0; // seconds
-const MAX_REQUESTS_PER_SECOND: f64 = 10.0;
-
-impl RequestCounter {
     fn add(&mut self, count: f64) {
         self.current_window += count;
         self.big_reset_counter += count;
@@ -88,13 +86,13 @@ struct Targets {
 const WAIT_TIME_UNTIL_RETRY: std::time::Duration = std::time::Duration::from_millis(500);
 
 impl Targets {
-    fn new(configs: &[&'static WorkerConfig]) -> Self {
+    fn new(configs: &[&'static WorkerConfig], max_rps: f64) -> Self {
         let mut targets_vec = Vec::new();
         let mut request_counters_vec = Vec::new();
         for config in configs {
             let client = Client::new(config);
             targets_vec.push(client);
-            request_counters_vec.push(Mutex::new(RequestCounter::default()));
+            request_counters_vec.push(Mutex::new(RequestCounter::new(max_rps)));
         }
         let targets = Box::leak(targets_vec.into_boxed_slice()) as &'static [Client];
         let request_counter_static_slice = Box::leak(request_counters_vec.into_boxed_slice())
@@ -116,7 +114,7 @@ impl Targets {
                     let mut rc_guard = request_counter_static_slice[i].lock().await;
                     let calculated_rps = rc_guard.set_new_window();
 
-                    if calculated_rps > MAX_REQUESTS_PER_SECOND {
+                    if calculated_rps > rc_guard.max_rps {
                         log::debug!(
                             target: "faucet",
                             "Target {} ({}) is overloaded ({} RPS), attempting to spawn worker for next target",
@@ -191,7 +189,7 @@ pub struct RpsAutoscale {
 }
 
 impl RpsAutoscale {
-    pub(crate) async fn new(configs: &[&'static WorkerConfig]) -> Self {
+    pub(crate) async fn new(configs: &[&'static WorkerConfig], max_rps: f64) -> Self {
         // Spawn initial worker tasks as per configs
         for config in configs {
             if config.is_online.load(std::sync::atomic::Ordering::SeqCst) {
@@ -200,7 +198,7 @@ impl RpsAutoscale {
             }
         }
         Self {
-            targets: Targets::new(configs),
+            targets: Targets::new(configs, max_rps),
         }
     }
 }
@@ -247,12 +245,12 @@ impl LoadBalancingStrategy for RpsAutoscale {
                     }
                 };
 
-                if rc_guard.rps() <= MAX_REQUESTS_PER_SECOND || tried_all_once_in_overload_path {
+                if rc_guard.rps() <= rc_guard.max_rps || tried_all_once_in_overload_path {
                     rc_guard.add(1.0);
                     return client;
                 } else {
                     // Target is online but overloaded, try next
-                    log::debug!(target: "faucet", "Target {} ({}) is online but RPS {} > threshold {}, skipping.", current_index, client.config.target, rc_guard.rps(), MAX_REQUESTS_PER_SECOND);
+                    log::debug!(target: "faucet", "Target {} ({}) is online but RPS {} > threshold {}, skipping.", current_index, client.config.target, rc_guard.rps(), rc_guard.max_rps);
                 }
             } else {
                 log::debug!(target: "faucet", "Target {} ({}) is offline, skipping.", current_index, client.config.target);
@@ -311,10 +309,8 @@ impl LoadBalancingStrategy for RpsAutoscale {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::worker::{WorkerConfig, WorkerType}; // WorkerType needed for dummy
-    use crate::leak; // Required by WorkerConfig::dummy indirectly
+    use crate::client::worker::WorkerConfig; // WorkerType needed for dummy
     use std::net::{IpAddr, Ipv4Addr};
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
     use tokio::sync::Notify; // Notify used in WorkerConfig::dummy
@@ -344,7 +340,7 @@ mod tests {
     async fn test_new_rps_autoscale() {
         let config1 = create_leaked_dummy_config("new", 0, true);
         let config2 = create_leaked_dummy_config("new", 1, true);
-        let autoscale = RpsAutoscale::new(&[config1, config2]).await;
+        let autoscale = RpsAutoscale::new(&[config1, config2], 10.0).await;
         assert_eq!(autoscale.targets.targets.len(), 2);
         // Drop the autoscale to allow its background task to be cleaned up if possible
         drop(autoscale);
@@ -353,7 +349,7 @@ mod tests {
     #[tokio::test]
     async fn test_load_balancing_strategy_basic_entry() {
         let config1 = create_leaked_dummy_config("basic", 0, true);
-        let autoscale = RpsAutoscale::new(&[config1]).await;
+        let autoscale = RpsAutoscale::new(&[config1], 10.0).await;
         let client = autoscale.entry(dummy_ip()).await;
         assert_eq!(client.config.target, config1.target);
         assert!(client.is_online());
@@ -364,7 +360,7 @@ mod tests {
     async fn test_load_balancing_strategy_offline_target() {
         let config_offline = create_leaked_dummy_config("offline", 0, false);
         let config_online = create_leaked_dummy_config("offline", 1, true);
-        let autoscale = RpsAutoscale::new(&[config_offline, config_online]).await;
+        let autoscale = RpsAutoscale::new(&[config_offline, config_online], 10.0).await;
 
         for _ in 0..5 {
             let client = autoscale.entry(dummy_ip()).await;
@@ -381,13 +377,13 @@ mod tests {
     async fn test_load_balancing_overloaded_target_skipped_by_entry() {
         let config1 = create_leaked_dummy_config("overload", 0, true);
         let config2 = create_leaked_dummy_config("overload", 1, true);
-        let autoscale = RpsAutoscale::new(&[config1, config2]).await;
+        let autoscale = RpsAutoscale::new(&[config1, config2], 10.0).await;
 
         {
             let (_client1, rc1_mutex) = autoscale.targets.get(0);
             let mut rc1_guard = rc1_mutex.lock().await;
 
-            rc1_guard.current_window = MAX_REQUESTS_PER_SECOND * 5.0;
+            rc1_guard.current_window = rc1_guard.max_rps * 5.0;
         }
 
         tokio::time::sleep(Duration::from_millis(10)).await; // Ensure a tiny bit of time has passed for rc1.last_reset
@@ -419,12 +415,12 @@ mod tests {
             "Config1 handle should be None initially"
         );
 
-        let autoscale = RpsAutoscale::new(&[config0, config1]).await;
+        let autoscale = RpsAutoscale::new(&[config0, config1], 10.0).await;
 
         {
             let rc0_mutex = &autoscale.targets.request_counter[0];
             let mut rc0_guard = rc0_mutex.lock().await;
-            rc0_guard.current_window = (MAX_REQUESTS_PER_SECOND + 1.0) * WINDOW_SIZE;
+            rc0_guard.current_window = (rc0_guard.max_rps + 1.0) * WINDOW_SIZE;
         }
 
         let wait_duration = Duration::from_secs_f64(WINDOW_SIZE + 2.0);
@@ -442,7 +438,7 @@ mod tests {
         // We need to ensure spawn_worker_task was called for config0 so it's considered "running"
         // RpsAutoscale::new calls spawn_worker_task for initially online workers.
 
-        let autoscale = RpsAutoscale::new(&[config0]).await;
+        let autoscale = RpsAutoscale::new(&[config0], 10.0).await;
 
         // Wait for config0's handle to be set by RpsAutoscale::new
         tokio::time::sleep(Duration::from_millis(100)).await;

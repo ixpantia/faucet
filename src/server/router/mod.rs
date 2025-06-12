@@ -33,6 +33,7 @@ struct ReducedServerConfig {
     pub workers: NonZeroUsize,
     pub server_type: WorkerType,
     pub qmd: Option<PathBuf>,
+    pub max_rps: Option<f64>,
 }
 
 #[derive(serde::Deserialize)]
@@ -148,6 +149,7 @@ impl RouterConfig {
                 .app_dir(route_conf.config.app_dir)
                 .telemetry(telemetry)
                 .route(route.clone())
+                .max_rps(route_conf.config.max_rps)
                 .build()?
                 .extract_service(shutdown)
                 .await?;

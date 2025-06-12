@@ -76,6 +76,7 @@ pub struct FaucetServerBuilder {
     qmd: Option<PathBuf>,
     route: Option<String>,
     telemetry: Option<TelemetrySender>,
+    max_rps: Option<f64>,
 }
 
 impl FaucetServerBuilder {
@@ -93,6 +94,7 @@ impl FaucetServerBuilder {
             quarto: None,
             qmd: None,
             telemetry: None,
+            max_rps: None,
         }
     }
     pub fn app_dir(mut self, app_dir: Option<impl AsRef<str>>) -> Self {
@@ -157,6 +159,10 @@ impl FaucetServerBuilder {
         self.route = Some(route);
         self
     }
+    pub fn max_rps(mut self, max_rps: Option<f64>) -> Self {
+        self.max_rps = max_rps;
+        self
+    }
     pub fn build(self) -> FaucetResult<FaucetServerConfig> {
         let server_type = self
             .server_type
@@ -189,6 +195,7 @@ impl FaucetServerBuilder {
         });
         let telemetry = self.telemetry;
         let route = self.route.map(|r| -> &'static _ { leak!(r) });
+        let max_rps = self.max_rps;
         Ok(FaucetServerConfig {
             strategy,
             bind,
@@ -202,6 +209,7 @@ impl FaucetServerBuilder {
             quarto,
             telemetry,
             qmd,
+            max_rps,
         })
     }
 }
@@ -226,14 +234,20 @@ pub struct FaucetServerConfig {
     pub app_dir: Option<&'static str>,
     pub route: Option<&'static str>,
     pub qmd: Option<&'static Path>,
+    pub max_rps: Option<f64>,
 }
 
 impl FaucetServerConfig {
     pub async fn run(self, shutdown: &'static ShutdownSignal) -> FaucetResult<()> {
         let telemetry = self.telemetry.clone();
         let mut workers = WorkerConfigs::new(self.clone(), shutdown).await?;
-        let load_balancer =
-            LoadBalancer::new(self.strategy, self.extractor, &workers.workers).await?;
+        let load_balancer = LoadBalancer::new(
+            self.strategy,
+            self.extractor,
+            &workers.workers,
+            self.max_rps,
+        )
+        .await?;
         let bind = self.bind.ok_or(FaucetError::MissingArgument("bind"))?;
 
         let load_balancer = load_balancer.clone();
@@ -305,8 +319,13 @@ impl FaucetServerConfig {
     ) -> FaucetResult<(FaucetServerService, WorkerConfigs)> {
         let telemetry = self.telemetry.clone();
         let workers = WorkerConfigs::new(self.clone(), shutdown).await?;
-        let load_balancer =
-            LoadBalancer::new(self.strategy, self.extractor, &workers.workers).await?;
+        let load_balancer = LoadBalancer::new(
+            self.strategy,
+            self.extractor,
+            &workers.workers,
+            self.max_rps,
+        )
+        .await?;
         let service = Arc::new(
             ServiceBuilder::new(ProxyService)
                 .layer(logging::LogLayer { telemetry })

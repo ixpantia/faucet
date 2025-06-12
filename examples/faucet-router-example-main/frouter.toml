@@ -26,10 +26,11 @@ qmd = "old_faithful.qmd"
 # Showcase on serving a Plumber API
 [[route]]
 route = "/api/"
-workers = 1
+workers = 4
 server_type = "plumber"
 workdir = "./api"
-strategy = "round-robin"
+strategy = "rps"
+max_rps = 1
 
 # By default the `workdir` and `app_dir`
 # is `.` (Here). If we don't specify
