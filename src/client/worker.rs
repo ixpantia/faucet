@@ -12,7 +12,11 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use tokio::{process::Child, sync::Mutex, task::JoinHandle};
+use tokio::{
+    process::Child,
+    sync::{Mutex, Notify},
+    task::JoinHandle,
+};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
@@ -24,6 +28,8 @@ pub enum WorkerType {
     Shiny,
     #[serde(alias = "quarto-shiny", alias = "QuartoShiny", alias = "quarto_shiny")]
     QuartoShiny,
+    #[cfg(test)]
+    Dummy,
 }
 
 fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
@@ -77,6 +83,7 @@ pub struct WorkerConfig {
     pub qmd: Option<&'static Path>,
     pub handle: &'static Mutex<Option<JoinHandle<FaucetResult<()>>>>,
     pub shutdown: &'static ShutdownSignal,
+    pub idle_stop: &'static Notify,
 }
 
 impl WorkerConfig {
@@ -100,9 +107,11 @@ impl WorkerConfig {
             qmd: server_config.qmd,
             handle: leak!(Mutex::new(None)),
             shutdown,
+            idle_stop: leak!(Notify::new()),
         }
     }
     #[allow(dead_code)]
+    #[cfg(test)]
     pub fn dummy(target: &'static str, addr: &str, online: bool) -> WorkerConfig {
         WorkerConfig {
             target,
@@ -111,13 +120,14 @@ impl WorkerConfig {
             app_dir: None,
             worker_route: None,
             rscript: OsStr::new(""),
-            wtype: crate::client::worker::WorkerType::Shiny,
+            wtype: WorkerType::Dummy,
             worker_id: 1,
             quarto: OsStr::new(""),
             workdir: Path::new("."),
             qmd: None,
             handle: leak!(Mutex::new(None)),
             shutdown: leak!(ShutdownSignal::new()),
+            idle_stop: leak!(Notify::new()),
         }
     }
 }
@@ -207,39 +217,86 @@ fn spawn_quarto_shiny_worker(config: &WorkerConfig) -> FaucetResult<Child> {
 }
 
 impl WorkerConfig {
-    fn spawn_process(&self) -> Child {
+    fn spawn_process(&self) -> FaucetResult<Child> {
         let child_result = match self.wtype {
             WorkerType::Plumber => spawn_plumber_worker(self),
             WorkerType::Shiny => spawn_shiny_worker(self),
             WorkerType::QuartoShiny => spawn_quarto_shiny_worker(self),
+            #[cfg(test)]
+            WorkerType::Dummy => unreachable!(
+                "WorkerType::Dummy should be handled in spawn_worker_task and not reach spawn_process"
+            ),
         };
 
         match child_result {
-            Ok(child) => child,
+            Ok(child) => Ok(child),
             Err(e) => {
                 log::error!(target: "faucet", "Failed to invoke R for {target}: {e}", target = self.target);
-                log::error!(target: "faucet", "Exiting...");
-                std::process::exit(1);
+                Err(e)
             }
         }
     }
     pub async fn wait_until_done(&self) {
         if let Some(handle) = self.handle.lock().await.take() {
-            let _ = handle.await;
+            match handle.await {
+                Ok(Ok(_)) => { /* Task completed successfully */ }
+                Ok(Err(e)) => {
+                    panic!("Worker task for target '{}' failed: {:?}", self.target, e);
+                }
+                Err(e) => {
+                    panic!(
+                        "Worker task for target '{}' panicked or was cancelled: {:?}",
+                        self.target, e
+                    );
+                }
+            }
         }
     }
     pub async fn spawn_worker_task(&'static self) {
         let mut handle = self.handle.lock().await;
 
-        if handle.is_some() {
-            log::warn!(target: "faucet", "Worker task for {target} is already running, skipping spawn", target = self.target);
-            return;
+        if let Some(handle) = handle.as_ref() {
+            if !handle.is_finished() {
+                log::warn!(target: "faucet", "Worker task for {target} is already running, skipping spawn", target = self.target);
+                return;
+            }
         }
 
         *handle = Some(tokio::spawn(async move {
+            #[cfg(test)]
+            if self.wtype == WorkerType::Dummy {
+                log::debug!(
+                    target: "faucet",
+                    "Worker {target} is type Dummy, skipping real process spawn.",
+                    target = self.target
+                );
+                return FaucetResult::Ok(());
+            }
+
             'outer: loop {
-                let mut child = self.spawn_process();
-                let pid = child.id().expect("Failed to get plumber worker PID");
+                let mut child = match self.spawn_process() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::error!(
+                            target: "faucet",
+                            "Worker task for {target} failed to spawn initial process: {e}",
+                            target = self.target
+                        );
+                        return Err(e);
+                    }
+                };
+
+                let pid = match child.id() {
+                    Some(id) => id,
+                    None => {
+                        let err_msg = format!(
+                            "Spawned process for {target} has no PID",
+                            target = self.target
+                        );
+                        log::error!(target: "faucet", "{err_msg}");
+                        return Err(FaucetError::Unknown(err_msg));
+                    }
+                };
 
                 // We will run this loop asynchrnously on this same thread.
                 // We will use this to wait for either the stop signal
@@ -273,6 +330,12 @@ impl WorkerConfig {
                         log::info!(target: "faucet", "{target}'s process ({pid}) killed for shutdown", target = self.target);
                         break 'outer;
                     },
+                    _ = self.idle_stop.notified() => {
+                        let _ = child.kill().await;
+                        self.is_online.store(false, std::sync::atomic::Ordering::SeqCst);
+                        log::info!(target: "faucet", "{target}'s process ({pid}) killed for idle stop", target = self.target);
+                        break 'outer;
+                    },
                     // If our child loop stops that means the process crashed. We will restart it
                     status = child_loop => {
                        self
@@ -294,12 +357,6 @@ async fn check_if_online(addr: SocketAddr) -> bool {
 }
 
 const RECHECK_INTERVAL: Duration = Duration::from_millis(250);
-
-pub struct WorkerChild {
-    handle: Option<JoinHandle<FaucetResult<()>>>,
-}
-
-impl WorkerChild {}
 
 pub struct WorkerConfigs {
     pub workers: Box<[&'static WorkerConfig]>,
