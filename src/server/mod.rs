@@ -54,6 +54,11 @@ fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> St
                 Strategy::IpHash
             },
             Some(Strategy::IpHash) => Strategy::IpHash,
+        },
+        #[cfg(test)]
+        WorkerType::Dummy => {
+            log::debug!(target: "faucet", "WorkerType is Dummy, defaulting strategy to RoundRobin for tests.");
+            Strategy::RoundRobin
         }
     }
 }
