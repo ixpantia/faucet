@@ -172,7 +172,7 @@ impl RouterConfig {
         shutdown: &'static ShutdownSignal,
         telemetry: Option<&TelemetryManager>,
     ) -> FaucetResult<()> {
-        let (service, mut all_workers) = self
+        let (service, all_workers) = self
             .into_service(rscript, quarto, ip_from, telemetry, shutdown)
             .await?;
         // Bind to the port and listen for incoming TCP connections
