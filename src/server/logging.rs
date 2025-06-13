@@ -34,7 +34,7 @@ pub mod logger {
     fn start_log_writer_thread(
         path: PathBuf,
         max_file_size: Option<u64>,
-        shutdown: ShutdownSignal,
+        shutdown: &'static ShutdownSignal,
     ) -> (LogFileWriter, JoinHandle<()>) {
         let max_file_size = max_file_size.unwrap_or(u64::MAX);
         let mut current_file_size = match std::fs::metadata(&path) {
@@ -103,7 +103,7 @@ pub mod logger {
     pub fn build_logger(
         target: Target,
         max_file_size: Option<u64>,
-        shutdown: ShutdownSignal,
+        shutdown: &'static ShutdownSignal,
     ) -> Option<JoinHandle<()>> {
         let (target, handle) = match target {
             Target::File(path) => {

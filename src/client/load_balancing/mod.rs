@@ -2,6 +2,8 @@ pub mod cookie_hash;
 mod ip_extractor;
 pub mod ip_hash;
 pub mod round_robin;
+pub mod rps_autoscale;
+
 use super::worker::WorkerConfig;
 use crate::client::Client;
 use crate::error::FaucetResult;
@@ -15,6 +17,9 @@ use uuid::Uuid;
 
 use self::ip_hash::IpHash;
 use self::round_robin::RoundRobin;
+use self::rps_autoscale::RpsAutoscale;
+
+const DEFAULT_MAX_RPS: f64 = 10.0;
 
 trait LoadBalancingStrategy {
     type Input;
@@ -30,6 +35,8 @@ pub enum Strategy {
     IpHash,
     #[serde(alias = "cookie_hash", alias = "CookieHash", alias = "cookie-hash")]
     CookieHash,
+    #[serde(alias = "rps", alias = "Rps", alias = "rps")]
+    Rps,
 }
 
 impl FromStr for Strategy {
@@ -39,6 +46,7 @@ impl FromStr for Strategy {
             "round_robin" => Ok(Self::RoundRobin),
             "ip_hash" => Ok(Self::IpHash),
             "cookie_hash" => Ok(Self::CookieHash),
+            "rps" => Ok(Self::Rps),
             _ => Err("invalid strategy"),
         }
     }
@@ -55,6 +63,7 @@ enum DynLoadBalancer {
     IpHash(&'static ip_hash::IpHash),
     RoundRobin(&'static round_robin::RoundRobin),
     CookieHash(&'static cookie_hash::CookieHash),
+    Rps(&'static rps_autoscale::RpsAutoscale),
 }
 
 impl LoadBalancingStrategy for DynLoadBalancer {
@@ -64,6 +73,7 @@ impl LoadBalancingStrategy for DynLoadBalancer {
             LBIdent::Ip(ip) => match self {
                 DynLoadBalancer::RoundRobin(rr) => rr.entry(ip).await,
                 DynLoadBalancer::IpHash(ih) => ih.entry(ip).await,
+                DynLoadBalancer::Rps(rr) => rr.entry(ip).await,
                 _ => unreachable!(
                     "This should never happen, ip should never be passed to cookie hash"
                 ),
@@ -84,15 +94,24 @@ pub(crate) struct LoadBalancer {
 }
 
 impl LoadBalancer {
-    pub fn new(
+    pub async fn new(
         strategy: Strategy,
         extractor: IpExtractor,
-        workers: &[WorkerConfig],
+        workers: &[&'static WorkerConfig],
+        max_rps_config: Option<f64>, // New parameter
     ) -> FaucetResult<Self> {
         let strategy: DynLoadBalancer = match strategy {
-            Strategy::RoundRobin => DynLoadBalancer::RoundRobin(leak!(RoundRobin::new(workers)?)),
-            Strategy::IpHash => DynLoadBalancer::IpHash(leak!(IpHash::new(workers)?)),
-            Strategy::CookieHash => DynLoadBalancer::CookieHash(leak!(CookieHash::new(workers)?)),
+            Strategy::RoundRobin => {
+                DynLoadBalancer::RoundRobin(leak!(RoundRobin::new(workers).await))
+            }
+            Strategy::IpHash => DynLoadBalancer::IpHash(leak!(IpHash::new(workers).await)),
+            Strategy::CookieHash => {
+                DynLoadBalancer::CookieHash(leak!(CookieHash::new(workers).await))
+            }
+            Strategy::Rps => {
+                let rps_value = max_rps_config.unwrap_or(DEFAULT_MAX_RPS);
+                DynLoadBalancer::Rps(leak!(RpsAutoscale::new(workers, rps_value).await))
+            }
         };
         Ok(Self {
             strategy,
@@ -104,6 +123,7 @@ impl LoadBalancer {
             DynLoadBalancer::RoundRobin(_) => Strategy::RoundRobin,
             DynLoadBalancer::IpHash(_) => Strategy::IpHash,
             DynLoadBalancer::CookieHash(_) => Strategy::CookieHash,
+            DynLoadBalancer::Rps(_) => Strategy::Rps,
         }
     }
     async fn get_client_ip(&self, ip: IpAddr) -> FaucetResult<Client> {
@@ -152,26 +172,38 @@ mod tests {
         assert!(Strategy::from_str("invalid").is_err());
     }
 
-    #[test]
-    fn test_load_balancer_new_round_robin() {
+    #[tokio::test]
+    async fn test_load_balancer_new_round_robin() {
         let configs = Vec::new();
-        let _ = LoadBalancer::new(Strategy::RoundRobin, IpExtractor::XForwardedFor, &configs)
+        let _ = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &configs,
+            None,
+        )
+        .await
+        .expect("failed to create load balancer");
+    }
+
+    #[tokio::test]
+    async fn test_load_balancer_new_ip_hash() {
+        let configs = Vec::new();
+        let _ = LoadBalancer::new(Strategy::IpHash, IpExtractor::XForwardedFor, &configs, None)
+            .await
             .expect("failed to create load balancer");
     }
 
-    #[test]
-    fn test_load_balancer_new_ip_hash() {
+    #[tokio::test]
+    async fn test_load_balancer_extract_ip() {
         let configs = Vec::new();
-        let _ = LoadBalancer::new(Strategy::IpHash, IpExtractor::XForwardedFor, &configs)
-            .expect("failed to create load balancer");
-    }
-
-    #[test]
-    fn test_load_balancer_extract_ip() {
-        let configs = Vec::new();
-        let load_balancer =
-            LoadBalancer::new(Strategy::RoundRobin, IpExtractor::XForwardedFor, &configs)
-                .expect("failed to create load balancer");
+        let load_balancer = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &configs,
+            None,
+        )
+        .await
+        .expect("failed to create load balancer");
         let request = Request::builder()
             .header("x-forwarded-for", "192.168.0.1")
             .body(())
@@ -186,13 +218,26 @@ mod tests {
     #[tokio::test]
     async fn test_load_balancer_get_client() {
         use crate::client::ExtractSocketAddr;
-        let configs = [
-            WorkerConfig::dummy("test", "127.0.0.1:9999", true),
-            WorkerConfig::dummy("test", "127.0.0.1:9998", true),
+        let configs: [&'static WorkerConfig; 2] = [
+            &*Box::leak(Box::new(WorkerConfig::dummy(
+                "test",
+                "127.0.0.1:9999",
+                true,
+            ))),
+            &*Box::leak(Box::new(WorkerConfig::dummy(
+                "test",
+                "127.0.0.1:9998",
+                true,
+            ))),
         ];
-        let load_balancer =
-            LoadBalancer::new(Strategy::RoundRobin, IpExtractor::XForwardedFor, &configs)
-                .expect("failed to create load balancer");
+        let load_balancer = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &configs,
+            None,
+        )
+        .await
+        .expect("failed to create load balancer");
         let ip = "192.168.0.1".parse().unwrap();
         let client = load_balancer
             .get_client_ip(ip)
@@ -206,14 +251,23 @@ mod tests {
             .expect("failed to get client");
 
         assert_eq!(client.socket_addr(), "127.0.0.1:9998".parse().unwrap());
+
+        for config in configs.iter() {
+            config.wait_until_done().await;
+        }
     }
 
-    #[test]
-    fn test_clone_load_balancer() {
+    #[tokio::test]
+    async fn test_clone_load_balancer() {
         let configs = Vec::new();
-        let load_balancer =
-            LoadBalancer::new(Strategy::RoundRobin, IpExtractor::XForwardedFor, &configs)
-                .expect("failed to create load balancer");
+        let load_balancer = LoadBalancer::new(
+            Strategy::RoundRobin,
+            IpExtractor::XForwardedFor,
+            &configs,
+            None,
+        )
+        .await
+        .expect("failed to create load balancer");
         let _ = load_balancer.clone();
     }
 }
