@@ -331,8 +331,8 @@ impl WorkerConfig {
                         break 'outer;
                     },
                     _ = self.idle_stop.notified() => {
-                        let _ = child.kill().await;
                         self.is_online.store(false, std::sync::atomic::Ordering::SeqCst);
+                        let _ = child.kill().await;
                         log::info!(target: "faucet", "{target}'s process ({pid}) killed for idle stop", target = self.target);
                         break 'outer;
                     },

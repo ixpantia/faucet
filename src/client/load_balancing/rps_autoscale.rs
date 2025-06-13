@@ -44,12 +44,7 @@ impl RequestCounter {
                 0.0
             }
         };
-        log::debug!(
-            target: "faucet",
-            "Setting new window: {} requests per second in the last {} seconds for counter",
-            previous_window_rps,
-            elapsed_secs
-        );
+
         self.previous_window_rps = previous_window_rps;
         self.last_reset = std::time::Instant::now();
         self.current_window = 0.0;
@@ -60,10 +55,9 @@ impl RequestCounter {
         if elapsed_secs > 0.0 {
             self.current_window / elapsed_secs
         } else {
-            if self.current_window > 0.0 {
-                f64::MAX
-            } else {
-                0.0
+            match self.current_window > 0.0 {
+                true => f64::MAX,
+                false => 0.0,
             }
         }
     }
@@ -120,29 +114,28 @@ impl Targets {
                             "Target {} ({}) is overloaded ({} RPS), attempting to spawn worker for next target",
                             i, targets[i].config.target, calculated_rps
                         );
-                        if let Some(next_target_client) = targets.get(i + 1) {
-                            log::info!(
-                                target: "faucet",
-                                "Spawning worker task for adjacent target {} due to overload on target {}",
-                                next_target_client.config.target, targets[i].config.target
-                            );
-                            next_target_client.config.spawn_worker_task().await;
-                        } else if targets.len() == 1 {
-                            log::warn!(
-                                target: "faucet",
-                                "Target {} is overloaded but it's the only target. No autoscaling action possible for spawning.",
-                                targets[i].config.target
-                            );
+                        match targets.get(i + 1) {
+                            Some(next_target_client) => {
+                                log::info!(
+                                    target: "faucet",
+                                    "Spawning worker task for adjacent target {} due to overload on target {}",
+                                    next_target_client.config.target, targets[i].config.target
+                                );
+                                next_target_client.config.spawn_worker_task().await;
+                            }
+                            _ if targets.len() == 1 => {
+                                log::warn!(
+                                    target: "faucet",
+                                    "Target {} is overloaded but it's the only target. No autoscaling action possible for spawning.",
+                                    targets[i].config.target
+                                );
+                            }
+                            _ => (),
                         }
                     }
 
                     if is_big_reset_due {
                         let total_requests = rc_guard.total_requests_since_big_reset();
-                        log::debug!(
-                            target: "faucet",
-                            "Target {} ({}) has {} requests in the last ~{} seconds (big reset check)",
-                            i, targets[i].config.target, total_requests, BIG_RESET_WINDOW_SIZE
-                        );
 
                         if total_requests == 0.0 {
                             // Check if the worker is actually running before trying to stop it.
@@ -154,7 +147,7 @@ impl Targets {
                                 .lock()
                                 .await
                                 .as_ref()
-                                .map_or(false, |h| !h.is_finished());
+                                .map_or_else(|| false, |h| !h.is_finished());
                             if is_running || targets[i].is_online() {
                                 // is_online for initial state before handle is set
                                 log::info!(
@@ -211,95 +204,44 @@ impl LoadBalancingStrategy for RpsAutoscale {
             panic!("RpsAutoscale called with no targets!");
         }
 
-        let mut round = 0;
-        let mut current_index = rand::thread_rng().gen_range(0..len); // Start at a random target
-        let mut tried_all_once_in_overload_path = false;
-        let mut initial_biggest_online_idx = 0;
-        let mut first_pass = true;
+        let mut passes = 0;
+        let mut current_index; // Start at a random target
 
         loop {
-            let (client, request_counter_mutex) = self.targets.get(current_index);
+            current_index = rand::thread_rng().gen_range(0..len);
+            passes += 1;
 
-            if first_pass {
-                // Find max online index in the first pass
-                if client.is_online() {
-                    initial_biggest_online_idx = initial_biggest_online_idx.max(current_index);
-                }
-            }
+            let (client, request_counter_mutex) = self.targets.get(current_index);
 
             let is_online = client.is_online();
 
-            if is_online {
-                let mut rc_guard = match request_counter_mutex.try_lock() {
-                    Ok(rc) => rc,
-                    Err(_) => {
-                        // Mutex is busy, try next target
-                        current_index = (current_index + 1) % len;
-                        if current_index == 0 && !first_pass {
-                            round += 1;
-                        } // Completed a round
-                        if first_pass && current_index == 0 {
-                            first_pass = false;
-                        }
-                        continue;
-                    }
-                };
-
-                if rc_guard.rps() <= rc_guard.max_rps || tried_all_once_in_overload_path {
-                    rc_guard.add(1.0);
-                    return client;
-                } else {
-                    // Target is online but overloaded, try next
-                    log::debug!(target: "faucet", "Target {} ({}) is online but RPS {} > threshold {}, skipping.", current_index, client.config.target, rc_guard.rps(), rc_guard.max_rps);
+            let mut rc_guard = match request_counter_mutex.try_lock() {
+                Ok(rc) => rc,
+                Err(_) => {
+                    continue;
                 }
-            } else {
-                log::debug!(target: "faucet", "Target {} ({}) is offline, skipping.", current_index, client.config.target);
+            };
+
+            if is_online && (rc_guard.rps() <= rc_guard.max_rps || passes > len) {
+                rc_guard.add(1.0);
+                return client;
             }
 
-            // Move to next target
-            current_index = (current_index + 1) % len;
-            if current_index == 0 && !first_pass {
-                // Completed a full round trip
-                round += 1;
-                tried_all_once_in_overload_path = true; // Allow picking overloaded if all are overloaded
-            }
-            if first_pass && current_index == 0 {
-                first_pass = false;
+            if (passes > len * 2) && is_online {
+                return client; // If we tried all once and this one is online, return it
             }
 
-            if round >= 3 {
-                // After several rounds, if still no suitable target
-                log::warn!(target: "faucet", "Looped {} times, still no suitable target. Trying to spawn for target 0 if offline.", round);
-                // Attempt to revive/spawn the first target if it's offline.
-                // This is a last-ditch effort.
-                let (first_client, first_rc_mutex) = self.targets.get(0);
-                if !first_client.is_online() {
-                    first_client.config.spawn_worker_task().await;
-                    // Wait a bit for it to potentially come online
-                    for _ in 0..10 {
-                        // Try for up to 10 * WAIT_TIME_UNTIL_RETRY
-                        tokio::time::sleep(WAIT_TIME_UNTIL_RETRY).await;
-                        if first_client.is_online() {
-                            let mut rc_guard = first_rc_mutex.lock().await;
-                            rc_guard.add(1.0);
-                            return first_client;
-                        }
+            if (passes > len * 5) && !is_online {
+                log::warn!(target: "faucet", "Looped {} times, still no suitable target. Trying to spawn for target 0 if offline.", 5);
+                client.config.spawn_worker_task().await;
+                // Wait a bit for it to potentially come online
+                for _ in 0..1000 {
+                    // Try for up to 10 * WAIT_TIME_UNTIL_RETRY
+                    tokio::time::sleep(WAIT_TIME_UNTIL_RETRY).await;
+                    if client.is_online() {
+                        rc_guard.add(1.0);
+                        return client;
                     }
-                }
-                // If still nothing, return the client at initial_biggest_online_idx or 0 as fallback.
-                // This might be an overloaded client if tried_all_once_in_overload_path is true.
-                let (fallback_client, fallback_rc_mutex) =
-                    self.targets.get(initial_biggest_online_idx);
-                if fallback_client.is_online() {
-                    let mut rc_guard = fallback_rc_mutex.lock().await;
-                    rc_guard.add(1.0);
-                    return fallback_client;
-                } else {
-                    // if even that is offline, try target 0
-                    let (super_fallback_client, super_fallback_rc_mutex) = self.targets.get(0);
-                    let mut rc_guard = super_fallback_rc_mutex.lock().await; // Lock will wait
-                    rc_guard.add(1.0); // Add to its counter even if it was offline; it might be coming up
-                    return super_fallback_client; // Return it, relying on higher layers or eventual online status
                 }
             }
         }

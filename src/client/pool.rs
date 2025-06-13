@@ -25,13 +25,21 @@ impl ConnectionManager {
     }
 }
 
+const RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(20);
+
 impl managed::Manager for ConnectionManager {
     type Type = ConnectionHandle;
     type Error = FaucetError;
 
     async fn create(&self) -> FaucetResult<Self::Type> {
         log::debug!(target: "faucet", "Establishing TCP connection to {}", self.config.target);
-        let stream = TokioIo::new(TcpStream::connect(self.config.addr).await?);
+        let connection_res = loop {
+            match TcpStream::connect(self.config.addr).await {
+                Ok(stream) => break stream,
+                Err(_) => tokio::time::sleep(RETRY_DELAY).await,
+            }
+        };
+        let stream = TokioIo::new(connection_res);
         let (sender, conn) = hyper::client::conn::http1::handshake(stream).await?;
         tokio::spawn(async move {
             match conn.await {
@@ -50,6 +58,13 @@ impl managed::Manager for ConnectionManager {
         conn: &mut ConnectionHandle,
         _: &managed::Metrics,
     ) -> managed::RecycleResult<FaucetError> {
+        if !self
+            .config
+            .is_online
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(RecycleError::message("Worker is offline"));
+        }
         if conn.sender.is_closed() {
             Err(RecycleError::message("Connection closed"))
         } else {
