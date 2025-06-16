@@ -27,10 +27,10 @@ pub async fn socket_is_available(socket_addr: SocketAddr) -> FaucetResult<bool> 
 const PORT_RANGE: RangeInclusive<u16> = 1024..=49151;
 
 pub async fn get_available_socket(tries: usize) -> Result<SocketAddr, FaucetError> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for _ in 0..tries {
-        let port: u16 = rng.gen_range(PORT_RANGE);
+        let port: u16 = rng.random_range(PORT_RANGE);
 
         let socket_addr = SocketAddr::from(([127, 0, 0, 1], port));
 

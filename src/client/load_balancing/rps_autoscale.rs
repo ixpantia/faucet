@@ -208,7 +208,7 @@ impl LoadBalancingStrategy for RpsAutoscale {
         let mut current_index; // Start at a random target
 
         loop {
-            current_index = rand::thread_rng().gen_range(0..len);
+            current_index = rand::rng().random_range(0..len);
             passes += 1;
 
             let (client, request_counter_mutex) = self.targets.get(current_index);
