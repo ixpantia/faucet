@@ -29,7 +29,7 @@ pub enum FaucetError {
     Http(hyper::http::Error),
     MissingArgument(&'static str),
     DuplicateRoute(String),
-    Utf8Coding,
+    Utf8Coding(String),
     BufferCapacity(tokio_tungstenite::tungstenite::error::CapacityError),
     ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
     WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
@@ -61,7 +61,7 @@ impl From<tokio_tungstenite::tungstenite::Error> for FaucetError {
                 }
             },
             Error::Tls(err) => FaucetError::Unknown(err.to_string()),
-            Error::Utf8 => FaucetError::Utf8Coding,
+            Error::Utf8(err) => FaucetError::Utf8Coding(err),
             Error::Http(_) => FaucetError::Unknown("Unknown HTTP error".to_string()),
             Error::Capacity(err) => FaucetError::BufferCapacity(err),
             Error::HttpFormat(err) => FaucetError::Http(err),
@@ -146,7 +146,7 @@ impl std::fmt::Display for FaucetError {
             Self::AttackAttempt => write!(f, "Attack attempt detected"),
             Self::ConnectionClosed => write!(f, "Connection closed"),
             Self::ProtocolViolation(e) => write!(f, "Protocol violation: {e}"),
-            Self::Utf8Coding => write!(f, "Utf8 Coding error"),
+            Self::Utf8Coding(err) => write!(f, "Utf8 Coding error: {err}"),
             Self::BufferCapacity(cap_err) => write!(f, "Buffer Capacity: {cap_err}"),
             Self::WSWriteBufferFull(buf) => write!(f, "Web Socket Write buffer full, {buf}"),
             Self::PostgreSQL(value) => write!(f, "PostgreSQL error: {value}"),
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_faucet_error_from_io_error() {
-        let err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let err = std::io::Error::other("test");
 
         let _err: FaucetError = From::from(err);
     }
