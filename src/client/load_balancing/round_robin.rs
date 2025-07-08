@@ -1,8 +1,5 @@
 use super::LoadBalancingStrategy;
-use crate::{
-    client::{worker::WorkerConfig, Client},
-    error::FaucetResult,
-};
+use crate::client::{worker::WorkerConfig, Client};
 use std::{net::IpAddr, sync::atomic::AtomicUsize};
 
 struct Targets {
@@ -15,17 +12,17 @@ struct Targets {
 const WAIT_TIME_UNTIL_RETRY: std::time::Duration = std::time::Duration::from_micros(500);
 
 impl Targets {
-    fn new(configs: &[WorkerConfig]) -> FaucetResult<Self> {
+    fn new(configs: &[&'static WorkerConfig]) -> Self {
         let mut targets = Vec::new();
         for state in configs {
-            let client = Client::builder(*state).build()?;
+            let client = Client::new(state);
             targets.push(client);
         }
         let targets = Box::leak(targets.into_boxed_slice());
-        Ok(Targets {
+        Targets {
             targets,
             index: AtomicUsize::new(0),
-        })
+        }
     }
     fn next(&self) -> Client {
         let index = self.index.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -38,10 +35,14 @@ pub struct RoundRobin {
 }
 
 impl RoundRobin {
-    pub(crate) fn new(targets: &[WorkerConfig]) -> FaucetResult<Self> {
-        Ok(Self {
-            targets: Targets::new(targets)?,
-        })
+    pub(crate) async fn new(configs: &[&'static WorkerConfig]) -> Self {
+        // Start the process of each config
+        for config in configs {
+            config.spawn_worker_task().await;
+        }
+        Self {
+            targets: Targets::new(configs),
+        }
     }
 }
 
@@ -66,56 +67,109 @@ mod tests {
 
     #[test]
     fn test_new_targets() {
-        let configs = (0..3)
-            .map(|i| WorkerConfig::dummy("test", &format!("127.0.0.1:900{i}"), true))
-            .collect::<Vec<_>>();
+        let configs_static_refs: Vec<&'static WorkerConfig> = (0..3)
+            .map(|i| {
+                &*Box::leak(Box::new(WorkerConfig::dummy(
+                    "test",
+                    &format!("127.0.0.1:900{i}"),
+                    true,
+                )))
+            })
+            .collect();
 
-        let _ = Targets::new(&configs).expect("failed to create targets");
+        let _ = Targets::new(&configs_static_refs);
     }
 
-    #[test]
-    fn test_new_round_robin() {
-        let configs = (0..3)
-            .map(|i| WorkerConfig::dummy("test", &format!("127.0.0.1:900{i}"), true))
-            .collect::<Vec<_>>();
+    #[tokio::test]
+    async fn test_new_round_robin() {
+        let configs_static_refs: Vec<&'static WorkerConfig> = (0..3)
+            .map(|i| {
+                &*Box::leak(Box::new(WorkerConfig::dummy(
+                    "test",
+                    &format!("127.0.0.1:900{i}"),
+                    true,
+                )))
+            })
+            .collect();
 
-        let _ = RoundRobin::new(&configs).expect("failed to create round robin");
+        let _ = RoundRobin::new(&configs_static_refs).await;
+
+        for config in configs_static_refs.iter() {
+            config.wait_until_done().await;
+        }
     }
 
     #[tokio::test]
     async fn test_round_robin_entry() {
         use crate::client::ExtractSocketAddr;
 
-        let configs = (0..3)
-            .map(|i| WorkerConfig::dummy("test", &format!("127.0.0.1:900{i}"), true))
-            .collect::<Vec<_>>();
+        let original_addrs: Vec<std::net::SocketAddr> = (0..3)
+            .map(|i| {
+                format!("127.0.0.1:900{i}")
+                    .parse()
+                    .expect("Failed to parse addr")
+            })
+            .collect();
 
-        let rr = RoundRobin::new(&configs).expect("failed to create round robin");
+        let configs_static_refs: Vec<&'static WorkerConfig> = (0..3)
+            .map(|i| {
+                &*Box::leak(Box::new(WorkerConfig::dummy(
+                    "test",
+                    &format!("127.0.0.1:900{i}"),
+                    true,
+                )))
+            })
+            .collect();
+
+        let rr = RoundRobin::new(&configs_static_refs).await;
 
         let ip = "0.0.0.0".parse().expect("failed to parse ip");
 
-        assert_eq!(rr.entry(ip).await.socket_addr(), configs[0].addr);
-        assert_eq!(rr.entry(ip).await.socket_addr(), configs[1].addr);
-        assert_eq!(rr.entry(ip).await.socket_addr(), configs[2].addr);
-        assert_eq!(rr.entry(ip).await.socket_addr(), configs[0].addr);
-        assert_eq!(rr.entry(ip).await.socket_addr(), configs[1].addr);
-        assert_eq!(rr.entry(ip).await.socket_addr(), configs[2].addr);
+        assert_eq!(rr.entry(ip).await.socket_addr(), original_addrs[0]);
+        assert_eq!(rr.entry(ip).await.socket_addr(), original_addrs[1]);
+        assert_eq!(rr.entry(ip).await.socket_addr(), original_addrs[2]);
+        assert_eq!(rr.entry(ip).await.socket_addr(), original_addrs[0]);
+        assert_eq!(rr.entry(ip).await.socket_addr(), original_addrs[1]);
+        assert_eq!(rr.entry(ip).await.socket_addr(), original_addrs[2]);
+
+        for config in configs_static_refs.iter() {
+            config.wait_until_done().await;
+        }
     }
 
     #[tokio::test]
     async fn test_round_robin_entry_with_offline_target() {
         use crate::client::ExtractSocketAddr;
 
-        let configs = [
-            WorkerConfig::dummy("test", "127.0.0.1:9000", false),
-            WorkerConfig::dummy("test", "127.0.0.1:9001", false),
-            WorkerConfig::dummy("test", "127.0.0.1:9002", true),
+        // Storing the target address for assertion, as the original WorkerConfig array is no longer directly used.
+        let target_online_addr: std::net::SocketAddr = "127.0.0.1:9002".parse().unwrap();
+
+        let configs_static_refs: [&'static WorkerConfig; 3] = [
+            &*Box::leak(Box::new(WorkerConfig::dummy(
+                "test",
+                "127.0.0.1:9000",
+                false,
+            ))),
+            &*Box::leak(Box::new(WorkerConfig::dummy(
+                "test",
+                "127.0.0.1:9001",
+                false,
+            ))),
+            &*Box::leak(Box::new(WorkerConfig::dummy(
+                "test",
+                "127.0.0.1:9002",
+                true,
+            ))),
         ];
 
-        let rr = RoundRobin::new(&configs).expect("failed to create round robin");
+        let rr = RoundRobin::new(&configs_static_refs).await;
 
         let ip = "0.0.0.0".parse().expect("failed to parse ip");
 
-        assert_eq!(rr.entry(ip).await.socket_addr(), configs[2].addr);
+        assert_eq!(rr.entry(ip).await.socket_addr(), target_online_addr);
+
+        for config in configs_static_refs.iter() {
+            config.wait_until_done().await;
+        }
     }
 }

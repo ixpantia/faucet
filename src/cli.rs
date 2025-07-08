@@ -38,6 +38,8 @@ pub enum Strategy {
     /// request to. This is useful for sticky sessions from within the same
     /// network.
     CookieHash,
+    /// Round-robin with RPS (Requests Per Second) scaling.
+    Rps,
 }
 
 impl From<Strategy> for load_balancing::Strategy {
@@ -46,6 +48,7 @@ impl From<Strategy> for load_balancing::Strategy {
             Strategy::RoundRobin => load_balancing::Strategy::RoundRobin,
             Strategy::IpHash => load_balancing::Strategy::IpHash,
             Strategy::CookieHash => load_balancing::Strategy::CookieHash,
+            Strategy::Rps => load_balancing::Strategy::Rps,
         }
     }
 }
@@ -100,6 +103,10 @@ pub struct StartArgs {
     /// Quarto Shiny file path.
     #[arg(long, short, env = "FAUCET_QMD", default_value = None)]
     pub qmd: Option<PathBuf>,
+
+    /// The maximum requests per second for the RPS autoscaler strategy.
+    #[arg(long, env = "FAUCET_MAX_RPS", default_value = None)]
+    pub max_rps: Option<f64>,
 }
 
 #[derive(Parser, Debug)]

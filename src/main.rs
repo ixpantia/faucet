@@ -40,7 +40,7 @@ pub async fn main() -> FaucetResult<()> {
                 faucet_server::server::logger::Target::File(file.to_path_buf())
             }),
         cli_args.max_log_file_size,
-        shutdown_signal.clone(),
+        shutdown_signal,
     );
 
     match cli_args.command {
@@ -59,6 +59,7 @@ pub async fn main() -> FaucetResult<()> {
                 .quarto(cli_args.quarto)
                 .qmd(start_args.qmd)
                 .telemetry(telemetry.as_ref())
+                .max_rps(start_args.max_rps)
                 .build()?
                 .run(shutdown_signal)
                 .await?;

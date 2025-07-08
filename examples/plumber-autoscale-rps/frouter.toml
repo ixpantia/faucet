@@ -1,0 +1,15 @@
+[[route]]
+route = "/api1/"
+workers = 4 # Maximum number of workers to handle requests
+server_type = "plumber"
+workdir = "./api1"
+strategy = "rps" # Strategy for scaling based on requests per second
+max_rps = 10 # Maximum requests per second before scaling up
+
+[[route]]
+route = "/api2/"
+workers = 2
+server_type = "plumber"
+workdir = "./api2"
+strategy = "rps"
+max_rps = 5

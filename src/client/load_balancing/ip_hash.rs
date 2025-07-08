@@ -1,7 +1,7 @@
 use super::LoadBalancingStrategy;
 use super::WorkerConfig;
+use crate::client::Client;
 use crate::leak;
-use crate::{client::Client, error::FaucetResult};
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -10,14 +10,14 @@ struct Targets {
 }
 
 impl Targets {
-    fn new(configs: &[WorkerConfig]) -> FaucetResult<Self> {
+    fn new(configs: &[&'static WorkerConfig]) -> Self {
         let mut targets = Vec::new();
         for state in configs {
-            let client = Client::builder(*state).build()?;
+            let client = Client::new(state);
             targets.push(client);
         }
         let targets = leak!(targets);
-        Ok(Targets { targets })
+        Targets { targets }
     }
 }
 
@@ -27,11 +27,15 @@ pub struct IpHash {
 }
 
 impl IpHash {
-    pub(crate) fn new(targets: &[WorkerConfig]) -> FaucetResult<Self> {
-        Ok(Self {
-            targets_len: targets.as_ref().len(),
-            targets: Targets::new(targets)?,
-        })
+    pub(crate) async fn new(configs: &[&'static WorkerConfig]) -> Self {
+        // Start the process of each config
+        for config in configs {
+            config.spawn_worker_task().await;
+        }
+        Self {
+            targets_len: configs.as_ref().len(),
+            targets: Targets::new(configs),
+        }
     }
 }
 
@@ -253,22 +257,32 @@ mod tests {
 
     #[test]
     fn test_new_targets() {
-        let worker_state = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
-        let Targets { targets } = Targets::new(&[worker_state]).unwrap();
+        let worker_state: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test",
+            "127.0.0.1:9999",
+            true,
+        )));
+        let Targets { targets } = Targets::new(&[worker_state]);
 
         assert_eq!(targets.len(), 1);
     }
 
-    #[test]
-    fn test_new_ip_hash() {
-        let worker_state = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
+    #[tokio::test]
+    async fn test_new_ip_hash() {
+        let worker_state: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test",
+            "127.0.0.1:9999",
+            true,
+        )));
         let IpHash {
             targets,
             targets_len,
-        } = IpHash::new(&[worker_state]).unwrap();
+        } = IpHash::new(&[worker_state]).await;
 
         assert_eq!(targets.targets.len(), 1);
         assert_eq!(targets_len, 1);
+
+        worker_state.wait_until_done().await;
     }
 
     #[test]
@@ -282,11 +296,18 @@ mod tests {
     #[tokio::test]
     async fn test_load_balancing_strategy() {
         use crate::client::ExtractSocketAddr;
-        let workers = [
-            WorkerConfig::dummy("test", "127.0.0.1:9999", true),
-            WorkerConfig::dummy("test", "127.0.0.1:8888", true),
-        ];
-        let ip_hash = IpHash::new(&workers).unwrap();
+        let worker1: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test",
+            "127.0.0.1:9999",
+            true,
+        )));
+        let worker2: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test",
+            "127.0.0.1:8888",
+            true,
+        )));
+        let workers_static_refs = [worker1, worker2];
+        let ip_hash = IpHash::new(&workers_static_refs).await;
         let client1 = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
         let client2 = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
         assert_eq!(client1.socket_addr(), client2.socket_addr());
@@ -299,6 +320,10 @@ mod tests {
         assert_eq!(client1.socket_addr(), client2.socket_addr());
 
         assert_ne!(client1.socket_addr(), client3.socket_addr());
+
+        for worker_config in workers_static_refs.iter() {
+            worker_config.wait_until_done().await;
+        }
     }
 
     #[tokio::test]
@@ -306,9 +331,13 @@ mod tests {
         use crate::client::ExtractSocketAddr;
 
         let online = Arc::new(AtomicBool::new(false));
-        let worker = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
+        let worker: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test",
+            "127.0.0.1:9999",
+            true,
+        )));
 
-        let ip_hash = IpHash::new(&[worker]).unwrap();
+        let ip_hash = IpHash::new(&[worker]).await;
 
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(100)).await;
@@ -318,5 +347,7 @@ mod tests {
         let entry = ip_hash.entry("192.168.0.1".parse().unwrap()).await;
 
         assert_eq!(entry.socket_addr(), "127.0.0.1:9999".parse().unwrap());
+
+        worker.wait_until_done().await;
     }
 }

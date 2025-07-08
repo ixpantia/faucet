@@ -2,8 +2,8 @@ use uuid::Uuid;
 
 use super::LoadBalancingStrategy;
 use super::WorkerConfig;
+use crate::client::Client;
 use crate::leak;
-use crate::{client::Client, error::FaucetResult};
 use std::time::Duration;
 
 struct Targets {
@@ -11,14 +11,14 @@ struct Targets {
 }
 
 impl Targets {
-    fn new(configs: &[WorkerConfig]) -> FaucetResult<Self> {
+    fn new(configs: &[&'static WorkerConfig]) -> Self {
         let mut targets = Vec::new();
         for state in configs {
-            let client = Client::builder(*state).build()?;
+            let client = Client::new(state);
             targets.push(client);
         }
         let targets = leak!(targets);
-        Ok(Targets { targets })
+        Targets { targets }
     }
 }
 
@@ -28,11 +28,15 @@ pub struct CookieHash {
 }
 
 impl CookieHash {
-    pub(crate) fn new(targets: &[WorkerConfig]) -> FaucetResult<Self> {
-        Ok(Self {
-            targets_len: targets.as_ref().len(),
-            targets: Targets::new(targets)?,
-        })
+    pub(crate) async fn new(configs: &[&'static WorkerConfig]) -> Self {
+        // Start the process of each config
+        for config in configs {
+            config.spawn_worker_task().await;
+        }
+        Self {
+            targets_len: configs.as_ref().len(),
+            targets: Targets::new(configs),
+        }
     }
 }
 
@@ -158,22 +162,32 @@ mod tests {
 
     #[test]
     fn test_new_targets() {
-        let worker_state = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
-        let Targets { targets } = Targets::new(&[worker_state]).unwrap();
+        let worker_state: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test",
+            "127.0.0.1:9999",
+            true,
+        )));
+        let Targets { targets } = Targets::new(&[worker_state]);
 
         assert_eq!(targets.len(), 1);
     }
 
-    #[test]
-    fn test_new_cookie_hash() {
-        let worker_state = WorkerConfig::dummy("test", "127.0.0.1:9999", true);
+    #[tokio::test]
+    async fn test_new_cookie_hash() {
+        let worker_state: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test",
+            "127.0.0.1:9999",
+            true,
+        )));
         let CookieHash {
             targets,
             targets_len,
-        } = CookieHash::new(&[worker_state]).unwrap();
+        } = CookieHash::new(&[worker_state]).await;
 
         assert_eq!(targets.targets.len(), 1);
         assert_eq!(targets_len, 1);
+
+        worker_state.wait_until_done().await;
     }
 
     #[test]
@@ -186,11 +200,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_balancing_strategy() {
-        let workers = [
-            WorkerConfig::dummy("test1", "127.0.0.1:9999", true),
-            WorkerConfig::dummy("test2", "127.0.0.1:8888", true),
-        ];
-        let cookie_hash = CookieHash::new(&workers).unwrap();
+        let worker1: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test1",
+            "127.0.0.1:9999",
+            true,
+        )));
+        let worker2: &'static WorkerConfig = Box::leak(Box::new(WorkerConfig::dummy(
+            "test2",
+            "127.0.0.1:8888",
+            true,
+        )));
+        let workers_static_refs = [worker1, worker2];
+        let cookie_hash = CookieHash::new(&workers_static_refs).await;
 
         let uuid1 = Uuid::now_v7();
         let client1_a = cookie_hash.entry(uuid1).await;
@@ -222,7 +243,7 @@ mod tests {
         assert_eq!(client2_a.socket_addr(), client2_b.socket_addr());
         assert_eq!(client2_a.socket_addr(), client2_addr);
 
-        if workers.len() > 1 {
+        if workers_static_refs.len() > 1 {
             // Only assert inequality if we expect different clients to be possible and were found
             if client1_a.socket_addr() != client2_a.socket_addr() {
                 assert_ne!(client1_a.socket_addr(), client2_a.socket_addr());
@@ -233,6 +254,10 @@ mod tests {
             }
         } else {
             assert_eq!(client1_a.socket_addr(), client2_a.socket_addr());
+        }
+
+        for worker_config in workers_static_refs.iter() {
+            worker_config.wait_until_done().await;
         }
     }
 }

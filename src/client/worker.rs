@@ -12,7 +12,11 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use tokio::{process::Child, task::JoinHandle};
+use tokio::{
+    process::Child,
+    sync::{Mutex, Notify},
+    task::JoinHandle,
+};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
@@ -24,6 +28,8 @@ pub enum WorkerType {
     Shiny,
     #[serde(alias = "quarto-shiny", alias = "QuartoShiny", alias = "quarto_shiny")]
     QuartoShiny,
+    #[cfg(test)]
+    Dummy,
 }
 
 fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
@@ -75,10 +81,18 @@ pub struct WorkerConfig {
     pub worker_route: Option<&'static str>,
     pub is_online: &'static AtomicBool,
     pub qmd: Option<&'static Path>,
+    pub handle: &'static Mutex<Option<JoinHandle<FaucetResult<()>>>>,
+    pub shutdown: &'static ShutdownSignal,
+    pub idle_stop: &'static Notify,
 }
 
 impl WorkerConfig {
-    fn new(worker_id: usize, addr: SocketAddr, server_config: &FaucetServerConfig) -> Self {
+    fn new(
+        worker_id: usize,
+        addr: SocketAddr,
+        server_config: &FaucetServerConfig,
+        shutdown: &'static ShutdownSignal,
+    ) -> Self {
         Self {
             addr,
             worker_id,
@@ -91,9 +105,13 @@ impl WorkerConfig {
             rscript: server_config.rscript,
             quarto: server_config.quarto,
             qmd: server_config.qmd,
+            handle: leak!(Mutex::new(None)),
+            shutdown,
+            idle_stop: leak!(Notify::new()),
         }
     }
     #[allow(dead_code)]
+    #[cfg(test)]
     pub fn dummy(target: &'static str, addr: &str, online: bool) -> WorkerConfig {
         WorkerConfig {
             target,
@@ -102,17 +120,20 @@ impl WorkerConfig {
             app_dir: None,
             worker_route: None,
             rscript: OsStr::new(""),
-            wtype: crate::client::worker::WorkerType::Shiny,
+            wtype: WorkerType::Dummy,
             worker_id: 1,
             quarto: OsStr::new(""),
             workdir: Path::new("."),
             qmd: None,
+            handle: leak!(Mutex::new(None)),
+            shutdown: leak!(ShutdownSignal::new()),
+            idle_stop: leak!(Notify::new()),
         }
     }
 }
 
 fn spawn_child_rscript_process(
-    config: WorkerConfig,
+    config: &WorkerConfig,
     command: impl AsRef<str>,
 ) -> FaucetResult<Child> {
     let mut cmd = tokio::process::Command::new(config.rscript);
@@ -140,7 +161,7 @@ fn spawn_child_rscript_process(
     cmd.spawn().map_err(Into::into)
 }
 
-fn spawn_plumber_worker(config: WorkerConfig) -> FaucetResult<Child> {
+fn spawn_plumber_worker(config: &WorkerConfig) -> FaucetResult<Child> {
     let command = format!(
         r#"
         options("plumber.port" = {port})
@@ -153,7 +174,7 @@ fn spawn_plumber_worker(config: WorkerConfig) -> FaucetResult<Child> {
     log_stdio(child, config.target)
 }
 
-fn spawn_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
+fn spawn_shiny_worker(config: &WorkerConfig) -> FaucetResult<Child> {
     let command = format!(
         r#"
         options("shiny.port" = {port})
@@ -167,7 +188,7 @@ fn spawn_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
     log_stdio(child, config.target)
 }
 
-fn spawn_quarto_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
+fn spawn_quarto_shiny_worker(config: &WorkerConfig) -> FaucetResult<Child> {
     let mut cmd = tokio::process::Command::new(config.quarto);
     // Set the current directory to the directory containing the entrypoint
     cmd.current_dir(config.workdir)
@@ -196,28 +217,138 @@ fn spawn_quarto_shiny_worker(config: WorkerConfig) -> FaucetResult<Child> {
 }
 
 impl WorkerConfig {
-    fn spawn_process(self, config: WorkerConfig) -> Child {
+    fn spawn_process(&self) -> FaucetResult<Child> {
         let child_result = match self.wtype {
-            WorkerType::Plumber => spawn_plumber_worker(config),
-            WorkerType::Shiny => spawn_shiny_worker(config),
-            WorkerType::QuartoShiny => spawn_quarto_shiny_worker(config),
+            WorkerType::Plumber => spawn_plumber_worker(self),
+            WorkerType::Shiny => spawn_shiny_worker(self),
+            WorkerType::QuartoShiny => spawn_quarto_shiny_worker(self),
+            #[cfg(test)]
+            WorkerType::Dummy => unreachable!(
+                "WorkerType::Dummy should be handled in spawn_worker_task and not reach spawn_process"
+            ),
         };
+
         match child_result {
-            Ok(child) => child,
+            Ok(child) => Ok(child),
             Err(e) => {
-                log::error!(target: "faucet", "Failed to invoke R for {target}: {e}", target = config.target);
-                log::error!(target: "faucet", "Exiting...");
-                std::process::exit(1);
+                log::error!(target: "faucet", "Failed to invoke R for {target}: {e}", target = self.target);
+                Err(e)
             }
         }
     }
-}
+    pub async fn wait_until_done(&self) {
+        if let Some(handle) = self.handle.lock().await.take() {
+            match handle.await {
+                Ok(Ok(_)) => { /* Task completed successfully */ }
+                Ok(Err(e)) => {
+                    panic!("Worker task for target '{}' failed: {:?}", self.target, e);
+                }
+                Err(e) => {
+                    panic!(
+                        "Worker task for target '{}' panicked or was cancelled: {:?}",
+                        self.target, e
+                    );
+                }
+            }
+        }
+    }
+    pub async fn spawn_worker_task(&'static self) {
+        let mut handle = self.handle.lock().await;
 
-pub struct Worker {
-    /// Whether the worker should be stopped
-    pub child: WorkerChild,
-    /// The address of the worker's socket.
-    pub config: WorkerConfig,
+        if let Some(handle) = handle.as_ref() {
+            if !handle.is_finished() {
+                log::warn!(target: "faucet", "Worker task for {target} is already running, skipping spawn", target = self.target);
+                return;
+            }
+        }
+
+        *handle = Some(tokio::spawn(async move {
+            #[cfg(test)]
+            if self.wtype == WorkerType::Dummy {
+                log::debug!(
+                    target: "faucet",
+                    "Worker {target} is type Dummy, skipping real process spawn.",
+                    target = self.target
+                );
+                return FaucetResult::Ok(());
+            }
+
+            'outer: loop {
+                let mut child = match self.spawn_process() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        log::error!(
+                            target: "faucet",
+                            "Worker task for {target} failed to spawn initial process: {e}",
+                            target = self.target
+                        );
+                        return Err(e);
+                    }
+                };
+
+                let pid = match child.id() {
+                    Some(id) => id,
+                    None => {
+                        let err_msg = format!(
+                            "Spawned process for {target} has no PID",
+                            target = self.target
+                        );
+                        log::error!(target: "faucet", "{err_msg}");
+                        return Err(FaucetError::Unknown(err_msg));
+                    }
+                };
+
+                // We will run this loop asynchrnously on this same thread.
+                // We will use this to wait for either the stop signal
+                // or the child exiting
+                let child_loop = async {
+                    log::info!(target: "faucet", "Starting process {pid} for {target} on port {port}", port = self.addr.port(), target = self.target);
+                    loop {
+                        // Try to connect to the socket
+                        let check_status = check_if_online(self.addr).await;
+                        // If it's online, we can break out of the loop and start serving connections
+                        if check_status {
+                            log::info!(target: "faucet", "{target} is online and ready to serve connections at {route}", target = self.target, route = self.worker_route.unwrap_or("/"));
+                            self.is_online.store(check_status, Ordering::SeqCst);
+                            break;
+                        }
+                        // If it's not online but the child process has exited, we should break out of the loop
+                        // and restart the process
+                        if child.try_wait()?.is_some() {
+                            break;
+                        }
+
+                        tokio::time::sleep(RECHECK_INTERVAL).await;
+                    }
+                    FaucetResult::Ok(child.wait().await?)
+                };
+                tokio::select! {
+                    // If we receive a stop signal that means we will stop the outer loop
+                    // and kill the process
+                    _ = self.shutdown.wait() => {
+                        let _ = child.kill().await;
+                        log::info!(target: "faucet", "{target}'s process ({pid}) killed for shutdown", target = self.target);
+                        break 'outer;
+                    },
+                    _ = self.idle_stop.notified() => {
+                        self.is_online.store(false, std::sync::atomic::Ordering::SeqCst);
+                        let _ = child.kill().await;
+                        log::info!(target: "faucet", "{target}'s process ({pid}) killed for idle stop", target = self.target);
+                        break 'outer;
+                    },
+                    // If our child loop stops that means the process crashed. We will restart it
+                    status = child_loop => {
+                       self
+                            .is_online
+                            .store(false, std::sync::atomic::Ordering::SeqCst);
+                        log::error!(target: "faucet", "{target}'s process ({}) exited with status {}", pid, status?, target = self.target);
+                        continue 'outer;
+                    }
+                }
+            }
+            FaucetResult::Ok(())
+        }));
+    }
 }
 
 async fn check_if_online(addr: SocketAddr) -> bool {
@@ -227,105 +358,32 @@ async fn check_if_online(addr: SocketAddr) -> bool {
 
 const RECHECK_INTERVAL: Duration = Duration::from_millis(250);
 
-pub struct WorkerChild {
-    handle: Option<JoinHandle<FaucetResult<()>>>,
-}
-
-impl WorkerChild {
-    pub async fn wait_until_done(&mut self) {
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.await;
-        }
-    }
-}
-
-fn spawn_worker_task(config: WorkerConfig, shutdown: ShutdownSignal) -> WorkerChild {
-    let handle = tokio::spawn(async move {
-        'outer: loop {
-            let mut child = config.spawn_process(config);
-            let pid = child.id().expect("Failed to get plumber worker PID");
-
-            // We will run this loop asynchrnously on this same thread.
-            // We will use this to wait for either the stop signal
-            // or the child exiting
-            let child_loop = async {
-                log::info!(target: "faucet", "Starting process {pid} for {target} on port {port}", port = config.addr.port(), target = config.target);
-                loop {
-                    // Try to connect to the socket
-                    let check_status = check_if_online(config.addr).await;
-                    // If it's online, we can break out of the loop and start serving connections
-                    if check_status {
-                        log::info!(target: "faucet", "{target} is online and ready to serve connections at {route}", target = config.target, route = config.worker_route.unwrap_or("/"));
-                        config.is_online.store(check_status, Ordering::SeqCst);
-                        break;
-                    }
-                    // If it's not online but the child process has exited, we should break out of the loop
-                    // and restart the process
-                    if child.try_wait()?.is_some() {
-                        break;
-                    }
-
-                    tokio::time::sleep(RECHECK_INTERVAL).await;
-                }
-                FaucetResult::Ok(child.wait().await?)
-            };
-            tokio::select! {
-                // If we receive a stop signal that means we will stop the outer loop
-                // and kill the process
-                _ = shutdown.wait() => {
-                    let _ = child.kill().await;
-                    log::info!(target: "faucet", "{target}'s process ({pid}) killed", target = config.target);
-                    break 'outer;
-                },
-                // If our child loop stops that means the process crashed. We will restart it
-                status = child_loop => {
-                    config
-                        .is_online
-                        .store(false, std::sync::atomic::Ordering::SeqCst);
-                    log::error!(target: "faucet", "{target}'s process ({}) exited with status {}", pid, status?, target = config.target);
-                    continue 'outer;
-                }
-            }
-        }
-        FaucetResult::Ok(())
-    });
-    WorkerChild {
-        handle: Some(handle),
-    }
-}
-
-impl Worker {
-    pub fn from_config(config: WorkerConfig, shutdown: ShutdownSignal) -> FaucetResult<Self> {
-        let child = spawn_worker_task(config, shutdown);
-        Ok(Self { child, config })
-    }
-}
-
-pub struct Workers {
-    pub workers: Box<[Worker]>,
+pub struct WorkerConfigs {
+    pub workers: Box<[&'static WorkerConfig]>,
 }
 
 const TRIES: usize = 20;
 
-impl Workers {
+impl WorkerConfigs {
     pub(crate) async fn new(
         server_config: FaucetServerConfig,
-        shutdown: ShutdownSignal,
+        shutdown: &'static ShutdownSignal,
     ) -> FaucetResult<Self> {
         let mut workers = Vec::with_capacity(server_config.n_workers.get());
 
         for id in 0..server_config.n_workers.get() {
             let socket_addr = get_available_socket(TRIES).await?;
-            let config = WorkerConfig::new(id + 1, socket_addr, &server_config);
-            let worker = Worker::from_config(config, shutdown.clone())?;
-            workers.push(worker);
+            let config = leak!(WorkerConfig::new(
+                id + 1,
+                socket_addr,
+                &server_config,
+                shutdown
+            )) as &'static WorkerConfig;
+            workers.push(config);
         }
 
         let workers = workers.into_boxed_slice();
 
         Ok(Self { workers })
-    }
-    pub(crate) fn get_workers_config(&self) -> Vec<WorkerConfig> {
-        self.workers.iter().map(|w| w.config).collect()
     }
 }
