@@ -25,20 +25,31 @@ class ReconnectingWebSocket {
     this._reconnectAttempts = 0;
     this._forcedClose = false;
 
-    // --- NEW: Session Management ---
-    // Generate a unique session ID for this instance. crypto.randomUUID() is the modern standard.
-    this._sessionId = crypto.randomUUID();
-    
-    // --- NEW: URL Modification ---
-    // Modify the URL to include the session ID as a query parameter.
-    const sessionQueryParam = options.sessionQueryParam ?? 'sessionId';
-    const separator = url.includes('?') ? '&' : '?';
-    this._url = `${url}${separator}${sessionQueryParam}=${this._sessionId}`;
-    // --- END NEW ---
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      this._sessionId = window.crypto.randomUUID();
+    } else {
+      // Basic fallback for older browsers.
+      this._sessionId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+        /[xy]/g,
+        function (c) {
+          const r = (Math.random() * 16) | 0;
+          const v = c === "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        },
+      );
+    }
 
-    // Configuration
-    this._maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
-    this._reconnectDelay = options.reconnectDelay ?? 2000; // 2 seconds
+    const sessionQueryParam =
+      options.sessionQueryParam != null
+        ? options.sessionQueryParam
+        : "sessionId";
+    const separator = url.includes("?") ? "&" : "?";
+    this._url = `${url}${separator}${sessionQueryParam}=${this._sessionId}`;
+
+    this._maxReconnectAttempts =
+      options.maxReconnectAttempts != null ? options.maxReconnectAttempts : 5;
+    this._reconnectDelay =
+      options.reconnectDelay != null ? options.reconnectDelay : 2000; // 2 seconds
 
     // Initial connection
     this.connect();
@@ -53,7 +64,9 @@ class ReconnectingWebSocket {
     this._ws = new WebSocket(this._url, this._protocols);
 
     this._ws.onopen = (event) => {
-      console.log(`ReconnectingWebSocket: Connection opened with Session ID: ${this._sessionId}`);
+      console.log(
+        `ReconnectingWebSocket: Connection opened with Session ID: ${this._sessionId}`,
+      );
       this._reconnectAttempts = 0;
       if (this.onopen) {
         this.onopen(event);
@@ -81,7 +94,7 @@ class ReconnectingWebSocket {
         }
         return;
       }
-      
+
       this._handleReconnect(event);
     };
   }
@@ -90,12 +103,12 @@ class ReconnectingWebSocket {
     if (this._reconnectAttempts < this._maxReconnectAttempts) {
       this._reconnectAttempts++;
       console.log(
-        `ReconnectingWebSocket: Connection lost. Reconnecting with same session... (${this._reconnectAttempts}/${this._maxReconnectAttempts})`
+        `ReconnectingWebSocket: Connection lost. Reconnecting with same session... (${this._reconnectAttempts}/${this._maxReconnectAttempts})`,
       );
       setTimeout(() => this.connect(), this._reconnectDelay);
     } else {
       console.error(
-        `ReconnectingWebSocket: Failed to reconnect after ${this._maxReconnectAttempts} attempts.`
+        `ReconnectingWebSocket: Failed to reconnect after ${this._maxReconnectAttempts} attempts.`,
       );
       if (this.onclose) {
         this.onclose(event);
@@ -133,7 +146,7 @@ class ReconnectingWebSocket {
   get sessionId() {
     return this._sessionId;
   }
-  
+
   /** The current state of the WebSocket connection. */
   get readyState() {
     return this._ws ? this._ws.readyState : WebSocket.CONNECTING;
@@ -156,7 +169,7 @@ class ReconnectingWebSocket {
   get protocol() {
     return this._ws ? this._ws.protocol : "";
   }
-  
+
   get binaryType() {
     return this._ws ? this._ws.binaryType : "blob";
   }
@@ -174,8 +187,8 @@ ReconnectingWebSocket.OPEN = 1;
 ReconnectingWebSocket.CLOSING = 2;
 ReconnectingWebSocket.CLOSED = 3;
 
-Shiny.createSocket = function() {
-  return new ReconnectingWebSocket(
-    "ws://" + window.location.host + "/websocket",
-  );
-}
+Shiny.createSocket = function () {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const url = protocol + "//" + window.location.host + "/websocket";
+  return new ReconnectingWebSocket(url);
+};

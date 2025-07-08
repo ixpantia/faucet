@@ -4,6 +4,7 @@ use crate::{
     global_conn::{add_connection, remove_connection},
 };
 use base64::Engine;
+use bytes::Bytes;
 use futures_util::StreamExt;
 use hyper::{
     header::UPGRADE,
@@ -13,7 +14,12 @@ use hyper::{
 };
 use hyper_util::rt::TokioIo;
 use sha1::{Digest, Sha1};
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::LazyLock};
+use tokio_tungstenite::tungstenite::{
+    protocol::{frame::coding::CloseCode, CloseFrame},
+    Message,
+};
+use uuid::Uuid;
 
 struct UpgradeInfo {
     headers: HeaderMap,
@@ -53,38 +59,142 @@ fn build_uri(socket_addr: SocketAddr, path: Option<&PathAndQuery>) -> FaucetResu
     Ok(uri_builder.build()?)
 }
 
-async fn server_upgraded_io(upgraded: Upgraded, upgrade_info: UpgradeInfo) -> FaucetResult<()> {
-    let upgraded = TokioIo::new(upgraded);
-    // Bridge a websocket connection to ws://localhost:3838/websocket
-    // Use tokio-tungstenite to do the websocket handshake
+// We want to keep the shiny tx and rx in memory in case the upgraded connection is dropped. If the user reconnect we want to immediately
+// re establish the connection back to shiny
+use futures_util::SinkExt;
+
+type ConnectionPair = (
+    futures_util::stream::SplitSink<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+        tokio_tungstenite::tungstenite::Message,
+    >,
+    futures_util::stream::SplitStream<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    >,
+);
+
+struct ConnectionInstance {
+    access_count: usize,
+    pair: Option<ConnectionPair>,
+}
+
+impl Default for ConnectionInstance {
+    fn default() -> Self {
+        ConnectionInstance {
+            access_count: 1,
+            pair: None,
+        }
+    }
+}
+
+impl ConnectionInstance {
+    fn take(&mut self) -> ConnectionPair {
+        self.access_count += 1;
+        self.pair
+            .take()
+            .expect("Take should not be called if there is no underlying connection. This is a bug. Please report it")
+    }
+    fn put_back(&mut self, pair: ConnectionPair) {
+        self.access_count += 1;
+        self.pair = Some(pair);
+    }
+}
+
+// Note: This is a simplified cache for a single shiny connection using a static Mutex.
+// A more robust solution would use a session identifier to cache multiple connections.
+// We use a std::sync::Mutex as the lock is not held across .await points.
+static SHINY_CONNECTION_CACHE: LazyLock<std::sync::Mutex<HashMap<Uuid, ConnectionInstance>>> =
+    LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+async fn connect_or_retrieve(
+    upgrade_info: UpgradeInfo,
+    session_id: Uuid,
+) -> FaucetResult<ConnectionPair> {
+    if let Some(conn) = SHINY_CONNECTION_CACHE
+        .lock()
+        .expect("Mutex poisoned")
+        .get_mut(&session_id)
+    {
+        log::debug!("Reusing Shiny connection for session {session_id}");
+        return Ok(conn.take());
+    }
+    // If no connection is cached, establish a new one.
     let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
     *request.headers_mut() = upgrade_info.headers;
     let (shiny_ws, _) = tokio_tungstenite::connect_async(request).await?;
+    Ok(shiny_ws.split())
+}
 
-    // Bridge the websocket stream to the upgraded connection
-    // tokio::io::copy_bidirectional(&mut upgraded, ws_tx.get_mut()).await?;
+async fn server_upgraded_io(
+    upgraded: Upgraded,
+    upgrade_info: UpgradeInfo,
+    session_id: Uuid,
+) -> FaucetResult<()> {
+    // Attempt to retrieve a cached connection to Shiny.
+    let (mut shiny_tx, mut shiny_rx) = connect_or_retrieve(upgrade_info, session_id).await?;
 
-    // Instead of using copy_bidirectional, we can manually intercept the
-    // messages and forward them.
-    // We want this to add reconnection logic later.
-    let (shiny_tx, shiny_rx) = shiny_ws.split();
-
+    // Set up the WebSocket connection with the client.
+    let upgraded = TokioIo::new(upgraded);
     let upgraded_ws = tokio_tungstenite::WebSocketStream::from_raw_socket(
         upgraded,
         tokio_tungstenite::tungstenite::protocol::Role::Server,
         None,
     )
     .await;
+    let (mut upgraded_tx, mut upgraded_rx) = upgraded_ws.split();
 
-    let (upgraded_tx, upgraded_rx) = upgraded_ws.split();
-
-    let client_to_shiny = upgraded_rx.forward(shiny_tx);
-    let shiny_to_client = shiny_rx.forward(upgraded_tx);
-
-    tokio::select! {
-        _ = client_to_shiny => (),
-        _ = shiny_to_client => (),
+    // Manually pump messages in both directions.
+    // This allows us to regain ownership of the streams after a disconnect.
+    let client_to_shiny = async {
+        while let Some(Ok(msg)) = upgraded_rx.next().await {
+            if matches!(
+                msg,
+                Message::Close(Some(CloseFrame {
+                    code: CloseCode::Abnormal,
+                    ..
+                }))
+            ) {
+                break;
+            }
+            if shiny_tx.send(msg).await.is_err() {
+                break; // Shiny connection closed
+            }
+        }
     };
+
+    let shiny_to_client = async {
+        while let Some(Ok(msg)) = shiny_rx.next().await {
+            if upgraded_tx.send(msg).await.is_err() {
+                break; // Client connection closed
+            }
+        }
+    };
+
+    // Wait for either the client or Shiny to disconnect.
+    tokio::select! {
+        _ = client_to_shiny => log::debug!("Client connection closed for session {session_id}."),
+        _ = shiny_to_client => log::debug!("Shiny connection closed for session {session_id}."),
+    };
+
+    // After a disconnect, try to cache the Shiny connection for reuse.
+    // First, check if the connection is still alive by sending a ping.
+    if shiny_tx
+        .send(tokio_tungstenite::tungstenite::Message::Ping(Bytes::new()))
+        .await
+        .is_ok()
+    {
+        log::debug!("Client websocket connection to session {session_id} ended but the Shiny connection is still alive. Saving for reconnection.");
+        let mut cache = SHINY_CONNECTION_CACHE.lock().expect("Mutex poisoned");
+        let entry = cache.entry(session_id).or_default();
+        entry.put_back((shiny_tx, shiny_rx));
+    } else {
+        // Attempt to close the connection gracefully.
+        let _ = shiny_tx.close().await;
+    }
 
     Ok(())
 }
@@ -94,14 +204,26 @@ pub enum UpgradeStatus<ReqBody> {
     NotUpgraded(Request<ReqBody>),
 }
 
+const SESSION_ID_QUERY: &str = "sessionId";
+
 async fn upgrade_connection_from_request<ReqBody>(
     mut req: Request<ReqBody>,
     client: impl ExtractSocketAddr,
 ) -> FaucetResult<()> {
-    let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
-    let upgraded = hyper::upgrade::on(&mut req).await?;
-    server_upgraded_io(upgraded, upgrade_info).await?;
-    Ok(())
+    // Extract sessionId query parameter
+    if let Some(query) = req.uri().query() {
+        let session_id = url::form_urlencoded::parse(query.as_bytes())
+            .find(|(key, _)| key == SESSION_ID_QUERY)
+            .map(|(_, value)| value)
+            .expect("No sessionId");
+        let session_id = uuid::Uuid::from_str(&session_id).expect("Not a UUID");
+        let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
+        let upgraded = hyper::upgrade::on(&mut req).await?;
+        server_upgraded_io(upgraded, upgrade_info, session_id).await?;
+        return Ok(());
+    }
+
+    unreachable!()
 }
 
 async fn init_upgrade<ReqBody: Send + Sync + 'static>(

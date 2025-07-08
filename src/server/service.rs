@@ -93,6 +93,9 @@ fn add_lb_cookie_to_resp(resp: &mut hyper::Response<ExclusiveBody>, lb_cookie: O
 //
 // Andrés
 
+const RESEREVED_RECONNECT_PATH: &str = "__faucet__/reconnect.js";
+const RECONNECT_JS: &str = include_str!("reconnect.js");
+
 impl<S, ReqBody> Service<hyper::Request<ReqBody>> for AddStateService<S>
 where
     ReqBody: hyper::body::Body + Send + Sync + 'static,
@@ -118,6 +121,14 @@ where
                 return Err(e);
             }
         };
+
+        // Check if the user is asking for "/__faucet__/reconnect.js"
+        if req.uri().path().ends_with(RESEREVED_RECONNECT_PATH) {
+            return Ok(hyper::Response::builder()
+                .status(200)
+                .body(ExclusiveBody::plain_text(RECONNECT_JS))
+                .expect("Response should build"));
+        }
 
         let is_cookie_hash = self.load_balancer.get_strategy() == Strategy::CookieHash;
 
