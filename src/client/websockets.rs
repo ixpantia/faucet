@@ -4,6 +4,7 @@ use crate::{
     global_conn::{add_connection, remove_connection},
 };
 use base64::Engine;
+use futures_util::StreamExt;
 use hyper::{
     header::UPGRADE,
     http::{uri::PathAndQuery, HeaderValue},
@@ -52,16 +53,38 @@ fn build_uri(socket_addr: SocketAddr, path: Option<&PathAndQuery>) -> FaucetResu
     Ok(uri_builder.build()?)
 }
 
-async fn server_upgraded_io(upgraded: Upgraded, mut upgrade_info: UpgradeInfo) -> FaucetResult<()> {
-    let mut upgraded = TokioIo::new(upgraded);
+async fn server_upgraded_io(upgraded: Upgraded, upgrade_info: UpgradeInfo) -> FaucetResult<()> {
+    let upgraded = TokioIo::new(upgraded);
     // Bridge a websocket connection to ws://localhost:3838/websocket
     // Use tokio-tungstenite to do the websocket handshake
     let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
-    std::mem::swap(request.headers_mut(), &mut upgrade_info.headers);
-    let (mut ws_tx, _) = tokio_tungstenite::connect_async(request).await?;
+    *request.headers_mut() = upgrade_info.headers;
+    let (shiny_ws, _) = tokio_tungstenite::connect_async(request).await?;
 
     // Bridge the websocket stream to the upgraded connection
-    tokio::io::copy_bidirectional(&mut upgraded, ws_tx.get_mut()).await?;
+    // tokio::io::copy_bidirectional(&mut upgraded, ws_tx.get_mut()).await?;
+
+    // Instead of using copy_bidirectional, we can manually intercept the
+    // messages and forward them.
+    // We want this to add reconnection logic later.
+    let (shiny_tx, shiny_rx) = shiny_ws.split();
+
+    let upgraded_ws = tokio_tungstenite::WebSocketStream::from_raw_socket(
+        upgraded,
+        tokio_tungstenite::tungstenite::protocol::Role::Server,
+        None,
+    )
+    .await;
+
+    let (upgraded_tx, upgraded_rx) = upgraded_ws.split();
+
+    let client_to_shiny = upgraded_rx.forward(shiny_tx);
+    let shiny_to_client = shiny_rx.forward(upgraded_tx);
+
+    tokio::select! {
+        _ = client_to_shiny => (),
+        _ = shiny_to_client => (),
+    };
 
     Ok(())
 }

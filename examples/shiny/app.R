@@ -1,10 +1,46 @@
 library(shiny)
 library(bslib)
 
+inject <- paste(
+  tags$script(src='/reconnect.js'),
+  HTML("</head>"),
+  sep="\n"
+)
+
+filter <- function(...) {
+  # The signature of filter functions changed between Shiny 0.4.0 and
+  # 0.4.1; previously the parameters were (ws, headers, response) and
+  # after they became (request, response). To work with both types, we
+  # just grab the last argument.
+  response <- list(...)[[length(list(...))]]
+
+  if (response$status < 200 || response$status > 300) return(response)
+
+  # Don't break responses that use httpuv's file-based bodies.
+  if ('file' %in% names(response$content))
+     return(response)
+                                            
+  if (!grepl("^text/html\\b", response$content_type, perl=T))
+     return(response)
+
+  # HTML files served from static handler are raw. Convert to char so we
+  # can inject our head content.
+  if (is.raw(response$content))
+     response$content <- rawToChar(response$content)
+
+  response$content <- sub("</head>", inject, response$content, 
+     ignore.case=T)
+  return(response)
+}
+options(shiny.http.response.filter=filter)
+
 # Define UI for app that draws a histogram ----
 ui <- page_sidebar(
   # App title ----
   title = "Hello Shiny!",
+  tags$head(
+    tags$script("console.log('Hello Shiny!');")
+  ),
   # Sidebar panel for inputs ----
   sidebar = sidebar(
     # Input: Slider for the number of bins ----
