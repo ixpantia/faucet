@@ -162,7 +162,7 @@ impl std::fmt::Display for FaucetError {
                     write!(f, "Invalid query parameter: {param}")
                 }
                 BadRequestReason::UnsupportedUrlScheme => {
-                    write!(f, "UnsupportedUrlScheme use ws:// os wss://")
+                    write!(f, "UnsupportedUrlScheme use ws:// or wss://")
                 }
                 BadRequestReason::NoHostName => write!(f, "No Host Name"),
                 BadRequestReason::MissingHeader(header) => {

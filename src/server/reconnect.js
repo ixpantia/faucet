@@ -130,7 +130,6 @@ class ReconnectingWebSocket {
     if (this.readyState === WebSocket.OPEN) {
       this._ws.send(data);
       this._reconnectAttempts = 0;
-      this._reconnectAttempts = 0;
     } else {
       throw new Error("WebSocket is not open. readyState: " + this.readyState);
     }

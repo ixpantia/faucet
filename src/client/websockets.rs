@@ -224,7 +224,7 @@ async fn server_upgraded_io(
             log::debug!("Waiting for message or ping timeout");
             tokio::select! {
                 msg = upgraded_rx.next() => {
-                    log::debug!("Recieved msg: {msg:?}");
+                    log::debug!("Received msg: {msg:?}");
                     match msg {
                         Some(Ok(msg)) => {
                             if shiny_tx.send(msg).await.is_err() {
@@ -266,7 +266,7 @@ async fn server_upgraded_io(
         _ = client_to_shiny => log::debug!("Client connection closed for session {session_id}."),
         _ = shiny_to_client => log::debug!("Shiny connection closed for session {session_id}."),
         _ = shutdown.wait() => {
-            log::debug!("Recieved shutdown signal. Exiting websocket bridge.");
+            log::debug!("Received shutdown signal. Exiting websocket bridge.");
             return Ok(());
         }
     };
