@@ -252,7 +252,7 @@ impl FaucetServerConfig {
 
         let load_balancer = load_balancer.clone();
         let service = Arc::new(
-            ServiceBuilder::new(ProxyService)
+            ServiceBuilder::new(ProxyService { shutdown })
                 .layer(logging::LogLayer { telemetry })
                 .layer(AddStateLayer::new(load_balancer))
                 .build(),
@@ -332,7 +332,7 @@ impl FaucetServerConfig {
         )
         .await?;
         let service = Arc::new(
-            ServiceBuilder::new(ProxyService)
+            ServiceBuilder::new(ProxyService { shutdown })
                 .layer(logging::LogLayer { telemetry })
                 .layer(AddStateLayer::new(load_balancer))
                 .build(),

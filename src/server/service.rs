@@ -4,6 +4,7 @@ use crate::{
     client::{load_balancing::Strategy, Client, ExclusiveBody, UpgradeStatus},
     error::FaucetError,
     server::load_balancing::LoadBalancer,
+    shutdown::ShutdownSignal,
 };
 use hyper::{body::Incoming, header::HeaderValue};
 
@@ -181,7 +182,9 @@ impl<S> Layer<S> for AddStateLayer {
     }
 }
 
-pub(crate) struct ProxyService;
+pub(crate) struct ProxyService {
+    pub shutdown: &'static ShutdownSignal,
+}
 
 impl Service<hyper::Request<Incoming>> for ProxyService {
     type Error = FaucetError;
@@ -197,7 +200,7 @@ impl Service<hyper::Request<Incoming>> for ProxyService {
             .get::<State>()
             .expect("State not found")
             .clone();
-        match state.client.attempt_upgrade(req).await? {
+        match state.client.attempt_upgrade(req, self.shutdown).await? {
             UpgradeStatus::Upgraded(res) => {
                 log::debug!(
                     target: "faucet",

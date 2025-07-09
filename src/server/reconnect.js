@@ -18,6 +18,7 @@ class ReconnectingWebSocket {
     this.onclose = null;
     this.onmessage = null;
     this.onerror = null;
+    this.onreconnect = null;
 
     // --- Internal State ---
     this._protocols = protocols;
@@ -59,7 +60,6 @@ class ReconnectingWebSocket {
    * Initiates the WebSocket connection.
    */
   connect() {
-    // The URL used here now includes the session ID
     console.log(`ReconnectingWebSocket: Connecting to ${this._url}...`);
     this._ws = new WebSocket(this._url, this._protocols);
 
@@ -104,6 +104,13 @@ class ReconnectingWebSocket {
       console.log(
         `ReconnectingWebSocket: Connection lost. Reconnecting with same session... (${this._reconnectAttempts}/${this._maxReconnectAttempts})`,
       );
+      if (this.onreconnect) {
+        this.onreconnect({
+          attempts: this._reconnectAttempts,
+          maxAttempts: this._maxReconnectAttempts,
+          delay: this._reconnectDelay,
+        });
+      }
       setTimeout(() => this.connect(), this._reconnectDelay);
     } else {
       console.error(
@@ -193,3 +200,16 @@ Shiny.createSocket = function () {
   const url = protocol + "//" + window.location.host + "/websocket";
   return new ReconnectingWebSocket(url);
 };
+
+/**
+ * Gets the WebSocket instance for the current Shiny application.
+ *
+ * This is a convenience function for accessing the socket which is normally
+ * stored at `Shiny.shinyapp.$socket`.
+ *
+ * @returns {ReconnectingWebSocket | null} The active ReconnectingWebSocket
+ *   instance, or null if no connection is established.
+ */
+function getShinySocket() {
+  return Shiny.shinyapp.$socket;
+}

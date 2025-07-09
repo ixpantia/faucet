@@ -94,5 +94,7 @@ pub async fn main() -> FaucetResult<()> {
         let _ = handle.await;
     }
 
+    log::debug!("All co-routines shutdown.");
+
     Ok(())
 }

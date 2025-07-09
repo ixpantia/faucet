@@ -2,6 +2,7 @@ use super::{pool::ExtractSocketAddr, Client, ExclusiveBody};
 use crate::{
     error::{FaucetError, FaucetResult},
     global_conn::{add_connection, remove_connection},
+    shutdown::ShutdownSignal,
 };
 use base64::Engine;
 use bytes::Bytes;
@@ -202,6 +203,7 @@ async fn server_upgraded_io(
     upgraded: Upgraded,
     upgrade_info: UpgradeInfo,
     session_id: Uuid,
+    shutdown: &'static ShutdownSignal,
 ) -> FaucetResult<()> {
     // Attempt to retrieve a cached connection to Shiny.
     let (mut shiny_tx, mut shiny_rx) = connect_or_retrieve(upgrade_info, session_id).await?;
@@ -264,6 +266,10 @@ async fn server_upgraded_io(
     tokio::select! {
         _ = client_to_shiny => log::debug!("Client connection closed for session {session_id}."),
         _ = shiny_to_client => log::debug!("Shiny connection closed for session {session_id}."),
+        _ = shutdown.wait() => {
+            log::debug!("Recieved shutdown signal. Exiting websocket bridge.");
+            return Ok(());
+        }
     };
 
     // After a disconnect, try to cache the Shiny connection for reuse.
@@ -280,28 +286,34 @@ async fn server_upgraded_io(
 
         // Schedule a check in 30 seconds. If the connection is not in use
         tokio::spawn(async move {
-            tokio::time::sleep(RECHECK_TIME).await;
-            let entry = SHINY_CONNECTION_CACHE.attempt_take(session_id).await;
-            match entry {
-                Err(_) => (),
-                Ok((shiny_tx, shiny_rx)) => {
-                    let mut ws = shiny_tx
-                        .reunite(shiny_rx)
-                        .expect("shiny_rx and tx always have the same origin.");
-                    //
-                    if ws
-                        .close(Some(CloseFrame {
-                            code: CloseCode::Abnormal,
-                            reason: Utf8Bytes::default(),
-                        }))
-                        .await
-                        .is_ok()
-                    {
-                        log::debug!("Closed reserved connection for session {session_id}");
+            tokio::select! {
+                _ = tokio::time::sleep(RECHECK_TIME) => {
+                    let entry = SHINY_CONNECTION_CACHE.attempt_take(session_id).await;
+                    match entry {
+                        Err(_) => (),
+                        Ok((shiny_tx, shiny_rx)) => {
+                            let mut ws = shiny_tx
+                                .reunite(shiny_rx)
+                                .expect("shiny_rx and tx always have the same origin.");
+                            //
+                            if ws
+                                .close(Some(CloseFrame {
+                                    code: CloseCode::Abnormal,
+                                    reason: Utf8Bytes::default(),
+                                }))
+                                .await
+                                .is_ok()
+                            {
+                                log::debug!("Closed reserved connection for session {session_id}");
+                            }
+                        }
                     }
+                    SHINY_CONNECTION_CACHE.remove_session(session_id).await;
+                },
+                _ = shutdown.wait() => {
+                    log::debug!("Shutdown signaled, not running websocket cleanup for session {}", session_id);
                 }
             }
-            SHINY_CONNECTION_CACHE.remove_session(session_id)
         });
     } else {
         // Attempt to close the connection gracefully.
@@ -321,6 +333,7 @@ const SESSION_ID_QUERY: &str = "sessionId";
 async fn upgrade_connection_from_request<ReqBody>(
     mut req: Request<ReqBody>,
     client: impl ExtractSocketAddr,
+    shutdown: &'static ShutdownSignal,
 ) -> FaucetResult<()> {
     // Extract sessionId query parameter
     if let Some(query) = req.uri().query() {
@@ -331,7 +344,7 @@ async fn upgrade_connection_from_request<ReqBody>(
         let session_id = uuid::Uuid::from_str(&session_id).expect("Not a UUID");
         let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
         let upgraded = hyper::upgrade::on(&mut req).await?;
-        server_upgraded_io(upgraded, upgrade_info, session_id).await?;
+        server_upgraded_io(upgraded, upgrade_info, session_id, shutdown).await?;
         return Ok(());
     }
 
@@ -341,6 +354,7 @@ async fn upgrade_connection_from_request<ReqBody>(
 async fn init_upgrade<ReqBody: Send + Sync + 'static>(
     req: Request<ReqBody>,
     client: impl ExtractSocketAddr + Send + Sync + 'static,
+    shutdown: &'static ShutdownSignal,
 ) -> FaucetResult<Response<ExclusiveBody>> {
     let mut res = Response::new(ExclusiveBody::empty());
     let sec_websocket_key = req
@@ -350,7 +364,7 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
         .ok_or(FaucetError::no_sec_web_socket_key())?;
     tokio::task::spawn(async move {
         add_connection();
-        if let Err(e) = upgrade_connection_from_request(req, client).await {
+        if let Err(e) = upgrade_connection_from_request(req, client, shutdown).await {
             log::error!("upgrade error: {:?}", e);
         }
         remove_connection();
@@ -377,9 +391,12 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
 async fn attempt_upgrade<ReqBody: Send + Sync + 'static>(
     req: Request<ReqBody>,
     client: impl ExtractSocketAddr + Send + Sync + 'static,
+    shutdown: &'static ShutdownSignal,
 ) -> FaucetResult<UpgradeStatus<ReqBody>> {
     if req.headers().contains_key(UPGRADE) {
-        return Ok(UpgradeStatus::Upgraded(init_upgrade(req, client).await?));
+        return Ok(UpgradeStatus::Upgraded(
+            init_upgrade(req, client, shutdown).await?,
+        ));
     }
     Ok(UpgradeStatus::NotUpgraded(req))
 }
@@ -388,11 +405,12 @@ impl Client {
     pub async fn attempt_upgrade<ReqBody>(
         &self,
         req: Request<ReqBody>,
+        shutdown: &'static ShutdownSignal,
     ) -> FaucetResult<UpgradeStatus<ReqBody>>
     where
         ReqBody: Send + Sync + 'static,
     {
-        attempt_upgrade(req, self.clone()).await
+        attempt_upgrade(req, self.clone(), shutdown).await
     }
 }
 
