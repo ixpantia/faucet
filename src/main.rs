@@ -81,6 +81,8 @@ pub async fn main() -> FaucetResult<()> {
         }
     }
 
+    log::debug!("Main server shutdown. Waiting to shutdown co-routines.");
+
     if let Some(telemetry) = telemetry {
         log::debug!("Waiting to stop DB writes");
         drop(telemetry.sender);
@@ -88,6 +90,7 @@ pub async fn main() -> FaucetResult<()> {
     }
 
     if let Some(handle) = log_thread_handle {
+        log::debug!("Waiting for log thread to be finished!");
         let _ = handle.await;
     }
 

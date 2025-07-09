@@ -14,10 +14,14 @@ use hyper::{
 };
 use hyper_util::rt::TokioIo;
 use sha1::{Digest, Sha1};
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::LazyLock};
+use std::{
+    collections::HashMap, future::Future, hash::Hash, net::SocketAddr, ops::Add, str::FromStr,
+    sync::LazyLock, time::Duration,
+};
+use tokio::sync::{Mutex, MutexGuard};
 use tokio_tungstenite::tungstenite::{
     protocol::{frame::coding::CloseCode, CloseFrame},
-    Message,
+    Message, Utf8Bytes,
 };
 use uuid::Uuid;
 
@@ -77,26 +81,16 @@ type ConnectionPair = (
     >,
 );
 
+#[derive(Default)]
 struct ConnectionInstance {
     access_count: usize,
     pair: Option<ConnectionPair>,
 }
 
-impl Default for ConnectionInstance {
-    fn default() -> Self {
-        ConnectionInstance {
-            access_count: 1,
-            pair: None,
-        }
-    }
-}
-
 impl ConnectionInstance {
     fn take(&mut self) -> ConnectionPair {
         self.access_count += 1;
-        self.pair
-            .take()
-            .expect("Take should not be called if there is no underlying connection. This is a bug. Please report it")
+        self.pair.take().unwrap()
     }
     fn put_back(&mut self, pair: ConnectionPair) {
         self.access_count += 1;
@@ -104,30 +98,105 @@ impl ConnectionInstance {
     }
 }
 
+struct ConnectionManagerInner {
+    map: HashMap<Uuid, ConnectionInstance>,
+    purge_count: usize,
+}
+
+struct ConnectionManager {
+    inner: Mutex<ConnectionManagerInner>,
+}
+
+impl ConnectionManager {
+    fn new() -> Self {
+        ConnectionManager {
+            inner: Mutex::new(ConnectionManagerInner {
+                map: HashMap::new(),
+                purge_count: 0,
+            }),
+        }
+    }
+    async fn initialize_if_not(
+        &self,
+        session_id: Uuid,
+        init: impl Future<Output = FaucetResult<ConnectionPair>>,
+    ) -> Option<FaucetResult<ConnectionPair>> {
+        {
+            let mut inner = self.inner.lock().await;
+            let entry = inner.map.entry(session_id).or_default();
+            if entry.access_count != 0 {
+                return None;
+            }
+            entry.access_count += 1;
+        }
+        let connection_pair = match init.await {
+            Ok(connection_pair) => connection_pair,
+            Err(e) => return Some(Err(e)),
+        };
+        return Some(Ok(connection_pair));
+    }
+    async fn attempt_take(&self, session_id: Uuid) -> FaucetResult<ConnectionPair> {
+        let mut inner = self.inner.lock().await;
+        let instance = inner.map.entry(session_id).or_default();
+
+        if instance.access_count % 2 == 0 {
+            return Ok(instance.take());
+        }
+
+        Err(FaucetError::WebSocketConnectionInUse)
+    }
+    async fn put_pack(&self, session_id: Uuid, pair: ConnectionPair) {
+        let mut inner = self.inner.lock().await;
+        if let Some(instance) = inner.map.get_mut(&session_id) {
+            instance.put_back(pair);
+        }
+    }
+    async fn remove_session(&self, session_id: Uuid) {
+        let mut inner = self.inner.lock().await;
+        inner.map.remove(&session_id);
+        inner.purge_count += 1;
+        const CONN_PURGE_SHRINK_INTERVAL: usize = 50;
+        if inner.purge_count % CONN_PURGE_SHRINK_INTERVAL == 0 {
+            inner.map.shrink_to_fit();
+        }
+    }
+}
+
 // Note: This is a simplified cache for a single shiny connection using a static Mutex.
 // A more robust solution would use a session identifier to cache multiple connections.
 // We use a std::sync::Mutex as the lock is not held across .await points.
-static SHINY_CONNECTION_CACHE: LazyLock<std::sync::Mutex<HashMap<Uuid, ConnectionInstance>>> =
-    LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+static SHINY_CONNECTION_CACHE: LazyLock<ConnectionManager> =
+    LazyLock::new(|| ConnectionManager::new());
+
+async fn connect_to_worker(upgrade_info: UpgradeInfo) -> FaucetResult<ConnectionPair> {
+    let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
+    *request.headers_mut() = upgrade_info.headers;
+    let (shiny_ws, _) = tokio_tungstenite::connect_async(request).await?;
+    return Ok(shiny_ws.split());
+}
 
 async fn connect_or_retrieve(
     upgrade_info: UpgradeInfo,
     session_id: Uuid,
 ) -> FaucetResult<ConnectionPair> {
-    if let Some(conn) = SHINY_CONNECTION_CACHE
-        .lock()
-        .expect("Mutex poisoned")
-        .get_mut(&session_id)
-    {
-        log::debug!("Reusing Shiny connection for session {session_id}");
-        return Ok(conn.take());
+    let init_pair = SHINY_CONNECTION_CACHE
+        .initialize_if_not(session_id, connect_to_worker(upgrade_info))
+        .await;
+
+    match init_pair {
+        None => {
+            // This means that the connection has already been initialized
+            // in the past
+            SHINY_CONNECTION_CACHE.attempt_take(session_id).await
+        }
+        Some(init_pair_res) => init_pair_res,
     }
-    // If no connection is cached, establish a new one.
-    let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
-    *request.headers_mut() = upgrade_info.headers;
-    let (shiny_ws, _) = tokio_tungstenite::connect_async(request).await?;
-    Ok(shiny_ws.split())
 }
+
+const RECHECK_TIME: Duration = Duration::from_secs(60);
+const PING_INTERVAL: Duration = Duration::from_secs(1);
+const PING_INTERVAL_TIMEOUT: Duration = Duration::from_secs(2);
+const PING_BYTES: Bytes = Bytes::from_static(b"Ping");
 
 async fn server_upgraded_io(
     upgraded: Upgraded,
@@ -150,26 +219,43 @@ async fn server_upgraded_io(
     // Manually pump messages in both directions.
     // This allows us to regain ownership of the streams after a disconnect.
     let client_to_shiny = async {
-        while let Some(Ok(msg)) = upgraded_rx.next().await {
-            if matches!(
-                msg,
-                Message::Close(Some(CloseFrame {
-                    code: CloseCode::Abnormal,
-                    ..
-                }))
-            ) {
-                break;
-            }
-            if shiny_tx.send(msg).await.is_err() {
-                break; // Shiny connection closed
+        loop {
+            log::debug!("Waiting for message or ping timeout");
+            tokio::select! {
+                msg = upgraded_rx.next() => {
+                    log::debug!("Recieved msg: {msg:?}");
+                    match msg {
+                        Some(Ok(msg)) => {
+                            if shiny_tx.send(msg).await.is_err() {
+                                break; // Shiny connection closed
+                            }
+                        },
+                        _ => break
+                    }
+                },
+                _ = tokio::time::sleep(PING_INTERVAL_TIMEOUT) => {
+                    log::debug!("Ping timeout reached for session {session_id}");
+                    break;
+                }
             }
         }
     };
 
     let shiny_to_client = async {
-        while let Some(Ok(msg)) = shiny_rx.next().await {
-            if upgraded_tx.send(msg).await.is_err() {
-                break; // Client connection closed
+        loop {
+            let ping_future = async {
+                tokio::time::sleep(PING_INTERVAL).await;
+                upgraded_tx.send(Message::Ping(PING_BYTES)).await
+            };
+            tokio::select! {
+                msg = shiny_rx.next() => {
+                    if let Some(Ok(msg)) = msg {
+                        if upgraded_tx.send(msg).await.is_err() {
+                            break; // Client connection closed
+                        }
+                    };
+                },
+                _ = ping_future => {}
             }
         }
     };
@@ -183,14 +269,40 @@ async fn server_upgraded_io(
     // After a disconnect, try to cache the Shiny connection for reuse.
     // First, check if the connection is still alive by sending a ping.
     if shiny_tx
-        .send(tokio_tungstenite::tungstenite::Message::Ping(Bytes::new()))
+        .send(tokio_tungstenite::tungstenite::Message::Ping(PING_BYTES))
         .await
         .is_ok()
     {
         log::debug!("Client websocket connection to session {session_id} ended but the Shiny connection is still alive. Saving for reconnection.");
-        let mut cache = SHINY_CONNECTION_CACHE.lock().expect("Mutex poisoned");
-        let entry = cache.entry(session_id).or_default();
-        entry.put_back((shiny_tx, shiny_rx));
+        SHINY_CONNECTION_CACHE
+            .put_pack(session_id, (shiny_tx, shiny_rx))
+            .await;
+
+        // Schedule a check in 30 seconds. If the connection is not in use
+        tokio::spawn(async move {
+            tokio::time::sleep(RECHECK_TIME).await;
+            let entry = SHINY_CONNECTION_CACHE.attempt_take(session_id).await;
+            match entry {
+                Err(_) => (),
+                Ok((shiny_tx, shiny_rx)) => {
+                    let mut ws = shiny_tx
+                        .reunite(shiny_rx)
+                        .expect("shiny_rx and tx always have the same origin.");
+                    //
+                    if ws
+                        .close(Some(CloseFrame {
+                            code: CloseCode::Abnormal,
+                            reason: Utf8Bytes::default(),
+                        }))
+                        .await
+                        .is_ok()
+                    {
+                        log::debug!("Closed reserved connection for session {session_id}");
+                    }
+                }
+            }
+            SHINY_CONNECTION_CACHE.remove_session(session_id)
+        });
     } else {
         // Attempt to close the connection gracefully.
         let _ = shiny_tx.close().await;

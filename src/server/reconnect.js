@@ -47,9 +47,9 @@ class ReconnectingWebSocket {
     this._url = `${url}${separator}${sessionQueryParam}=${this._sessionId}`;
 
     this._maxReconnectAttempts =
-      options.maxReconnectAttempts != null ? options.maxReconnectAttempts : 5;
+      options.maxReconnectAttempts != null ? options.maxReconnectAttempts : 40;
     this._reconnectDelay =
-      options.reconnectDelay != null ? options.reconnectDelay : 2000; // 2 seconds
+      options.reconnectDelay != null ? options.reconnectDelay : 500; // 500ms
 
     // Initial connection
     this.connect();
@@ -67,7 +67,6 @@ class ReconnectingWebSocket {
       console.log(
         `ReconnectingWebSocket: Connection opened with Session ID: ${this._sessionId}`,
       );
-      this._reconnectAttempts = 0;
       if (this.onopen) {
         this.onopen(event);
       }
@@ -123,6 +122,8 @@ class ReconnectingWebSocket {
   send(data) {
     if (this.readyState === WebSocket.OPEN) {
       this._ws.send(data);
+      this._reconnectAttempts = 0;
+      this._reconnectAttempts = 0;
     } else {
       throw new Error("WebSocket is not open. readyState: " + this.readyState);
     }

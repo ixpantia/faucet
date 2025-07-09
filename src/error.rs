@@ -34,6 +34,7 @@ pub enum FaucetError {
     ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
     WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
     PostgreSQL(tokio_postgres::Error),
+    WebSocketConnectionInUse,
     AttackAttempt,
 }
 
@@ -150,6 +151,7 @@ impl std::fmt::Display for FaucetError {
             Self::BufferCapacity(cap_err) => write!(f, "Buffer Capacity: {cap_err}"),
             Self::WSWriteBufferFull(buf) => write!(f, "Web Socket Write buffer full, {buf}"),
             Self::PostgreSQL(value) => write!(f, "PostgreSQL error: {value}"),
+            Self::WebSocketConnectionInUse => write!(f, "WebSocket Connection in use"),
             Self::BadRequest(r) => match r {
                 BadRequestReason::UnsupportedUrlScheme => {
                     write!(f, "UnsupportedUrlScheme use ws:// os wss://")

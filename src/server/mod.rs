@@ -307,9 +307,14 @@ impl FaucetServerConfig {
             _ = main_loop() => (),
         }
 
+        log::debug!("Main loop ended!");
+
         for worker in &mut workers.workers {
+            log::debug!("Waiting for {} to finish", worker.target);
             worker.wait_until_done().await;
         }
+
+        log::debug!("All workers are finished!");
 
         FaucetResult::Ok(())
     }

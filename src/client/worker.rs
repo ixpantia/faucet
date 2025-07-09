@@ -248,8 +248,11 @@ impl WorkerConfig {
     }
     pub async fn wait_until_done(&self) {
         if let Some(handle) = self.handle.lock().await.take() {
+            log::debug!("Waiting for process to be finished");
             match handle.await {
-                Ok(Ok(_)) => { /* Task completed successfully */ }
+                Ok(Ok(_)) => {
+                    log::debug!("Task ended successfully!")
+                }
                 Ok(Err(e)) => {
                     panic!("Worker task for target '{}' failed: {:?}", self.target, e);
                 }
@@ -356,6 +359,7 @@ impl WorkerConfig {
                     }
                 }
             }
+            log::debug!("{target}'s process has ended.", target = self.target);
             FaucetResult::Ok(())
         }));
     }
