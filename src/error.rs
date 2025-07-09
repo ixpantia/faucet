@@ -5,6 +5,8 @@ use crate::client::ExclusiveBody;
 pub enum BadRequestReason {
     MissingHeader(&'static str),
     InvalidHeader(&'static str),
+    MissingQueryParam(&'static str),
+    InvalidQueryParam(&'static str),
     NoPathOrQuery,
     NoHostName,
     UnsupportedUrlScheme,
@@ -153,6 +155,12 @@ impl std::fmt::Display for FaucetError {
             Self::PostgreSQL(value) => write!(f, "PostgreSQL error: {value}"),
             Self::WebSocketConnectionInUse => write!(f, "WebSocket Connection in use"),
             Self::BadRequest(r) => match r {
+                BadRequestReason::MissingQueryParam(param) => {
+                    write!(f, "Missing query parameter: {param}")
+                }
+                BadRequestReason::InvalidQueryParam(param) => {
+                    write!(f, "Invalid query parameter: {param}")
+                }
                 BadRequestReason::UnsupportedUrlScheme => {
                     write!(f, "UnsupportedUrlScheme use ws:// os wss://")
                 }

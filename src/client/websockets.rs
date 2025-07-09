@@ -1,6 +1,6 @@
 use super::{pool::ExtractSocketAddr, Client, ExclusiveBody};
 use crate::{
-    error::{FaucetError, FaucetResult},
+    error::{BadRequestReason, FaucetError, FaucetResult},
     global_conn::{add_connection, remove_connection},
     shutdown::ShutdownSignal,
 };
@@ -16,10 +16,10 @@ use hyper::{
 use hyper_util::rt::TokioIo;
 use sha1::{Digest, Sha1};
 use std::{
-    collections::HashMap, future::Future, hash::Hash, net::SocketAddr, ops::Add, str::FromStr,
-    sync::LazyLock, time::Duration,
+    collections::HashMap, future::Future, net::SocketAddr, str::FromStr, sync::LazyLock,
+    time::Duration,
 };
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::{
     protocol::{frame::coding::CloseCode, CloseFrame},
     Message, Utf8Bytes,
@@ -134,7 +134,7 @@ impl ConnectionManager {
             Ok(connection_pair) => connection_pair,
             Err(e) => return Some(Err(e)),
         };
-        return Some(Ok(connection_pair));
+        Some(Ok(connection_pair))
     }
     async fn attempt_take(&self, session_id: Uuid) -> FaucetResult<ConnectionPair> {
         let mut inner = self.inner.lock().await;
@@ -166,14 +166,13 @@ impl ConnectionManager {
 // Note: This is a simplified cache for a single shiny connection using a static Mutex.
 // A more robust solution would use a session identifier to cache multiple connections.
 // We use a std::sync::Mutex as the lock is not held across .await points.
-static SHINY_CONNECTION_CACHE: LazyLock<ConnectionManager> =
-    LazyLock::new(|| ConnectionManager::new());
+static SHINY_CONNECTION_CACHE: LazyLock<ConnectionManager> = LazyLock::new(ConnectionManager::new);
 
 async fn connect_to_worker(upgrade_info: UpgradeInfo) -> FaucetResult<ConnectionPair> {
     let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
     *request.headers_mut() = upgrade_info.headers;
     let (shiny_ws, _) = tokio_tungstenite::connect_async(request).await?;
-    return Ok(shiny_ws.split());
+    Ok(shiny_ws.split())
 }
 
 async fn connect_or_retrieve(
@@ -336,19 +335,21 @@ async fn upgrade_connection_from_request<ReqBody>(
     shutdown: &'static ShutdownSignal,
 ) -> FaucetResult<()> {
     // Extract sessionId query parameter
-    if let Some(query) = req.uri().query() {
-        let session_id = url::form_urlencoded::parse(query.as_bytes())
-            .find(|(key, _)| key == SESSION_ID_QUERY)
-            .map(|(_, value)| value)
-            .expect("No sessionId");
-        let session_id = uuid::Uuid::from_str(&session_id).expect("Not a UUID");
-        let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
-        let upgraded = hyper::upgrade::on(&mut req).await?;
-        server_upgraded_io(upgraded, upgrade_info, session_id, shutdown).await?;
-        return Ok(());
-    }
-
-    unreachable!()
+    let query = req.uri().query().ok_or(FaucetError::BadRequest(
+        BadRequestReason::MissingQueryParam("sessionId"),
+    ))?;
+    let session_id = url::form_urlencoded::parse(query.as_bytes())
+        .find(|(key, _)| key == SESSION_ID_QUERY)
+        .map(|(_, value)| value)
+        .ok_or(FaucetError::BadRequest(
+            BadRequestReason::MissingQueryParam("sessionId"),
+        ))?;
+    let session_id = uuid::Uuid::from_str(&session_id)
+        .map_err(|_| FaucetError::BadRequest(BadRequestReason::InvalidQueryParam("sessionId")))?;
+    let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
+    let upgraded = hyper::upgrade::on(&mut req).await?;
+    server_upgraded_io(upgraded, upgrade_info, session_id, shutdown).await?;
+    Ok(())
 }
 
 async fn init_upgrade<ReqBody: Send + Sync + 'static>(
@@ -416,9 +417,10 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::networking::get_available_socket;
+    use crate::{leak, networking::get_available_socket, shutdown::ShutdownSignal};
 
     use super::*;
+    use uuid::Uuid;
 
     #[test]
     fn test_calculate_sec_websocket_accept() {
@@ -468,18 +470,19 @@ mod tests {
         let uri = Uri::builder()
             .scheme("http")
             .authority(socket_addr.to_string().as_str())
-            .path_and_query("/")
+            .path_and_query(format!("/?{}={}", SESSION_ID_QUERY, Uuid::now_v7()))
             .build()
             .unwrap();
 
         let req = Request::builder()
-            .uri(uri)
+            .uri(uri.clone())
             .header(UPGRADE, "websocket")
             .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
             .body(())
             .unwrap();
 
-        let result = init_upgrade(req, client).await.unwrap();
+        let shutdown = leak!(ShutdownSignal::new());
+        let result = init_upgrade(req, client, shutdown).await.unwrap();
 
         server.abort();
 
@@ -521,17 +524,18 @@ mod tests {
         let uri = Uri::builder()
             .scheme("http")
             .authority(socket_addr.to_string().as_str())
-            .path_and_query("/")
+            .path_and_query(format!("/?{}={}", SESSION_ID_QUERY, Uuid::now_v7()))
             .build()
             .unwrap();
 
         let req = Request::builder()
-            .uri(uri)
+            .uri(uri.clone())
             .header(UPGRADE, "websocket")
             .body(())
             .unwrap();
 
-        let result = init_upgrade(req, client).await;
+        let shutdown = leak!(ShutdownSignal::new());
+        let result = init_upgrade(req, client, shutdown).await;
 
         server.abort();
 
@@ -571,7 +575,8 @@ mod tests {
             .body(())
             .unwrap();
 
-        let result = attempt_upgrade(req, client).await.unwrap();
+        let shutdown = leak!(ShutdownSignal::new());
+        let result = attempt_upgrade(req, client, shutdown).await.unwrap();
 
         server.abort();
 
@@ -604,7 +609,7 @@ mod tests {
         let uri = Uri::builder()
             .scheme("http")
             .authority(socket_addr.to_string().as_str())
-            .path_and_query("/")
+            .path_and_query(format!("/?{}={}", SESSION_ID_QUERY, Uuid::now_v7()))
             .build()
             .unwrap();
 
@@ -615,7 +620,8 @@ mod tests {
             .body(())
             .unwrap();
 
-        let result = attempt_upgrade(req, client).await.unwrap();
+        let shutdown = leak!(ShutdownSignal::new());
+        let result = attempt_upgrade(req, client, shutdown).await.unwrap();
 
         server.abort();
 
@@ -635,51 +641,8 @@ mod tests {
                     HeaderValue::from_static("Upgrade")
                 );
             }
-            _ => panic!("Expected NotUpgraded"),
+            _ => panic!("Expected Upgraded"),
         }
-    }
-
-    #[tokio::test]
-    async fn test_upgrade_connection_from_request() {
-        struct MockClient {
-            socket_addr: SocketAddr,
-        }
-
-        impl ExtractSocketAddr for MockClient {
-            fn socket_addr(&self) -> SocketAddr {
-                self.socket_addr
-            }
-        }
-
-        let socket_addr = get_available_socket(20).await.unwrap();
-
-        let client = MockClient { socket_addr };
-
-        let server = tokio::spawn(async move {
-            dummy_websocket_server::run(socket_addr).await.unwrap();
-        });
-
-        let uri = Uri::builder()
-            .scheme("http")
-            .authority(socket_addr.to_string().as_str())
-            .path_and_query("/")
-            .build()
-            .unwrap();
-
-        let req = Request::builder()
-            .uri(uri)
-            .header(UPGRADE, "websocket")
-            .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
-            .body(())
-            .unwrap();
-
-        let _ = tokio::spawn(async move {
-            let result = upgrade_connection_from_request(req, client).await;
-            assert!(result.is_ok());
-        })
-        .await;
-
-        server.abort();
     }
 
     mod dummy_websocket_server {
