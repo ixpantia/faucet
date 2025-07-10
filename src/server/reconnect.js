@@ -13,6 +13,8 @@ class ReconnectingWebSocket {
    * @param {string} [options.sessionQueryParam='sessionId'] The name of the query param for the session ID.
    */
   constructor(url, protocols, options = {}) {
+
+    console.log(url);
     // --- Public Interface ---
     this.onopen = null;
     this.onclose = null;
@@ -195,8 +197,7 @@ ReconnectingWebSocket.CLOSING = 2;
 ReconnectingWebSocket.CLOSED = 3;
 
 Shiny.createSocket = function () {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const url = protocol + "//" + window.location.host + "/websocket";
+  const url = "websocket";
   return new ReconnectingWebSocket(url);
 };
 
