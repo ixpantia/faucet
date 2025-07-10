@@ -96,5 +96,5 @@ pub async fn main() -> FaucetResult<()> {
 
     log::debug!("All co-routines shutdown.");
 
-    Ok(())
+    std::process::exit(0);
 }

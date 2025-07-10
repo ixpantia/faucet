@@ -84,6 +84,7 @@ type ConnectionPair = (
 
 #[derive(Default)]
 struct ConnectionInstance {
+    purged: bool,
     access_count: usize,
     pair: Option<ConnectionPair>,
 }
@@ -120,6 +121,7 @@ impl ConnectionManager {
     async fn initialize_if_not(
         &self,
         session_id: Uuid,
+        attempt: usize,
         init: impl Future<Output = FaucetResult<ConnectionPair>>,
     ) -> Option<FaucetResult<ConnectionPair>> {
         {
@@ -128,6 +130,14 @@ impl ConnectionManager {
             if entry.access_count != 0 {
                 return None;
             }
+            if entry.purged {
+                return Some(Err(FaucetError::WebSocketConnectionPurged));
+            }
+
+            if entry.access_count == 0 && attempt > 0 {
+                return Some(Err(FaucetError::WebSocketConnectionPurged));
+            }
+
             entry.access_count += 1;
         }
         let connection_pair = match init.await {
@@ -156,9 +166,8 @@ impl ConnectionManager {
         let mut inner = self.inner.lock().await;
         inner.map.remove(&session_id);
         inner.purge_count += 1;
-        const CONN_PURGE_SHRINK_INTERVAL: usize = 50;
-        if inner.purge_count % CONN_PURGE_SHRINK_INTERVAL == 0 {
-            inner.map.shrink_to_fit();
+        if let Some(instance) = inner.map.get_mut(&session_id) {
+            instance.purged = true;
         }
     }
 }
@@ -178,9 +187,10 @@ async fn connect_to_worker(upgrade_info: UpgradeInfo) -> FaucetResult<Connection
 async fn connect_or_retrieve(
     upgrade_info: UpgradeInfo,
     session_id: Uuid,
+    attempt: usize,
 ) -> FaucetResult<ConnectionPair> {
     let init_pair = SHINY_CONNECTION_CACHE
-        .initialize_if_not(session_id, connect_to_worker(upgrade_info))
+        .initialize_if_not(session_id, attempt, connect_to_worker(upgrade_info))
         .await;
 
     match init_pair {
@@ -195,18 +205,16 @@ async fn connect_or_retrieve(
 
 const RECHECK_TIME: Duration = Duration::from_secs(60);
 const PING_INTERVAL: Duration = Duration::from_secs(1);
-const PING_INTERVAL_TIMEOUT: Duration = Duration::from_secs(2);
+const PING_INTERVAL_TIMEOUT: Duration = Duration::from_secs(20);
 const PING_BYTES: Bytes = Bytes::from_static(b"Ping");
 
 async fn server_upgraded_io(
     upgraded: Upgraded,
     upgrade_info: UpgradeInfo,
     session_id: Uuid,
+    attempt: usize,
     shutdown: &'static ShutdownSignal,
 ) -> FaucetResult<()> {
-    // Attempt to retrieve a cached connection to Shiny.
-    let (mut shiny_tx, mut shiny_rx) = connect_or_retrieve(upgrade_info, session_id).await?;
-
     // Set up the WebSocket connection with the client.
     let upgraded = TokioIo::new(upgraded);
     let upgraded_ws = tokio_tungstenite::WebSocketStream::from_raw_socket(
@@ -216,6 +224,26 @@ async fn server_upgraded_io(
     )
     .await;
     let (mut upgraded_tx, mut upgraded_rx) = upgraded_ws.split();
+
+    // Attempt to retrieve a cached connection to Shiny.
+    let (mut shiny_tx, mut shiny_rx) =
+        match connect_or_retrieve(upgrade_info, session_id, attempt).await {
+            Ok(pair) => pair,
+            Err(e) => match e {
+                FaucetError::WebSocketConnectionPurged => {
+                    upgraded_tx
+                        .send(Message::Close(Some(CloseFrame {
+                            code: CloseCode::Normal,
+                            reason: Utf8Bytes::from_static(
+                                "Connection purged due to inactivity or error.",
+                            ),
+                        })))
+                        .await?;
+                    return Err(FaucetError::WebSocketConnectionPurged);
+                }
+                e => return Err(e),
+            },
+        };
 
     // Manually pump messages in both directions.
     // This allows us to regain ownership of the streams after a disconnect.
@@ -315,6 +343,7 @@ async fn server_upgraded_io(
             }
         });
     } else {
+        SHINY_CONNECTION_CACHE.remove_session(session_id).await;
         // Attempt to close the connection gracefully.
         let _ = shiny_tx.close().await;
     }
@@ -338,17 +367,29 @@ async fn upgrade_connection_from_request<ReqBody>(
     let query = req.uri().query().ok_or(FaucetError::BadRequest(
         BadRequestReason::MissingQueryParam("sessionId"),
     ))?;
-    let session_id = url::form_urlencoded::parse(query.as_bytes())
-        .find(|(key, _)| key == SESSION_ID_QUERY)
-        .map(|(_, value)| value)
-        .ok_or(FaucetError::BadRequest(
-            BadRequestReason::MissingQueryParam("sessionId"),
-        ))?;
-    let session_id = uuid::Uuid::from_str(&session_id)
-        .map_err(|_| FaucetError::BadRequest(BadRequestReason::InvalidQueryParam("sessionId")))?;
+
+    let mut session_id: Option<uuid::Uuid> = None;
+    let mut attempt: Option<usize> = None;
+
+    url::form_urlencoded::parse(query.as_bytes()).for_each(|(key, value)| {
+        if key == SESSION_ID_QUERY {
+            session_id = uuid::Uuid::from_str(&value).ok();
+        } else if key == "attempt" {
+            attempt = value.parse::<usize>().ok();
+        }
+    });
+
+    let session_id = session_id.ok_or(FaucetError::BadRequest(
+        BadRequestReason::MissingQueryParam("sessionId"),
+    ))?;
+
+    let attempt = attempt.ok_or(FaucetError::BadRequest(
+        BadRequestReason::MissingQueryParam("attempt"),
+    ))?;
+
     let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
     let upgraded = hyper::upgrade::on(&mut req).await?;
-    server_upgraded_io(upgraded, upgrade_info, session_id, shutdown).await?;
+    server_upgraded_io(upgraded, upgrade_info, session_id, attempt, shutdown).await?;
     Ok(())
 }
 

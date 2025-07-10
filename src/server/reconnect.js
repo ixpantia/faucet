@@ -26,6 +26,7 @@ class ReconnectingWebSocket {
     this._protocols = protocols;
     this._ws = null;
     this._reconnectAttempts = 0;
+    this._totalReconnectAttempts = 0;
     this._forcedClose = false;
 
     if (window.crypto && typeof window.crypto.randomUUID === "function") {
@@ -50,9 +51,9 @@ class ReconnectingWebSocket {
     this._url = `${url}${separator}${sessionQueryParam}=${this._sessionId}`;
 
     this._maxReconnectAttempts =
-      options.maxReconnectAttempts != null ? options.maxReconnectAttempts : 40;
+      options.maxReconnectAttempts != null ? options.maxReconnectAttempts : 50;
     this._reconnectDelay =
-      options.reconnectDelay != null ? options.reconnectDelay : 500; // 500ms
+      options.reconnectDelay != null ? options.reconnectDelay : 100; // 100ms
 
     // Initial connection
     this.connect();
@@ -63,7 +64,7 @@ class ReconnectingWebSocket {
    */
   connect() {
     console.log(`ReconnectingWebSocket: Connecting to ${this._url}...`);
-    this._ws = new WebSocket(this._url, this._protocols);
+    this._ws = new WebSocket(`${this._url}&attempt=${this._totalReconnectAttempts}`, this._protocols);
 
     this._ws.onopen = (event) => {
       console.log(
@@ -88,8 +89,11 @@ class ReconnectingWebSocket {
     };
 
     this._ws.onclose = (event) => {
-      if (this._forcedClose) {
-        console.log(`ReconnectingWebSocket: Connection closed by user.`);
+
+      // if it was closed with a normal close code, it means it was closed by the server
+      // intentionally, so we don't want to reconnect
+      if (event.code === 1000 || event.code === 1001 || this._forcedClose) {
+        console.log(`ReconnectingWebSocket: Connection closed normally. Code: ${event.code}, Reason: ${event.reason}`);
         if (this.onclose) {
           this.onclose(event);
         }
@@ -103,6 +107,7 @@ class ReconnectingWebSocket {
   _handleReconnect(event) {
     if (this._reconnectAttempts < this._maxReconnectAttempts) {
       this._reconnectAttempts++;
+      this._totalReconnectAttempts++;
       console.log(
         `ReconnectingWebSocket: Connection lost. Reconnecting with same session... (${this._reconnectAttempts}/${this._maxReconnectAttempts})`,
       );
@@ -115,9 +120,7 @@ class ReconnectingWebSocket {
       }
       setTimeout(() => this.connect(), this._reconnectDelay);
     } else {
-      console.error(
-        `ReconnectingWebSocket: Failed to reconnect after ${this._maxReconnectAttempts} attempts.`,
-      );
+      console.error(`ReconnectingWebSocket: Failed to reconnect after ${this._maxReconnectAttempts} attempts.`);
       if (this.onclose) {
         this.onclose(event);
       }
