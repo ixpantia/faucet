@@ -278,11 +278,14 @@ async fn server_upgraded_io(
             };
             tokio::select! {
                 msg = shiny_rx.next() => {
-                    if let Some(Ok(msg)) = msg {
-                        if upgraded_tx.send(msg).await.is_err() {
-                            break; // Client connection closed
-                        }
-                    };
+                    match msg {
+                        Some(Ok(msg)) => {
+                            if upgraded_tx.send(msg).await.is_err() {
+                                break; // Client connection closed
+                            }
+                        },
+                        _ => break
+                    }
                 },
                 _ = ping_future => {}
             }
