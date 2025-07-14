@@ -5,6 +5,8 @@ use crate::client::ExclusiveBody;
 pub enum BadRequestReason {
     MissingHeader(&'static str),
     InvalidHeader(&'static str),
+    MissingQueryParam(&'static str),
+    InvalidQueryParam(&'static str),
     NoPathOrQuery,
     NoHostName,
     UnsupportedUrlScheme,
@@ -34,6 +36,8 @@ pub enum FaucetError {
     ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
     WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
     PostgreSQL(tokio_postgres::Error),
+    WebSocketConnectionInUse,
+    WebSocketConnectionPurged,
     AttackAttempt,
 }
 
@@ -150,9 +154,17 @@ impl std::fmt::Display for FaucetError {
             Self::BufferCapacity(cap_err) => write!(f, "Buffer Capacity: {cap_err}"),
             Self::WSWriteBufferFull(buf) => write!(f, "Web Socket Write buffer full, {buf}"),
             Self::PostgreSQL(value) => write!(f, "PostgreSQL error: {value}"),
+            Self::WebSocketConnectionInUse => write!(f, "WebSocket Connection in use"),
+            Self::WebSocketConnectionPurged => write!(f, "WebSocket Connection purged"),
             Self::BadRequest(r) => match r {
+                BadRequestReason::MissingQueryParam(param) => {
+                    write!(f, "Missing query parameter: {param}")
+                }
+                BadRequestReason::InvalidQueryParam(param) => {
+                    write!(f, "Invalid query parameter: {param}")
+                }
                 BadRequestReason::UnsupportedUrlScheme => {
-                    write!(f, "UnsupportedUrlScheme use ws:// os wss://")
+                    write!(f, "UnsupportedUrlScheme use ws:// or wss://")
                 }
                 BadRequestReason::NoHostName => write!(f, "No Host Name"),
                 BadRequestReason::MissingHeader(header) => {

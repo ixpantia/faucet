@@ -176,10 +176,20 @@ fn spawn_plumber_worker(config: &WorkerConfig) -> FaucetResult<Child> {
 
 fn spawn_shiny_worker(config: &WorkerConfig) -> FaucetResult<Child> {
     let command = format!(
-        r#"
+        r###"
         options("shiny.port" = {port})
+        filter <- function(...) {{
+          response <- list(...)[[length(list(...))]]
+          if (response$status < 200 || response$status > 300) return(response)
+          if ('file' %in% names(response$content)) return(response)
+          if (!grepl("^text/html\\b", response$content_type, perl = T)) return(response)
+          if (is.raw(response$content)) response$content <- rawToChar(response$content)
+          response$content <- sub("</head>", '<script src="__faucet__/reconnect.js"></script></head>', response$content, ignore.case = T)
+          return(response)
+        }}
+        options(shiny.http.response.filter = filter)
         shiny::runApp("{app_dir}")
-        "#,
+        "###,
         port = config.addr.port(),
         app_dir = config.app_dir.unwrap_or(".")
     );
@@ -238,8 +248,11 @@ impl WorkerConfig {
     }
     pub async fn wait_until_done(&self) {
         if let Some(handle) = self.handle.lock().await.take() {
+            log::debug!("Waiting for process to be finished");
             match handle.await {
-                Ok(Ok(_)) => { /* Task completed successfully */ }
+                Ok(Ok(_)) => {
+                    log::debug!("Task ended successfully!")
+                }
                 Ok(Err(e)) => {
                     panic!("Worker task for target '{}' failed: {:?}", self.target, e);
                 }
@@ -346,6 +359,7 @@ impl WorkerConfig {
                     }
                 }
             }
+            log::debug!("{target}'s process has ended.", target = self.target);
             FaucetResult::Ok(())
         }));
     }

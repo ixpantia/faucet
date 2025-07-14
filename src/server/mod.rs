@@ -252,7 +252,7 @@ impl FaucetServerConfig {
 
         let load_balancer = load_balancer.clone();
         let service = Arc::new(
-            ServiceBuilder::new(ProxyService)
+            ServiceBuilder::new(ProxyService { shutdown })
                 .layer(logging::LogLayer { telemetry })
                 .layer(AddStateLayer::new(load_balancer))
                 .build(),
@@ -307,9 +307,14 @@ impl FaucetServerConfig {
             _ = main_loop() => (),
         }
 
+        log::debug!("Main loop ended!");
+
         for worker in &mut workers.workers {
+            log::debug!("Waiting for {} to finish", worker.target);
             worker.wait_until_done().await;
         }
+
+        log::debug!("All workers are finished!");
 
         FaucetResult::Ok(())
     }
@@ -327,7 +332,7 @@ impl FaucetServerConfig {
         )
         .await?;
         let service = Arc::new(
-            ServiceBuilder::new(ProxyService)
+            ServiceBuilder::new(ProxyService { shutdown })
                 .layer(logging::LogLayer { telemetry })
                 .layer(AddStateLayer::new(load_balancer))
                 .build(),

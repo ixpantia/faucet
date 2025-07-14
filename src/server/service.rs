@@ -4,6 +4,7 @@ use crate::{
     client::{load_balancing::Strategy, Client, ExclusiveBody, UpgradeStatus},
     error::FaucetError,
     server::load_balancing::LoadBalancer,
+    shutdown::ShutdownSignal,
 };
 use hyper::{body::Incoming, header::HeaderValue};
 
@@ -93,6 +94,9 @@ fn add_lb_cookie_to_resp(resp: &mut hyper::Response<ExclusiveBody>, lb_cookie: O
 //
 // Andrés
 
+const RESERVED_RECONNECT_PATH: &str = "__faucet__/reconnect.js";
+const RECONNECT_JS: &str = include_str!("reconnect.js");
+
 impl<S, ReqBody> Service<hyper::Request<ReqBody>> for AddStateService<S>
 where
     ReqBody: hyper::body::Body + Send + Sync + 'static,
@@ -118,6 +122,14 @@ where
                 return Err(e);
             }
         };
+
+        // Check if the user is asking for "/__faucet__/reconnect.js"
+        if req.uri().path().ends_with(RESERVED_RECONNECT_PATH) {
+            return Ok(hyper::Response::builder()
+                .status(200)
+                .body(ExclusiveBody::plain_text(RECONNECT_JS))
+                .expect("Response should build"));
+        }
 
         let is_cookie_hash = self.load_balancer.get_strategy() == Strategy::CookieHash;
 
@@ -170,7 +182,9 @@ impl<S> Layer<S> for AddStateLayer {
     }
 }
 
-pub(crate) struct ProxyService;
+pub(crate) struct ProxyService {
+    pub shutdown: &'static ShutdownSignal,
+}
 
 impl Service<hyper::Request<Incoming>> for ProxyService {
     type Error = FaucetError;
@@ -186,7 +200,7 @@ impl Service<hyper::Request<Incoming>> for ProxyService {
             .get::<State>()
             .expect("State not found")
             .clone();
-        match state.client.attempt_upgrade(req).await? {
+        match state.client.attempt_upgrade(req, self.shutdown).await? {
             UpgradeStatus::Upgraded(res) => {
                 log::debug!(
                     target: "faucet",
