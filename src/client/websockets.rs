@@ -147,14 +147,18 @@ impl ConnectionManager {
         Some(Ok(connection_pair))
     }
     async fn attempt_take(&self, session_id: Uuid) -> FaucetResult<ConnectionPair> {
-        let mut inner = self.inner.lock().await;
-        let instance = inner.map.entry(session_id).or_default();
+        match self.inner.try_lock() {
+            Ok(mut inner) => {
+                let instance = inner.map.entry(session_id).or_default();
 
-        if instance.access_count % 2 == 0 {
-            return Ok(instance.take());
+                if instance.access_count % 2 == 0 {
+                    return Ok(instance.take());
+                }
+
+                Err(FaucetError::WebSocketConnectionInUse)
+            }
+            _ => Err(FaucetError::WebSocketConnectionInUse),
         }
-
-        Err(FaucetError::WebSocketConnectionInUse)
     }
     async fn put_pack(&self, session_id: Uuid, pair: ConnectionPair) {
         let mut inner = self.inner.lock().await;
@@ -205,7 +209,7 @@ async fn connect_or_retrieve(
 
 const RECHECK_TIME: Duration = Duration::from_secs(60);
 const PING_INTERVAL: Duration = Duration::from_secs(1);
-const PING_INTERVAL_TIMEOUT: Duration = Duration::from_secs(20);
+const PING_INTERVAL_TIMEOUT: Duration = Duration::from_secs(30);
 const PING_BYTES: Bytes = Bytes::from_static(b"Ping");
 
 async fn server_upgraded_io(
@@ -295,60 +299,55 @@ async fn server_upgraded_io(
     // Wait for either the client or Shiny to disconnect.
     tokio::select! {
         _ = client_to_shiny => log::debug!("Client connection closed for session {session_id}."),
-        _ = shiny_to_client => log::debug!("Shiny connection closed for session {session_id}."),
+        _ = shiny_to_client => {
+            // If this happens that means shiny ended the session, immediately
+            // remove the session from the cache
+            SHINY_CONNECTION_CACHE.remove_session(session_id).await;
+            log::debug!("Shiny connection closed for session {session_id}.");
+            return Ok(());
+        },
         _ = shutdown.wait() => {
             log::debug!("Received shutdown signal. Exiting websocket bridge.");
             return Ok(());
         }
     };
 
-    // After a disconnect, try to cache the Shiny connection for reuse.
-    // First, check if the connection is still alive by sending a ping.
-    if shiny_tx
-        .send(tokio_tungstenite::tungstenite::Message::Ping(PING_BYTES))
-        .await
-        .is_ok()
-    {
-        log::debug!("Client websocket connection to session {session_id} ended but the Shiny connection is still alive. Saving for reconnection.");
-        SHINY_CONNECTION_CACHE
-            .put_pack(session_id, (shiny_tx, shiny_rx))
-            .await;
+    // Getting here meant that the only possible way the session ended is if
+    // the client ended the connection
 
-        // Schedule a check in 30 seconds. If the connection is not in use
-        tokio::spawn(async move {
-            tokio::select! {
-                _ = tokio::time::sleep(RECHECK_TIME) => {
-                    let entry = SHINY_CONNECTION_CACHE.attempt_take(session_id).await;
-                    match entry {
-                        Err(_) => (),
-                        Ok((shiny_tx, shiny_rx)) => {
-                            let mut ws = shiny_tx
-                                .reunite(shiny_rx)
-                                .expect("shiny_rx and tx always have the same origin.");
-                            //
-                            if ws
-                                .close(Some(CloseFrame {
-                                    code: CloseCode::Abnormal,
-                                    reason: Utf8Bytes::default(),
-                                }))
-                                .await
-                                .is_ok()
-                            {
-                                log::debug!("Closed reserved connection for session {session_id}");
-                            }
-                        }
+    log::debug!("Client websocket connection to session {session_id} ended but the Shiny connection is still alive. Saving for reconnection.");
+    SHINY_CONNECTION_CACHE
+        .put_pack(session_id, (shiny_tx, shiny_rx))
+        .await;
+
+    // Schedule a check in 30 seconds. If the connection is not in use
+    tokio::select! {
+        _ = tokio::time::sleep(RECHECK_TIME) => {
+            let entry = SHINY_CONNECTION_CACHE.attempt_take(session_id).await;
+            match entry {
+                Err(_) => (),
+                Ok((shiny_tx, shiny_rx)) => {
+                    let mut ws = shiny_tx
+                        .reunite(shiny_rx)
+                        .expect("shiny_rx and tx always have the same origin.");
+                    //
+                    if ws
+                        .close(Some(CloseFrame {
+                            code: CloseCode::Abnormal,
+                            reason: Utf8Bytes::default(),
+                        }))
+                        .await
+                        .is_ok()
+                    {
+                        log::debug!("Closed reserved connection for session {session_id}");
                     }
                     SHINY_CONNECTION_CACHE.remove_session(session_id).await;
-                },
-                _ = shutdown.wait() => {
-                    log::debug!("Shutdown signaled, not running websocket cleanup for session {}", session_id);
                 }
             }
-        });
-    } else {
-        SHINY_CONNECTION_CACHE.remove_session(session_id).await;
-        // Attempt to close the connection gracefully.
-        let _ = shiny_tx.close().await;
+        },
+        _ = shutdown.wait() => {
+            log::debug!("Shutdown signaled, not running websocket cleanup for session {}", session_id);
+        }
     }
 
     Ok(())
