@@ -53,7 +53,7 @@ class ReconnectingWebSocket {
     this._maxReconnectAttempts =
       options.maxReconnectAttempts != null ? options.maxReconnectAttempts : 50;
     this._reconnectDelay =
-      options.reconnectDelay != null ? options.reconnectDelay : 100; // 100ms
+      options.reconnectDelay != null ? options.reconnectDelay : 500; // 100ms
 
     // Initial connection
     this.connect();
