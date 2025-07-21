@@ -14,13 +14,41 @@ class ReconnectingWebSocket {
    */
   constructor(url, protocols, options = {}) {
 
-    console.log(url);
     // --- Public Interface ---
     this.onopen = null;
     this.onclose = null;
     this.onmessage = null;
     this.onerror = null;
-    this.onreconnect = null;
+    this.onreconnect = (details) => {
+      var reconnecting_el = document.getElementById("faucet-reconnecting-msg");
+      if (!reconnecting_el) {
+        const el = document.createElement("div");
+
+        // Style the element to be a floating notification
+        el.style.position = "fixed";
+        el.style.bottom = "0";
+        el.style.left = "5px";
+        el.style.padding = "5px";
+        el.style.backgroundColor = "rgba(220, 220, 220, 0.4)";
+        el.style.color = "black";
+        el.style.borderRadius = "5px 5px 0 0";
+        el.style.zIndex = "10001";
+        el.style.fontFamily = "sans-serif";
+
+        el.id = "faucet-reconnecting-msg";
+        el.textContent = "Reconnecting...";
+
+        document.body.appendChild(el);
+
+      };
+    }
+
+    this.onreconnected = () => {
+      var reconnecting_el = document.getElementById("faucet-reconnecting-msg");
+      if (reconnecting_el) {
+        reconnecting_el.remove()
+      }
+    }
 
     // --- Internal State ---
     this._protocols = protocols;
@@ -53,7 +81,10 @@ class ReconnectingWebSocket {
     this._maxReconnectAttempts =
       options.maxReconnectAttempts != null ? options.maxReconnectAttempts : 50;
     this._reconnectDelay =
-      options.reconnectDelay != null ? options.reconnectDelay : 100; // 100ms
+      options.reconnectDelay != null ? options.reconnectDelay : 500;
+    this._maxReconnectTime =
+      options.maxReconnectTime != null ? options.maxReconnectTime : 10000; // 10 seconds
+    this._lastDisconnectTime = null;
 
     // Initial connection
     this.connect();
@@ -71,6 +102,7 @@ class ReconnectingWebSocket {
         `ReconnectingWebSocket: Connection opened with Session ID: ${this._sessionId}`,
       );
       if (this.onopen) {
+        this.onreconnected();
         this.onopen(event);
       }
     };
@@ -100,12 +132,16 @@ class ReconnectingWebSocket {
         return;
       }
 
+      if (this._reconnectAttempts == 0) {
+        this._lastDisconnectTime = Date.now();
+      }
       this._handleReconnect(event);
     };
   }
 
   _handleReconnect(event) {
-    if (this._reconnectAttempts < this._maxReconnectAttempts) {
+    var more_than_max_time_passed = (Date.now() - this._lastDisconnectTime) < this._maxReconnectTime;
+    if (this._reconnectAttempts < this._maxReconnectAttempts && more_than_max_time_passed) {
       this._reconnectAttempts++;
       this._totalReconnectAttempts++;
       console.log(
