@@ -48,7 +48,7 @@ uuid = { version = "1.11.0", features = ["v7"] }
 parse-size = "1.0.0"
 dotenv = "0.15.0"
 cookie = "0.18.1"
-rand = "0.9.1"
+rand = "0.9.2"
 url = "2.5.4"
 
 [dev-dependencies]
