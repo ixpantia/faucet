@@ -10,6 +10,14 @@ get_session_id <- function(session = shiny::getDefaultReactiveDomain()) {
   request$HTTP_FAUCET_SESSION_ID
 }
 
+unbox_if_truthy <- function(x) {
+  if (is.na(x) || is.null(x) || length(x) == 0) {
+    NA
+  } else {
+    jsonlite::unbox(x)
+  }
+}
+
 
 #' Log an Event
 #'
@@ -46,7 +54,7 @@ log <- function(
     list(
       target = jsonlite::unbox(target),
       event_id = jsonlite::unbox(event_id),
-      parent_event_id = jsonlite::unbox(parent),
+      parent_event_id = unbox_if_truthy(parent),
       event_type = jsonlite::unbox(event_type),
       message = jsonlite::unbox(message),
       body = body
