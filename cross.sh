@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# This is a script to cross-compile the project for Windows and Linux
+# This is a script to cross-compile the project for Windows, Linux, and macOS
 mkdir -p target/cross
 
 rustup target add aarch64-unknown-linux-musl
 rustup target add x86_64-unknown-linux-musl
 rustup target add x86_64-pc-windows-gnu
+rustup target add aarch64-apple-darwin
 
 function build() {
     export TARGET=$1
@@ -16,9 +17,12 @@ function build() {
     sha256sum target/cross/faucet-$TARGET$EXTENSION > target/cross/faucet-$TARGET$EXTENSION.sha256
 }
 
-# Build for Linux 
+# Build for Linux
 build aarch64-unknown-linux-musl
 build x86_64-unknown-linux-musl
 
 # Build for Windows
 build x86_64-pc-windows-gnu .exe
+
+# Build for macOS ARM
+build aarch64-apple-darwin
