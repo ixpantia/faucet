@@ -18,3 +18,16 @@ CREATE TABLE faucet_http_events (
 
 -- For use in timescale
 -- SELECT create_hypertable('faucet_http_events', by_range('time'));
+
+
+CREATE TABLE faucet_log_events (
+    namespace TEXT,
+    version TEXT,
+    target TEXT,
+    time TIMESTAMPTZ NOT NULL,
+    event_id UUID,
+    parent_event_id UUID,
+    event_type TEXT,
+    message TEXT,
+    body JSONB
+);

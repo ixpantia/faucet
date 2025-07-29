@@ -1,5 +1,5 @@
-mod logging;
-pub use logging::{logger, LogData, LogOption};
+pub mod logging;
+pub use logging::{logger, HttpLogData, LogOption};
 pub mod onion;
 mod router;
 mod service;
@@ -12,7 +12,6 @@ use crate::{
     error::{FaucetError, FaucetResult},
     leak,
     shutdown::ShutdownSignal,
-    telemetry::{TelemetryManager, TelemetrySender},
 };
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request};
 use hyper_util::rt::TokioIo;
@@ -75,7 +74,6 @@ pub struct FaucetServerBuilder {
     quarto: Option<OsString>,
     qmd: Option<PathBuf>,
     route: Option<String>,
-    telemetry: Option<TelemetrySender>,
     max_rps: Option<f64>,
 }
 
@@ -93,7 +91,6 @@ impl FaucetServerBuilder {
             route: None,
             quarto: None,
             qmd: None,
-            telemetry: None,
             max_rps: None,
         }
     }
@@ -102,22 +99,22 @@ impl FaucetServerBuilder {
         self
     }
     pub fn strategy(mut self, strategy: Option<Strategy>) -> Self {
-        log::debug!(target: "faucet", "Using load balancing strategy: {:?}", strategy);
+        log::debug!(target: "faucet", "Using load balancing strategy: {strategy:?}");
         self.strategy = strategy;
         self
     }
     pub fn bind(mut self, bind: SocketAddr) -> Self {
-        log::debug!(target: "faucet", "Will bind to: {}", bind);
+        log::debug!(target: "faucet", "Will bind to: {bind}");
         self.bind = Some(bind);
         self
     }
     pub fn extractor(mut self, extractor: load_balancing::IpExtractor) -> Self {
-        log::debug!(target: "faucet", "Using IP extractor: {:?}", extractor);
+        log::debug!(target: "faucet", "Using IP extractor: {extractor:?}");
         self.extractor = Some(extractor);
         self
     }
     pub fn workers(mut self, n: usize) -> Self {
-        log::debug!(target: "faucet", "Will spawn {} workers", n);
+        log::debug!(target: "faucet", "Will spawn {n} workers");
         self.n_workers = match n.try_into() {
             Ok(n) => Some(n),
             Err(_) => {
@@ -128,7 +125,7 @@ impl FaucetServerBuilder {
         self
     }
     pub fn server_type(mut self, server_type: WorkerType) -> Self {
-        log::debug!(target: "faucet", "Using worker type: {:?}", server_type);
+        log::debug!(target: "faucet", "Using worker type: {server_type:?}");
         self.server_type = Some(server_type);
         self
     }
@@ -149,10 +146,6 @@ impl FaucetServerBuilder {
     }
     pub fn qmd(mut self, qmd: Option<impl AsRef<Path>>) -> Self {
         self.qmd = qmd.map(|s| s.as_ref().into());
-        self
-    }
-    pub fn telemetry(mut self, telemetry_manager: Option<&TelemetryManager>) -> Self {
-        self.telemetry = telemetry_manager.map(|m| m.sender.clone());
         self
     }
     pub fn route(mut self, route: String) -> Self {
@@ -193,7 +186,6 @@ impl FaucetServerBuilder {
             log::debug!(target: "faucet", "No quarto command specified. Defaulting to `quarto`.");
             OsStr::new("quarto")
         });
-        let telemetry = self.telemetry;
         let route = self.route.map(|r| -> &'static _ { leak!(r) });
         let max_rps = self.max_rps;
         Ok(FaucetServerConfig {
@@ -207,7 +199,6 @@ impl FaucetServerBuilder {
             app_dir,
             route,
             quarto,
-            telemetry,
             qmd,
             max_rps,
         })
@@ -230,7 +221,6 @@ pub struct FaucetServerConfig {
     pub extractor: load_balancing::IpExtractor,
     pub rscript: &'static OsStr,
     pub quarto: &'static OsStr,
-    pub telemetry: Option<TelemetrySender>,
     pub app_dir: Option<&'static str>,
     pub route: Option<&'static str>,
     pub qmd: Option<&'static Path>,
@@ -239,7 +229,6 @@ pub struct FaucetServerConfig {
 
 impl FaucetServerConfig {
     pub async fn run(self, shutdown: &'static ShutdownSignal) -> FaucetResult<()> {
-        let telemetry = self.telemetry.clone();
         let mut workers = WorkerConfigs::new(self.clone(), shutdown).await?;
         let load_balancer = LoadBalancer::new(
             self.strategy,
@@ -253,14 +242,14 @@ impl FaucetServerConfig {
         let load_balancer = load_balancer.clone();
         let service = Arc::new(
             ServiceBuilder::new(ProxyService { shutdown })
-                .layer(logging::LogLayer { telemetry })
+                .layer(logging::LogLayer {})
                 .layer(AddStateLayer::new(load_balancer))
                 .build(),
         );
 
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(bind).await?;
-        log::info!(target: "faucet", "Listening on http://{}", bind);
+        log::info!(target: "faucet", "Listening on http://{bind}");
         let main_loop = || async {
             loop {
                 match listener.accept().await {
@@ -270,7 +259,7 @@ impl FaucetServerConfig {
                     }
                     Ok((tcp, client_addr)) => {
                         let tcp = TokioIo::new(tcp);
-                        log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
+                        log::debug!(target: "faucet", "Accepted TCP connection from {client_addr}");
 
                         let service = service.clone();
 
@@ -290,7 +279,7 @@ impl FaucetServerConfig {
                             tokio::select! {
                                 result = conn => {
                                     if let Err(e) = result {
-                                        log::error!(target: "faucet", "Connection error: {:?}", e);
+                                        log::error!(target: "faucet", "Connection error: {e:?}");
                                     }
                                 }
                                 _ = shutdown.wait() => ()
@@ -322,7 +311,6 @@ impl FaucetServerConfig {
         self,
         shutdown: &'static ShutdownSignal,
     ) -> FaucetResult<(FaucetServerService, WorkerConfigs)> {
-        let telemetry = self.telemetry.clone();
         let workers = WorkerConfigs::new(self.clone(), shutdown).await?;
         let load_balancer = LoadBalancer::new(
             self.strategy,
@@ -333,7 +321,7 @@ impl FaucetServerConfig {
         .await?;
         let service = Arc::new(
             ServiceBuilder::new(ProxyService { shutdown })
-                .layer(logging::LogLayer { telemetry })
+                .layer(logging::LogLayer {})
                 .layer(AddStateLayer::new(load_balancer))
                 .build(),
         );

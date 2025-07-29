@@ -23,6 +23,7 @@ pub async fn main() -> FaucetResult<()> {
             &cli_args.telemetry_namespace,
             cli_args.telemetry_version.as_deref(),
             &pg_con,
+            shutdown_signal,
         ) {
             Ok(telemetry) => telemetry,
             Err(e) => {
@@ -58,7 +59,6 @@ pub async fn main() -> FaucetResult<()> {
                 .app_dir(start_args.app_dir)
                 .quarto(cli_args.quarto)
                 .qmd(start_args.qmd)
-                .telemetry(telemetry.as_ref())
                 .max_rps(start_args.max_rps)
                 .build()?
                 .run(shutdown_signal)
@@ -75,7 +75,6 @@ pub async fn main() -> FaucetResult<()> {
                     cli_args.ip_from.into(),
                     cli_args.host.parse()?,
                     shutdown_signal,
-                    telemetry.as_ref(),
                 )
                 .await?;
         }
@@ -85,7 +84,6 @@ pub async fn main() -> FaucetResult<()> {
 
     if let Some(telemetry) = telemetry {
         log::debug!("Waiting to stop DB writes");
-        drop(telemetry.sender);
         let _ = telemetry.http_events_join_handle.await;
     }
 

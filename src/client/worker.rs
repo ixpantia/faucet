@@ -2,8 +2,12 @@ use crate::{
     error::{FaucetError, FaucetResult},
     leak,
     networking::get_available_socket,
-    server::FaucetServerConfig,
+    server::{
+        logging::{parse_faucet_event, FaucetEventResult},
+        FaucetServerConfig,
+    },
     shutdown::ShutdownSignal,
+    telemetry::send_log_event,
 };
 use std::{
     ffi::OsStr,
@@ -52,7 +56,15 @@ fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
     tokio::spawn(async move {
         while let Some(line) = stderr.next().await {
             if let Ok(line) = line {
-                log::warn!(target: target, "{line}");
+                match parse_faucet_event(&line) {
+                    FaucetEventResult::Output(line) => log::warn!(target: target, "{line}"),
+                    FaucetEventResult::Event(e) => {
+                        send_log_event(e);
+                    }
+                    FaucetEventResult::EventError(e) => {
+                        log::error!(target: target, "{e:?}")
+                    }
+                }
             }
         }
     });
@@ -178,16 +190,15 @@ fn spawn_shiny_worker(config: &WorkerConfig) -> FaucetResult<Child> {
     let command = format!(
         r###"
         options("shiny.port" = {port})
-        filter <- function(...) {{
+        options(shiny.http.response.filter = function(...) {{
           response <- list(...)[[length(list(...))]]
           if (response$status < 200 || response$status > 300) return(response)
           if ('file' %in% names(response$content)) return(response)
-          if (!grepl("^text/html\\b", response$content_type, perl = T)) return(response)
+          if (!grepl("^text/html", response$content_type, perl = T)) return(response)
           if (is.raw(response$content)) response$content <- rawToChar(response$content)
           response$content <- sub("</head>", '<script src="__faucet__/reconnect.js"></script></head>', response$content, ignore.case = T)
           return(response)
-        }}
-        options(shiny.http.response.filter = filter)
+        }})
         shiny::runApp("{app_dir}")
         "###,
         port = config.addr.port(),

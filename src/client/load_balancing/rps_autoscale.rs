@@ -264,7 +264,7 @@ mod tests {
         initial_online: bool,
     ) -> &'static WorkerConfig {
         let target_name =
-            Box::leak(format!("{}-{}", id_prefix, index).into_boxed_str()) as &'static str;
+            Box::leak(format!("{id_prefix}-{index}").into_boxed_str()) as &'static str;
         let addr_str = format!("127.0.0.1:{}", 9500 + index); // Ensure unique ports for tests
 
         &*Box::leak(Box::new(WorkerConfig::dummy(

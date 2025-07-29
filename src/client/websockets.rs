@@ -2,7 +2,9 @@ use super::{pool::ExtractSocketAddr, Client, ExclusiveBody};
 use crate::{
     error::{BadRequestReason, FaucetError, FaucetResult},
     global_conn::{add_connection, remove_connection},
+    server::logging::EventLogData,
     shutdown::ShutdownSignal,
+    telemetry::send_log_event,
 };
 use base64::Engine;
 use bytes::Bytes;
@@ -14,6 +16,7 @@ use hyper::{
     HeaderMap, Request, Response, StatusCode, Uri,
 };
 use hyper_util::rt::TokioIo;
+use serde_json::json;
 use sha1::{Digest, Sha1};
 use std::{
     collections::HashMap, future::Future, net::SocketAddr, str::FromStr, sync::LazyLock,
@@ -181,10 +184,26 @@ impl ConnectionManager {
 // We use a std::sync::Mutex as the lock is not held across .await points.
 static SHINY_CONNECTION_CACHE: LazyLock<ConnectionManager> = LazyLock::new(ConnectionManager::new);
 
-async fn connect_to_worker(upgrade_info: UpgradeInfo) -> FaucetResult<ConnectionPair> {
+async fn connect_to_worker(
+    mut upgrade_info: UpgradeInfo,
+    session_id: Uuid,
+) -> FaucetResult<ConnectionPair> {
     let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
+    upgrade_info.headers.append(
+        "FAUCET_SESSION_ID",
+        HeaderValue::from_str(&session_id.to_string())
+            .expect("Unable to set Session ID as header. This is a bug. please report it!"),
+    );
     *request.headers_mut() = upgrade_info.headers;
     let (shiny_ws, _) = tokio_tungstenite::connect_async(request).await?;
+    send_log_event(EventLogData {
+        target: "faucet".into(),
+        event_id: session_id,
+        parent_event_id: None,
+        event_type: "websocket_connection".into(),
+        message: "Established new WebSocket connection to shiny".to_string(),
+        body: None,
+    });
     Ok(shiny_ws.split())
 }
 
@@ -194,14 +213,31 @@ async fn connect_or_retrieve(
     attempt: usize,
 ) -> FaucetResult<ConnectionPair> {
     let init_pair = SHINY_CONNECTION_CACHE
-        .initialize_if_not(session_id, attempt, connect_to_worker(upgrade_info))
+        .initialize_if_not(
+            session_id,
+            attempt,
+            connect_to_worker(upgrade_info, session_id),
+        )
         .await;
 
     match init_pair {
         None => {
             // This means that the connection has already been initialized
             // in the past
-            SHINY_CONNECTION_CACHE.attempt_take(session_id).await
+            match SHINY_CONNECTION_CACHE.attempt_take(session_id).await {
+                Ok(con) => {
+                    send_log_event(EventLogData {
+                        target: "faucet".into(),
+                        event_id: Uuid::new_v4(),
+                        parent_event_id: Some(session_id),
+                        event_type: "websocket_connection".into(),
+                        message: "Client successfully reconnected".to_string(),
+                        body: Some(json!({"attempts": attempt})),
+                    });
+                    Ok(con)
+                }
+                Err(e) => FaucetResult::Err(e),
+            }
         }
         Some(init_pair_res) => init_pair_res,
     }
@@ -298,11 +334,29 @@ async fn server_upgraded_io(
 
     // Wait for either the client or Shiny to disconnect.
     tokio::select! {
-        _ = client_to_shiny => log::debug!("Client connection closed for session {session_id}."),
+        _ = client_to_shiny => {
+            send_log_event(EventLogData {
+                target: "faucet".into(),
+                event_id: Uuid::new_v4(),
+                parent_event_id: Some(session_id),
+                event_type: "websocket_connection".into(),
+                message: "Session ended by client.".to_string(),
+                body: None,
+            });
+            log::debug!("Client connection closed for session {session_id}.")
+        },
         _ = shiny_to_client => {
             // If this happens that means shiny ended the session, immediately
             // remove the session from the cache
             SHINY_CONNECTION_CACHE.remove_session(session_id).await;
+            send_log_event(EventLogData {
+                target: "faucet".into(),
+                event_id: Uuid::new_v4(),
+                parent_event_id: Some(session_id),
+                event_type: "websocket_connection".into(),
+                message: "Shiny session ended by Shiny.".to_string(),
+                body: None,
+            });
             log::debug!("Shiny connection closed for session {session_id}.");
             return Ok(());
         },
@@ -346,7 +400,7 @@ async fn server_upgraded_io(
             }
         },
         _ = shutdown.wait() => {
-            log::debug!("Shutdown signaled, not running websocket cleanup for session {}", session_id);
+            log::debug!("Shutdown signaled, not running websocket cleanup for session {session_id}");
         }
     }
 
@@ -409,7 +463,7 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
     tokio::task::spawn(async move {
         add_connection();
         if let Err(e) = upgrade_connection_from_request(req, client, shutdown).await {
-            log::error!("upgrade error: {:?}", e);
+            log::error!("upgrade error: {e:?}");
         }
         remove_connection();
     });
@@ -699,7 +753,7 @@ mod tests {
             // Create the event loop and TCP listener we'll accept connections on.
             let try_socket = TcpListener::bind(&addr).await;
             let listener = try_socket.expect("Failed to bind");
-            info!("Listening on: {}", addr);
+            info!("Listening on: {addr}");
 
             while let Ok((stream, _)) = listener.accept().await {
                 tokio::spawn(accept_connection(stream));
@@ -712,13 +766,13 @@ mod tests {
             let addr = stream
                 .peer_addr()
                 .expect("connected streams should have a peer address");
-            info!("Peer address: {}", addr);
+            info!("Peer address: {addr}");
 
             let ws_stream = tokio_tungstenite::accept_async(stream)
                 .await
                 .expect("Error during the websocket handshake occurred");
 
-            info!("New WebSocket connection: {}", addr);
+            info!("New WebSocket connection: {addr}");
 
             let (write, read) = ws_stream.split();
             // We should not forward messages other than text or binary.

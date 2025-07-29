@@ -47,7 +47,7 @@ fn extract_lb_uuid_from_req_cookies<B>(req: &hyper::Request<B>) -> Option<uuid::
             for cookie in cookie::Cookie::split_parse(cookie_str) {
                 match cookie {
                     Err(e) => {
-                        log::error!(target: "faucet", "Error parsing cookie: {}", e);
+                        log::error!(target: "faucet", "Error parsing cookie: {e}");
                         continue;
                     }
                     Ok(cookie) => {
@@ -56,7 +56,7 @@ fn extract_lb_uuid_from_req_cookies<B>(req: &hyper::Request<B>) -> Option<uuid::
                             return match parse_res {
                                 Ok(uuid) => Some(uuid),
                                 Err(e) => {
-                                    log::error!(target: "faucet", "Error parsing UUID from cookie: {}", e);
+                                    log::error!(target: "faucet", "Error parsing UUID from cookie: {e}");
                                     None
                                 }
                             };
@@ -75,8 +75,7 @@ fn add_lb_cookie_to_resp(resp: &mut hyper::Response<ExclusiveBody>, lb_cookie: O
         resp.headers_mut().append(
             "Set-Cookie",
             HeaderValue::from_str(&format!(
-                "FAUCET_LB_COOKIE={}; Path=/; HttpOnly; SameSite=Lax",
-                lb_cookie
+                "FAUCET_LB_COOKIE={lb_cookie}; Path=/; HttpOnly; SameSite=Lax"
             ))
             .expect("UUID is invalid, this is a bug! Report it please!"),
         );
@@ -118,7 +117,7 @@ where
         let remote_addr = match self.load_balancer.extract_ip(&req, socket_addr) {
             Ok(ip) => ip,
             Err(e) => {
-                log::error!(target: "faucet", "Error extracting IP, verify that proxy headers are set correctly: {}", e);
+                log::error!(target: "faucet", "Error extracting IP, verify that proxy headers are set correctly: {e}");
                 return Err(e);
             }
         };
