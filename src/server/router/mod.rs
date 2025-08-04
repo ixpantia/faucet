@@ -17,7 +17,6 @@ use crate::{
     },
     error::{FaucetError, FaucetResult},
     shutdown::ShutdownSignal,
-    telemetry::TelemetryManager,
 };
 
 fn default_workdir() -> PathBuf {
@@ -125,7 +124,6 @@ impl RouterConfig {
         rscript: impl AsRef<OsStr>,
         quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
-        telemetry: Option<&TelemetryManager>,
         shutdown: &'static ShutdownSignal,
     ) -> FaucetResult<(RouterService, Vec<WorkerConfigs>)> {
         let mut all_workers = Vec::with_capacity(self.route.len());
@@ -147,7 +145,6 @@ impl RouterConfig {
                 .workers(route_conf.config.workers.get())
                 .extractor(ip_from)
                 .app_dir(route_conf.config.app_dir)
-                .telemetry(telemetry)
                 .route(route.clone())
                 .max_rps(route_conf.config.max_rps)
                 .build()?
@@ -172,14 +169,13 @@ impl RouterConfig {
         ip_from: IpExtractor,
         addr: SocketAddr,
         shutdown: &'static ShutdownSignal,
-        telemetry: Option<&TelemetryManager>,
     ) -> FaucetResult<()> {
         let (service, all_workers) = self
-            .into_service(rscript, quarto, ip_from, telemetry, shutdown)
+            .into_service(rscript, quarto, ip_from, shutdown)
             .await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;
-        log::info!(target: "faucet", "Listening on http://{}", addr);
+        log::info!(target: "faucet", "Listening on http://{addr}");
         let main_loop = || async {
             loop {
                 match listener.accept().await {
@@ -189,7 +185,7 @@ impl RouterConfig {
                     }
                     Ok((tcp, client_addr)) => {
                         let tcp = TokioIo::new(tcp);
-                        log::debug!(target: "faucet", "Accepted TCP connection from {}", client_addr);
+                        log::debug!(target: "faucet", "Accepted TCP connection from {client_addr}");
 
                         let service = service.clone();
 
@@ -208,7 +204,7 @@ impl RouterConfig {
                             tokio::select! {
                                 result = conn => {
                                     if let Err(e) = result {
-                                        log::error!(target: "faucet", "Connection error: {:?}", e);
+                                        log::error!(target: "faucet", "Connection error: {e:?}");
                                     }
                                 }
                                 _ = shutdown.wait() => ()

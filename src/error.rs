@@ -134,18 +134,18 @@ impl From<hyper::Error> for FaucetError {
 impl std::fmt::Display for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::PoolBuild(e) => write!(f, "Pool build error: {}", e),
-            Self::PoolTimeout(e) => write!(f, "Pool timeout error: {:?}", e),
+            Self::PoolBuild(e) => write!(f, "Pool build error: {e}"),
+            Self::PoolTimeout(e) => write!(f, "Pool timeout error: {e:?}"),
             Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
             Self::PoolClosed => write!(f, "Pool closed error"),
             Self::PoolNoRuntimeSpecified => write!(f, "Pool no runtime specified error"),
-            Self::Io(e) => write!(f, "IO error: {}", e),
-            Self::Unknown(e) => write!(f, "Unknown error: {}", e),
-            Self::HostParseError(e) => write!(f, "Error parsing host address: {}", e),
-            Self::Hyper(e) => write!(f, "Hyper error: {}", e),
-            Self::Http(e) => write!(f, "Http error: {}", e),
-            Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {}", e),
-            Self::MissingArgument(s) => write!(f, "Missing argument: {}", s),
+            Self::Io(e) => write!(f, "IO error: {e}"),
+            Self::Unknown(e) => write!(f, "Unknown error: {e}"),
+            Self::HostParseError(e) => write!(f, "Error parsing host address: {e}"),
+            Self::Hyper(e) => write!(f, "Hyper error: {e}"),
+            Self::Http(e) => write!(f, "Http error: {e}"),
+            Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {e}"),
+            Self::MissingArgument(s) => write!(f, "Missing argument: {s}"),
             Self::DuplicateRoute(route) => write!(f, "Route '{route}' is duplicated"),
             Self::AttackAttempt => write!(f, "Attack attempt detected"),
             Self::ConnectionClosed => write!(f, "Connection closed"),
@@ -168,10 +168,10 @@ impl std::fmt::Display for FaucetError {
                 }
                 BadRequestReason::NoHostName => write!(f, "No Host Name"),
                 BadRequestReason::MissingHeader(header) => {
-                    write!(f, "Missing header: {}", header)
+                    write!(f, "Missing header: {header}")
                 }
                 BadRequestReason::InvalidHeader(header) => {
-                    write!(f, "Invalid header: {}", header)
+                    write!(f, "Invalid header: {header}")
                 }
                 BadRequestReason::NoPathOrQuery => write!(f, "No path and/or query"),
             },
@@ -182,7 +182,7 @@ impl std::fmt::Display for FaucetError {
 
 impl std::fmt::Debug for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn test_faucet_error_debug() {
         let err = FaucetError::unknown("test");
-        assert_eq!(format!("{:?}", err), r#"Unknown error: test"#);
+        assert_eq!(format!("{err:?}"), r#"Unknown error: test"#);
     }
 
     #[test]

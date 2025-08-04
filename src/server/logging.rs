@@ -1,7 +1,8 @@
 use hyper::{http::HeaderValue, Method, Request, Response, Uri, Version};
+use uuid::Uuid;
 
 use super::onion::{Layer, Service};
-use crate::{server::service::State, telemetry::TelemetrySender};
+use crate::{server::service::State, telemetry::send_http_event};
 use std::{net::IpAddr, time};
 
 pub mod logger {
@@ -176,7 +177,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             LogOption::None => write!(f, "-"),
-            LogOption::Some(v) => write!(f, "{}", v),
+            LogOption::Some(v) => write!(f, "{v}"),
         }
     }
 }
@@ -188,12 +189,12 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             LogOption::None => write!(f, r#""-""#),
-            LogOption::Some(v) => write!(f, "{:?}", v),
+            LogOption::Some(v) => write!(f, "{v:?}"),
         }
     }
 }
 
-pub struct LogData {
+pub struct HttpLogData {
     pub state_data: StateData,
     pub method: Method,
     pub path: Uri,
@@ -203,7 +204,7 @@ pub struct LogData {
     pub elapsed: i64,
 }
 
-impl LogData {
+impl HttpLogData {
     fn log(&self) {
         log::info!(
             target: self.state_data.target,
@@ -224,7 +225,7 @@ impl LogData {
 async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
     inner: &impl Service<Request<Body>, Response = Response<ResBody>, Error = Error>,
     req: Request<Body>,
-) -> Result<(Response<ResBody>, LogData), Error> {
+) -> Result<(Response<ResBody>, HttpLogData), Error> {
     let start = time::Instant::now();
 
     // Extract request info for logging
@@ -242,7 +243,7 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
     let status = res.status().as_u16() as i16;
     let elapsed = start.elapsed().as_millis() as i64;
 
-    let log_data = LogData {
+    let log_data = HttpLogData {
         state_data,
         method,
         path,
@@ -257,7 +258,6 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
 
 pub(super) struct LogService<S> {
     inner: S,
-    telemetry: Option<TelemetrySender>,
 }
 
 impl<S, Body, ResBody> Service<Request<Body>> for LogService<S>
@@ -275,25 +275,77 @@ where
         let (res, log_data) = capture_log_data::<_, _, _, State>(&self.inner, req).await?;
 
         log_data.log();
-        if let Some(telemetry) = &self.telemetry {
-            telemetry.send_http_event(log_data);
-        }
+        send_http_event(log_data);
 
         Ok(res)
     }
 }
 
-pub(super) struct LogLayer {
-    pub telemetry: Option<TelemetrySender>,
-}
+pub(super) struct LogLayer {}
 
 impl<S> Layer<S> for LogLayer {
     type Service = LogService<S>;
     fn layer(&self, inner: S) -> Self::Service {
-        LogService {
-            inner,
-            telemetry: self.telemetry.clone(),
+        LogService { inner }
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub struct EventLogData {
+    pub target: String,
+    pub event_id: Uuid,
+    pub parent_event_id: Option<Uuid>,
+    pub event_type: String,
+    pub message: String,
+    pub body: Option<serde_json::Value>,
+}
+
+#[derive(serde::Deserialize)]
+enum FaucetTracingLevel {
+    Error,
+    Warn,
+    Info,
+}
+
+#[derive(Debug)]
+pub enum FaucetEventParseError<'a> {
+    UnableToSplit,
+    InvalidString(&'a str),
+    SerdeError {
+        err: serde_json::Error,
+        str: &'a str,
+    },
+}
+
+pub enum FaucetEventResult<'a> {
+    Event(EventLogData),
+    Output(&'a str),
+    EventError(FaucetEventParseError<'a>),
+}
+
+pub fn parse_faucet_event(content: &str) -> FaucetEventResult {
+    use FaucetEventResult::*;
+
+    let content = content.trim_end_matches('\n');
+
+    if !content.starts_with("{{ faucet_event }}:") {
+        return Output(content);
+    }
+
+    match content.split_once(':') {
+        Some((_, content)) => {
+            let structure: EventLogData = match serde_json::from_str(content.trim()) {
+                Ok(structure) => structure,
+                Err(e) => {
+                    return FaucetEventResult::EventError(FaucetEventParseError::SerdeError {
+                        err: e,
+                        str: content,
+                    })
+                }
+            };
+            Event(structure)
         }
+        None => EventError(FaucetEventParseError::UnableToSplit),
     }
 }
 
@@ -407,7 +459,7 @@ mod tests {
             }
         }
 
-        let log_data = LogData {
+        let log_data = HttpLogData {
             state_data: StateData {
                 uuid: uuid::Uuid::now_v7(),
                 target: "test",
