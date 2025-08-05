@@ -118,6 +118,7 @@ fn spawn_events_task(
             PgType::TIMESTAMPTZ, // Timestamp
             PgType::UUID,        // Event_Id
             PgType::UUID,        // Parent_Event_Id
+            PgType::TEXT,        // Level
             PgType::TEXT,        // Event Type
             PgType::TEXT,        // Message
             PgType::JSONB,       // Body
@@ -160,6 +161,7 @@ fn spawn_events_task(
                                 let event_type = &event.event_type;
                                 let message = &event.message;
                                 let body = &event.body;
+                                let level = &event.level.as_str();
 
                                 let copy_result = copy_in_writer
                                     .as_mut()
@@ -170,6 +172,7 @@ fn spawn_events_task(
                                         &timestamp,
                                         event_id,
                                         parent_event_id,
+                                        level,
                                         event_type,
                                         message,
                                         body,

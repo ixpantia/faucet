@@ -57,6 +57,7 @@ log <- function(
       parent_event_id = unbox_if_truthy(parent),
       event_type = jsonlite::unbox(event_type),
       message = jsonlite::unbox(message),
+      level = jsonlite::unbox(level),
       body = body
     ),
     auto_unbox = TRUE
@@ -170,6 +171,80 @@ error <- function(
 ) {
   log(
     level = "Error",
+    message = message,
+    ...,
+    body = body,
+    target = target,
+    event_type = event_type,
+    parent = parent,
+    .envir = .envir
+  )
+}
+
+
+#' Log a Debug Message
+#'
+#' A wrapper around [log()] for debug messages (level = "Debug").
+#'
+#' @param message A character string that can be processed by `glue::glue()`.
+#' @param ... Arguments to be passed to `glue::glue()` for interpolation into `message`.
+#' @param body An optional body for the log event. Defaults to `NA_character_`.
+#' @param target The target of the log event. Defaults to `"shiny"`.
+#' @param event_type The type of the event. Defaults to `"log"`.
+#' @param parent The ID of a parent event, if any. Defaults to `NA_character_`.
+#' @param .envir The environment in which to evaluate the glue expressions in `message`.
+#'
+#' @return The generated UUID for the event, as a character string.
+#' @seealso [log()]
+#' @export
+debug <- function(
+  message,
+  ...,
+  body = NA_character_,
+  target = "shiny",
+  event_type = "log",
+  parent = NA_character_,
+  .envir = parent.frame()
+) {
+  log(
+    level = "Debug",
+    message = message,
+    ...,
+    body = body,
+    target = target,
+    event_type = event_type,
+    parent = parent,
+    .envir = .envir
+  )
+}
+
+
+#' Log a Trace Message
+#'
+#' A wrapper around [log()] for trace messages (level = "Trace").
+#'
+#' @param message A character string that can be processed by `glue::glue()`.
+#' @param ... Arguments to be passed to `glue::glue()` for interpolation into `message`.
+#' @param body An optional body for the log event. Defaults to `NA_character_`.
+#' @param target The target of the log event. Defaults to `"shiny"`.
+#' @param event_type The type of the event. Defaults to `"log"`.
+#' @param parent The ID of a parent event, if any. Defaults to `NA_character_`.
+#' @param .envir The environment in which to evaluate the glue expressions in `message`.
+#'
+#' @return The generated UUID for the event, as a character string.
+#' @seealso [log()]
+#' @export
+trace <- function(
+  message,
+  ...,
+  body = NA_character_,
+  target = "shiny",
+  event_type = "log",
+  parent = NA_character_,
+  .envir = parent.frame()
+) {
+  log(
+    level = "Trace",
     message = message,
     ...,
     body = body,

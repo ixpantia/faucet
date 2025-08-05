@@ -1,5 +1,6 @@
 library(shiny)
 library(bslib)
+devtools::load_all("../../r-package")
 
 # Define UI for app that draws a histogram ----
 ui <- page_sidebar(
@@ -36,6 +37,8 @@ server <- function(input, output) {
   output$distPlot <- renderPlot({
     x <- faithful$waiting
     bins <- seq(min(x), max(x), length.out = input$bins + 1)
+
+    debug("Rendering plot")
 
     hist(
       x,

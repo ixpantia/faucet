@@ -290,21 +290,36 @@ impl<S> Layer<S> for LogLayer {
     }
 }
 
+#[derive(serde::Deserialize, Clone, Copy)]
+pub enum FaucetTracingLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl FaucetTracingLevel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FaucetTracingLevel::Trace => "trace",
+            FaucetTracingLevel::Debug => "debug",
+            FaucetTracingLevel::Error => "error",
+            FaucetTracingLevel::Warn => "warn",
+            FaucetTracingLevel::Info => "info",
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 pub struct EventLogData {
     pub target: String,
     pub event_id: Uuid,
+    pub level: FaucetTracingLevel,
     pub parent_event_id: Option<Uuid>,
     pub event_type: String,
     pub message: String,
     pub body: Option<serde_json::Value>,
-}
-
-#[derive(serde::Deserialize)]
-enum FaucetTracingLevel {
-    Error,
-    Warn,
-    Info,
 }
 
 #[derive(Debug)]

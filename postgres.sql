@@ -27,6 +27,7 @@ CREATE TABLE faucet_log_events (
     time TIMESTAMPTZ NOT NULL,
     event_id UUID,
     parent_event_id UUID,
+    level TEXT,
     event_type TEXT,
     message TEXT,
     body JSONB

@@ -1,11 +1,13 @@
 Package: faucet
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
-Authors@R:
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+Title: Faucet Load Balancer Utilities
+Version: 2.0.0
+Authors@R: c(
+    person("ixpantia, SRL", , , "hola@ixpantia.com", role = "cph"),
+    person("Andres", "Quintero", , "andres@ixpantia.com", role = c("aut", "cre"))
+  )
+Description: Interact with the faucet load balancer for Shiny Apps and Plumber APIs
+    through an R interface.
+License: MIT + file LICENSE
 Imports:
     glue,
     jsonlite,

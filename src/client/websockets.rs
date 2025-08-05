@@ -2,7 +2,7 @@ use super::{pool::ExtractSocketAddr, Client, ExclusiveBody};
 use crate::{
     error::{BadRequestReason, FaucetError, FaucetResult},
     global_conn::{add_connection, remove_connection},
-    server::logging::EventLogData,
+    server::logging::{EventLogData, FaucetTracingLevel},
     shutdown::ShutdownSignal,
     telemetry::send_log_event,
 };
@@ -200,6 +200,7 @@ async fn connect_to_worker(
         target: "faucet".into(),
         event_id: session_id,
         parent_event_id: None,
+        level: FaucetTracingLevel::Info,
         event_type: "websocket_connection".into(),
         message: "Established new WebSocket connection to shiny".to_string(),
         body: None,
@@ -231,6 +232,7 @@ async fn connect_or_retrieve(
                         event_id: Uuid::new_v4(),
                         parent_event_id: Some(session_id),
                         event_type: "websocket_connection".into(),
+                        level: FaucetTracingLevel::Info,
                         message: "Client successfully reconnected".to_string(),
                         body: Some(json!({"attempts": attempt})),
                     });
@@ -340,6 +342,7 @@ async fn server_upgraded_io(
                 event_id: Uuid::new_v4(),
                 parent_event_id: Some(session_id),
                 event_type: "websocket_connection".into(),
+                level: FaucetTracingLevel::Info,
                 message: "Session ended by client.".to_string(),
                 body: None,
             });
@@ -354,6 +357,7 @@ async fn server_upgraded_io(
                 event_id: Uuid::new_v4(),
                 parent_event_id: Some(session_id),
                 event_type: "websocket_connection".into(),
+                level: FaucetTracingLevel::Info,
                 message: "Shiny session ended by Shiny.".to_string(),
                 body: None,
             });
