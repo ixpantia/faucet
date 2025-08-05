@@ -394,10 +394,21 @@ impl WorkerConfigs {
         server_config: FaucetServerConfig,
         shutdown: &'static ShutdownSignal,
     ) -> FaucetResult<Self> {
-        let mut workers = Vec::with_capacity(server_config.n_workers.get());
+        let mut workers =
+            Vec::<&'static WorkerConfig>::with_capacity(server_config.n_workers.get());
 
         for id in 0..server_config.n_workers.get() {
-            let socket_addr = get_available_socket(TRIES).await?;
+            // Probably hacky but it works. I need to guarantee that ports are never
+            // reused
+            let socket_addr = 'find_socket: loop {
+                let addr_candidate = get_available_socket(TRIES).await?;
+                // Check if another worker has already reserved this port
+                if workers.iter().any(|w| w.addr == addr_candidate) {
+                    continue 'find_socket;
+                }
+                break 'find_socket addr_candidate;
+            };
+
             let config = leak!(WorkerConfig::new(
                 id + 1,
                 socket_addr,
