@@ -54,6 +54,6 @@ dotenv = "0.15.0"
 cookie = "0.18.1"
 rand = "0.9.1"
 url = "2.5.4"
-serde_json = "1.0.141"
+serde_json = "1.0.142"
 
 [dev-dependencies]
