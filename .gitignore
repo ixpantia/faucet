@@ -7,3 +7,6 @@ venv/
 .Renviron
 .env
 .venv
+
+faucet_*.tar.gz
+faucet.Rcheck/
