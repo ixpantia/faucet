@@ -155,7 +155,7 @@ impl std::fmt::Display for FaucetError {
             Self::WSWriteBufferFull(buf) => write!(f, "Web Socket Write buffer full, {buf}"),
             Self::PostgreSQL(value) => write!(f, "PostgreSQL error: {value}"),
             Self::WebSocketConnectionInUse => write!(f, "WebSocket Connection in use"),
-            Self::WebSocketConnectionPurged => write!(f, "WebSocket Connection purged"),
+            Self::WebSocketConnectionPurged => write!(f, "WebSocket Connection purged. The client is trying to access a Shiny connection that does not exist."),
             Self::BadRequest(r) => match r {
                 BadRequestReason::MissingQueryParam(param) => {
                     write!(f, "Missing query parameter: {param}")

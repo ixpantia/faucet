@@ -277,7 +277,7 @@ async fn server_upgraded_io(
                         .send(Message::Close(Some(CloseFrame {
                             code: CloseCode::Normal,
                             reason: Utf8Bytes::from_static(
-                                "Connection purged due to inactivity or error.",
+                                "Connection purged due to inactivity, update or error.",
                             ),
                         })))
                         .await?;
