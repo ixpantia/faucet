@@ -46,6 +46,70 @@ Worker logs are divided into two components: `stdout` and `stderr`.
 level. The source is the worker who owns the underlying process. The message
 is the line of output from the process.
 
+## Event Tracing
+
+Beyond basic logging, faucet allows you to emit structured "events" from your R Shiny applications. These events provide rich, machine-readable data about what's happening within your application, making it easier to monitor, debug, and analyze its behavior.
+
+### Emitting Events from R (Shiny)
+
+To send structured events from your Shiny application, use the `faucet` R package. It provides a set of logging functions that wrap the core event emission logic:
+
+-   `faucet::info()`: For general informational events.
+-   `faucet::warn()`: For non-critical issues or warnings.
+-   `faucet::error()`: For significant errors that require attention.
+-   `faucet::debug()`: For detailed debugging information (typically enabled during development).
+-   `faucet::trace()`: For very fine-grained operational details (most verbose).
+
+Each of these functions allows you to specify a `message`, an optional `body` for additional data, and a `parent` event to link related actions.
+
+**1. Logging a simple informational message**
+
+Use the `message` argument for a human-readable description of the event. You can also use `glue` syntax for dynamic messages.
+
+```/dev/null/example.R#L1-1
+faucet::info("Application started successfully.")
+```
+
+This would generate a structured log entry containing:
+-   A unique `event_id` for this specific log.
+-   `level: "Info"` indicating it's an informational message.
+-   `message: "Application started successfully."`
+
+**2. Including additional data with `body`**
+
+The `body` argument accepts any R object that can be converted to JSON, such as a list. This is useful for attaching contextual data, diagnostics, or payload details to your events.
+
+```/dev/null/example.R#L1-1
+faucet::info("User {user_id} logged in", user_id = "abc-123", body = list(session_duration_minutes = 15, ip_address = "192.168.1.10"))
+```
+
+This event will capture:
+-   The dynamic message: `"User abc-123 logged in"`.
+-   A `body` containing a list with `session_duration_minutes` and `ip_address`, allowing you to store specific metrics or details alongside the log message.
+
+**3. Tracing a sequence of operations with `parent`**
+
+You can link related events by passing the `event_id` of a previous event as the `parent` argument. This creates a "parent-child" relationship, helping you trace the flow of complex operations through your application.
+
+```/dev/null/example.R#L1-2
+event_id_start <- faucet::debug("Starting data retrieval from API.")
+# ... perform data retrieval ...
+faucet::info("Data retrieval complete.", parent = event_id_start, body = list(records_fetched = 1200))
+```
+
+In this example:
+-   The `debug` event marks the start of an operation, generating its own `event_id`.
+-   The subsequent `info` event related to completion will include the `event_id_start` as its `parent_event_id`, clearly indicating that it's a follow-up to the data retrieval initiation.
+
+### Storing and Analyzing Event Data
+
+All structured events emitted by your Shiny applications are automatically captured by faucet and stored in the `faucet_log_events` table within your PostgreSQL database. This enables you to:
+
+-   **Query and Filter**: Easily search for specific events based on `level`, `message` content, or data within the `body`.
+-   **Analyze Trends**: Track the frequency of certain events or errors over time.
+-   **Reconstruct User Journeys**: Use `event_id` and `parent_event_id` to trace a user's interactions or the execution flow of a specific request through your application.
+-   **Build Dashboards**: Use the structured data to create monitoring dashboards that provide real-time insights into your application's health and performance.
+
 ## Filtering logs
 
 By default, faucet logs at the `INFO` level, which means that `ERROR`,
