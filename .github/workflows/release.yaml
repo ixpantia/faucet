@@ -72,7 +72,7 @@ jobs:
             -t $TAG_R \
             -t $TAG_LATEST \
             -t $TAG_MINOR \
-            --build-arg R_VERSION=4.5.0 \
+            --build-arg R_VERSION=4.5.1 \
             .
   build-r44:
     name: Build Docker Image (R 4.4)
@@ -107,7 +107,7 @@ jobs:
             -t $TAG_R \
             -t $TAG_LATEST \
             -t $TAG_MINOR \
-            --build-arg R_VERSION=4.4.2 \
+            --build-arg R_VERSION=4.4.3 \
             .
   build-r43:
     name: Build Docker Image (R 4.3)
@@ -209,4 +209,3 @@ jobs:
             -t $TAG_MINOR \
             --build-arg R_VERSION=4.1.3 \
             .
-
