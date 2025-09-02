@@ -1,8 +1,14 @@
+## [unreleased]
 
+### 🐛 Bug Fixes
+
+- Fixes query param detection in case insensitive form
+
+### ⚙️ Miscellaneous Tasks
+
+- Update docker images to use latest versions
+- Updates cross.sh
 ## [2.0.0] - 2025-09-01
-
-### ⚠️ Breaking Changes
-- As of this version in order to save telemetry events such as HTTP requests and the new tracing events requires additional tables on the PostgreSQL instance. This change should not change previous tables, but requieres a new table. Current deployments that make use of this feature will need to add the new PostgreSQL table.
 
 ### 🚀 Features
 
