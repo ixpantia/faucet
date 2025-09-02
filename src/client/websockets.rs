@@ -418,6 +418,16 @@ pub enum UpgradeStatus<ReqBody> {
 
 const SESSION_ID_QUERY: &str = "sessionId";
 
+/// zero allocation case insensitive ascii compare
+fn case_insensitive_eq(this: &str, that: &str) -> bool {
+    if this.len() != that.len() {
+        return false;
+    }
+    this.bytes()
+        .zip(that.bytes())
+        .all(|(a, b)| a.to_ascii_lowercase() == b.to_ascii_lowercase())
+}
+
 async fn upgrade_connection_from_request<ReqBody>(
     mut req: Request<ReqBody>,
     client: impl ExtractSocketAddr,
@@ -425,16 +435,16 @@ async fn upgrade_connection_from_request<ReqBody>(
 ) -> FaucetResult<()> {
     // Extract sessionId query parameter
     let query = req.uri().query().ok_or(FaucetError::BadRequest(
-        BadRequestReason::MissingQueryParam("sessionId"),
+        BadRequestReason::MissingQueryParam("Unable to parse query params"),
     ))?;
 
     let mut session_id: Option<uuid::Uuid> = None;
     let mut attempt: Option<usize> = None;
 
     url::form_urlencoded::parse(query.as_bytes()).for_each(|(key, value)| {
-        if key == SESSION_ID_QUERY {
+        if case_insensitive_eq(&key, SESSION_ID_QUERY) {
             session_id = uuid::Uuid::from_str(&value).ok();
-        } else if key == "attempt" {
+        } else if case_insensitive_eq(&key, "attempt") {
             attempt = value.parse::<usize>().ok();
         }
     });
@@ -522,6 +532,12 @@ mod tests {
 
     use super::*;
     use uuid::Uuid;
+
+    #[test]
+    fn test_insensitive_compare() {
+        let session_id = "sessionid";
+        assert!(case_insensitive_eq(session_id, SESSION_ID_QUERY));
+    }
 
     #[test]
     fn test_calculate_sec_websocket_accept() {
