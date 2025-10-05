@@ -8,6 +8,7 @@ use faucet_server::{cli::Shutdown, shutdown};
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
+    log::info!("Logger test: faucet starting up");
     dotenv::from_filename(".Renviron").ok();
     dotenv::from_filename(".env").ok();
 

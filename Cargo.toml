@@ -47,6 +47,7 @@ deadpool-postgres = { version = "0.14.0", features = ["rt_tokio_1"] }
 bytes = "1.8.0"
 tokio-postgres-rustls = "0.13.0"
 rustls = "0.23.16"
+rustls-pemfile = "1"
 chrono = "0.4.38"
 uuid = { version = "1.11.0", features = ["serde", "v4", "v7"] }
 parse-size = "1.0.0"
@@ -55,5 +56,6 @@ cookie = "0.18.1"
 rand = "0.9.1"
 url = "2.5.4"
 serde_json = "1.0.141"
+webpki-roots = "1.0.2"
 
 [dev-dependencies]
