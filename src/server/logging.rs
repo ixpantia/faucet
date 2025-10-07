@@ -338,7 +338,7 @@ pub enum FaucetEventResult<'a> {
     EventError(FaucetEventParseError<'a>),
 }
 
-pub fn parse_faucet_event(content: &str) -> FaucetEventResult {
+pub fn parse_faucet_event(content: &str) -> FaucetEventResult<'_> {
     use FaucetEventResult::*;
 
     let content = content.trim_end_matches('\n');
