@@ -1,4 +1,4 @@
-use std::{pin::pin, str::FromStr, sync::OnceLock};
+use std::{path::Path, pin::pin, str::FromStr, sync::OnceLock};
 
 use chrono::{DateTime, Local};
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
@@ -9,6 +9,7 @@ use tokio::{
 };
 
 use crate::{
+    cli::PgSslMode,
     error::FaucetResult,
     leak,
     server::{logging::EventLogData, HttpLogData, LogOption},
@@ -38,9 +39,36 @@ pub struct TelemetryManager {
     pub log_events_join_handle: JoinHandle<()>,
 }
 
-fn make_tls() -> tokio_postgres_rustls::MakeRustlsConnect {
+fn make_tls(
+    sslmode: PgSslMode,
+    sslcert: Option<&Path>,
+) -> tokio_postgres_rustls::MakeRustlsConnect {
+    let mut root_store = rustls::RootCertStore::empty();
+
+    if matches!(sslmode, PgSslMode::VerifyCa | PgSslMode::VerifyFull) {
+        match sslcert {
+            Some(cert_path) => {
+                let mut reader =
+                    std::io::BufReader::new(std::fs::File::open(cert_path).unwrap_or_else(|e| {
+                        panic!("Failed to open certificate file '{:?}': {}", cert_path, e)
+                    }));
+                if let Ok(certs) = rustls_pemfile::certs(&mut reader) {
+                    for cert in certs {
+                        if let Err(e) = root_store.add(cert.clone().into()) {
+                            log::error!("Failed to add PEM certificate: {}", e);
+                        }
+                    }
+                }
+            }
+            None => panic!(
+                "Specified {} but did not provide a certificate path.",
+                sslmode.as_str()
+            ),
+        }
+    }
+
     let config = rustls::ClientConfig::builder()
-        .with_root_certificates(rustls::RootCertStore::empty())
+        .with_root_certificates(root_store)
         .with_no_client_auth();
 
     tokio_postgres_rustls::MakeRustlsConnect::new(config)
@@ -67,8 +95,11 @@ impl TelemetryManager {
         namespace: &str,
         version: Option<&str>,
         database_url: &str,
+        sslmode: PgSslMode,
+        sslcert: Option<&Path>,
         shutdown_signal: &'static ShutdownSignal,
     ) -> FaucetResult<TelemetryManager> {
+        log::debug!("Connecting to PostgreSQL with params: namespace='{}', version='{:?}', database_url='[REDACTED]'", namespace, version);
         let namespace = leak!(namespace) as &'static str;
         let version = version.map(|v| leak!(v) as &'static str);
 
@@ -76,7 +107,7 @@ impl TelemetryManager {
         let mgr_config = ManagerConfig {
             recycling_method: RecyclingMethod::Fast,
         };
-        let mgr = Manager::from_config(config, make_tls(), mgr_config);
+        let mgr = Manager::from_config(config, make_tls(sslmode, sslcert), mgr_config);
         let pool = Pool::builder(mgr).max_size(10).build()?;
 
         let (

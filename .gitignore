@@ -10,3 +10,5 @@ venv/
 
 faucet_*.tar.gz
 faucet.Rcheck/
+
+.DS_Store

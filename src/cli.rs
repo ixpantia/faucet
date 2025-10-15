@@ -131,6 +131,27 @@ pub enum Commands {
     Router(RouterArgs),
 }
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum PgSslMode {
+    Disable,
+    Prefer,
+    Require,
+    VerifyCa,
+    VerifyFull,
+}
+
+impl PgSslMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Disable => "disable",
+            Self::Prefer => "prefer",
+            Self::Require => "require",
+            Self::VerifyCa => "verify-ca",
+            Self::VerifyFull => "verify-full",
+        }
+    }
+}
+
 ///
 /// ███████╗ █████╗ ██╗   ██╗ ██████╗███████╗████████╗
 /// ██╔════╝██╔══██╗██║   ██║██╔════╝██╔════╝╚══██╔══╝
@@ -178,6 +199,18 @@ pub struct Args {
     /// Connection string to a PostgreSQL database for saving HTTP events.
     #[arg(long, env = "FAUCET_TELEMETRY_POSTGRES_STRING", default_value = None)]
     pub pg_con_string: Option<String>,
+
+    /// Path to CA certificate for PostgreSQL SSL/TLS.
+    #[arg(long, env = "FAUCET_TELEMETRY_POSTGRES_SSLCERT", default_value = None)]
+    pub pg_sslcert: Option<PathBuf>,
+
+    /// SSL mode for PostgreSQL connection (disable, prefer, require, verify-ca, verify-full).
+    #[arg(
+        long,
+        env = "FAUCET_TELEMETRY_POSTGRES_SSLMODE",
+        default_value = "prefer"
+    )]
+    pub pg_sslmode: PgSslMode,
 
     /// Save HTTP events on PostgreSQL under a specific namespace.
     #[arg(long, env = "FAUCET_TELEMETRY_NAMESPACE", default_value = "faucet")]

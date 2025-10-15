@@ -21,9 +21,9 @@ be set to `0.0.0.0:3838` to allow external access.
 - Environment: `FAUCET_IP_FROM`
 - Default: `client`
 - Possible values:
-    - `client`
-    - `x-forwarded-for`
-    - `x-real-ip`
+  - `client`
+  - `x-forwarded-for`
+  - `x-real-ip`
 
 How to determine the client IP. This is used to determine the IP for the IP Hash
 strategy and for logging of HTTP requests. If you are running faucet directly to end
@@ -78,11 +78,11 @@ Requires `log-file` to be set.
 - Environment: `FAUCET_LOG`
 - Default: `INFO`
 - Possible values:
-    - `ERROR`
-    - `WARN`
-    - `INFO`
-    - `DEBUG`
-    - `TRACE`
+  - `ERROR`
+  - `WARN`
+  - `INFO`
+  - `DEBUG`
+  - `TRACE`
 
 The logging level to use. This environment variable sets the global logging verbosity.
 Refer to the [logging](./logging.md) section for more information.
@@ -97,8 +97,8 @@ provide direct control over file-based logging.
 - Environment: `FAUCET_SHUTDOWN`
 - Default: `immediate`
 - Possible values:
-    - `immediate`
-    - `graceful`
+  - `immediate`
+  - `graceful`
 
 The strategy used for shutting down faucet. `immediate` kills every
 active connection and shutdown the process. `graceful` waits
@@ -130,6 +130,28 @@ Namespace under which HTTP events are saved in PostgreSQL.
 Represents the source code version of the service being run. This is useful for
 filtering telemetry data.
 
+### Telemetry: PostgreSQL SSL Certificate
+
+- CLI: `--pg-sslcert`
+- Environment: `FAUCET_TELEMETRY_POSTGRES_SSLCERT`
+- Default: `None`
+
+Path to a CA certificate file for verifying the PostgreSQL server when using SSL/TLS. Required if `--pg-sslmode` is set to `verify-ca` or `verify-full`. The certificate should be in PEM or DER format.
+
+### Telemetry: PostgreSQL SSL Mode
+
+- CLI: `--pg-sslmode`
+- Environment: `FAUCET_TELEMETRY_POSTGRES_SSLMODE`
+- Default: `prefer`
+- Possible values:
+  - `disable`
+  - `prefer`
+  - `require`
+  - `verify-ca`
+  - `verify-full`
+
+Controls the SSL/TLS behavior for the PostgreSQL connection. If set to `verify-ca` or `verify-full`, a CA certificate must be provided via `--pg-sslcert` or `FAUCET_TELEMETRY_POSTGRES_SSLCERT`.
+
 ## `start` Subcommand Options
 
 These options are specific to the `start` subcommand, used for running a standard faucet server.
@@ -150,9 +172,9 @@ to a higher number.
 - Environment: `FAUCET_STRATEGY`
 - Default: `round-robin`
 - Possible values:
-    - `round-robin`
-    - `ip-hash`
-    - `cookie-hash`
+  - `round-robin`
+  - `ip-hash`
+  - `cookie-hash`
 
 The strategy to use for load balancing. Which strategy you choose depends on your
 workload.
@@ -191,10 +213,10 @@ a NAT or share the same IP address.
 - Environment: `FAUCET_TYPE`
 - Default: `auto`
 - Possible values:
-    - `auto`
-    - `plumber`
-    - `shiny`
-    - `quarto-shiny`
+  - `auto`
+  - `plumber`
+  - `shiny`
+  - `quarto-shiny`
 
 The type of server to run. This is used to determine the correct strategy to use
 and how to spawn the workers.
@@ -203,10 +225,11 @@ and how to spawn the workers.
 
 Auto will attempt to determine the type of server based on the contents of the
 directory specified by `--dir`.
+
 - If the directory contains a `plumber.R` or `entrypoint.R` file, it will be assumed to be a Plumber server.
 - If the directory contains an `app.R`, or both `server.R` and `ui.R` files, it will be assumed to be a Shiny server.
 - If a `.qmd` file is provided via the `--qmd` argument, or if `FAUCET_QMD` is set, it will be assumed to be a Quarto Shiny application.
-Otherwise, faucet will exit with an error.
+  Otherwise, faucet will exit with an error.
 
 #### Plumber
 

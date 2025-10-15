@@ -8,6 +8,7 @@ use faucet_server::{cli::Shutdown, shutdown};
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
+    log::info!("Logger test: faucet starting up");
     dotenv::from_filename(".Renviron").ok();
     dotenv::from_filename(".env").ok();
 
@@ -23,6 +24,8 @@ pub async fn main() -> FaucetResult<()> {
             &cli_args.telemetry_namespace,
             cli_args.telemetry_version.as_deref(),
             &pg_con,
+            cli_args.pg_sslmode,
+            cli_args.pg_sslcert.as_deref(),
             shutdown_signal,
         ) {
             Ok(telemetry) => telemetry,
