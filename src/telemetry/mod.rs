@@ -38,9 +38,43 @@ pub struct TelemetryManager {
     pub log_events_join_handle: JoinHandle<()>,
 }
 
+
 fn make_tls() -> tokio_postgres_rustls::MakeRustlsConnect {
+    use std::env;
+    use std::io::Cursor;
+
+    let sslmode = env::var("FAUCET_TELEMETRY_POSTGRES_SSLMODE").unwrap_or_else(|_| "prefer".to_string());
+    let allowed_modes = ["disable", "prefer", "require", "verify-ca", "verify-full"];
+    if !allowed_modes.contains(&sslmode.as_str()) {
+        panic!("Invalid SSL mode '{}'. Allowed values: disable, prefer, require, verify-ca, verify-full.", sslmode);
+    }
+    let mut root_store = rustls::RootCertStore::empty();
+
+    if matches!(sslmode.as_str(), "verify-ca" | "verify-full") {
+        let cert_path = env::var("FAUCET_TELEMETRY_POSTGRES_SSLCERT")
+            .expect("SSL mode requires FAUCET_TELEMETRY_POSTGRES_SSLCERT to be set");
+        let cert_data = std::fs::read(&cert_path)
+            .unwrap_or_else(|e| panic!("Failed to read certificate file '{}': {}", cert_path, e));
+        let mut reader = Cursor::new(&cert_data);
+        let mut added = false;
+        if let Ok(certs) = rustls_pemfile::certs(&mut reader) {
+            if let Some(cert) = certs.first() {
+                if let Err(e) = root_store.add(cert.clone().into()) {
+                    log::error!("Failed to add PEM certificate: {}", e);
+                } else {
+                    added = true;
+                }
+            }
+        }
+        if !added {
+            if let Err(e) = root_store.add(cert_data.clone().into()) {
+                panic!("Failed to add certificate to root store: {}", e);
+            }
+        }
+    }
+
     let config = rustls::ClientConfig::builder()
-        .with_root_certificates(rustls::RootCertStore::empty())
+        .with_root_certificates(root_store)
         .with_no_client_auth();
 
     tokio_postgres_rustls::MakeRustlsConnect::new(config)
@@ -69,6 +103,7 @@ impl TelemetryManager {
         database_url: &str,
         shutdown_signal: &'static ShutdownSignal,
     ) -> FaucetResult<TelemetryManager> {
+        log::debug!("Connecting to PostgreSQL with params: namespace='{}', version='{:?}', database_url='[REDACTED]'", namespace, version);
         let namespace = leak!(namespace) as &'static str;
         let version = version.map(|v| leak!(v) as &'static str);
 
