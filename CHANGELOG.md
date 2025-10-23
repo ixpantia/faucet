@@ -1,13 +1,18 @@
+## [2.1.0] - 2025-10-23
+
+### 🚀 Features
+
+- Add PostgreSQL SSL envvars and command-line options (#254)
+- Adds new FAUCET_MAX_MESSAGE_SIZE option
+
+### 📚 Documentation
+
+- Update FAQs for Address/Port already in use issue (#252)
 ## [2.0.1] - 2025-09-02
 
 ### 🐛 Bug Fixes
 
 - Fixes query param detection in case insensitive form (#245)
-
-### ⚙️ Miscellaneous Tasks
-
-- Update docker images to use latest versions
-- Updates cross.sh
 ## [2.0.0] - 2025-09-01
 
 ### 🚀 Features
@@ -31,6 +36,8 @@
 - Adds levels to logging
 - Adds tests to r package
 - Runs devtools document
+- Update docker images to use latest versions
+- Updates cross.sh
 ## [1.2.0] - 2025-06-10
 
 ### 🚀 Features

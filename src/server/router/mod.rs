@@ -6,7 +6,7 @@ use std::{
 use hyper::{body::Incoming, server::conn::http1, service::service_fn, Request, Uri};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
-use tokio_tungstenite::tungstenite::http::uri::PathAndQuery;
+use tokio_tungstenite::tungstenite::{http::uri::PathAndQuery, protocol::WebSocketConfig};
 
 use super::{onion::Service, FaucetServerBuilder, FaucetServerService};
 use crate::{
@@ -125,6 +125,7 @@ impl RouterConfig {
         quarto: impl AsRef<OsStr>,
         ip_from: IpExtractor,
         shutdown: &'static ShutdownSignal,
+        websocket_config: &'static WebSocketConfig,
     ) -> FaucetResult<(RouterService, Vec<WorkerConfigs>)> {
         let mut all_workers = Vec::with_capacity(self.route.len());
         let mut routes = Vec::with_capacity(self.route.len());
@@ -148,7 +149,7 @@ impl RouterConfig {
                 .route(route.clone())
                 .max_rps(route_conf.config.max_rps)
                 .build()?
-                .extract_service(shutdown)
+                .extract_service(shutdown, websocket_config)
                 .await?;
             routes.push(route);
             all_workers.push(workers);
@@ -169,9 +170,10 @@ impl RouterConfig {
         ip_from: IpExtractor,
         addr: SocketAddr,
         shutdown: &'static ShutdownSignal,
+        websocket_config: &'static WebSocketConfig,
     ) -> FaucetResult<()> {
         let (service, all_workers) = self
-            .into_service(rscript, quarto, ip_from, shutdown)
+            .into_service(rscript, quarto, ip_from, shutdown, websocket_config)
             .await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;

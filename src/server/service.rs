@@ -7,6 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 use hyper::{body::Incoming, header::HeaderValue};
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use super::onion::{Layer, Service};
 
@@ -183,6 +184,7 @@ impl<S> Layer<S> for AddStateLayer {
 
 pub(crate) struct ProxyService {
     pub shutdown: &'static ShutdownSignal,
+    pub websocket_config: &'static WebSocketConfig,
 }
 
 impl Service<hyper::Request<Incoming>> for ProxyService {
@@ -199,7 +201,11 @@ impl Service<hyper::Request<Incoming>> for ProxyService {
             .get::<State>()
             .expect("State not found")
             .clone();
-        match state.client.attempt_upgrade(req, self.shutdown).await? {
+        match state
+            .client
+            .attempt_upgrade(req, self.shutdown, self.websocket_config)
+            .await?
+        {
             UpgradeStatus::Upgraded(res) => {
                 log::debug!(
                     target: "faucet",

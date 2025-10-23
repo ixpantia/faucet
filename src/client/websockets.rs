@@ -24,7 +24,7 @@ use std::{
 };
 use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::{
-    protocol::{frame::coding::CloseCode, CloseFrame},
+    protocol::{frame::coding::CloseCode, CloseFrame, WebSocketConfig},
     Message, Utf8Bytes,
 };
 use uuid::Uuid;
@@ -187,6 +187,7 @@ static SHINY_CONNECTION_CACHE: LazyLock<ConnectionManager> = LazyLock::new(Conne
 async fn connect_to_worker(
     mut upgrade_info: UpgradeInfo,
     session_id: Uuid,
+    config: &'static WebSocketConfig,
 ) -> FaucetResult<ConnectionPair> {
     let mut request = Request::builder().uri(upgrade_info.uri).body(())?;
     upgrade_info.headers.append(
@@ -195,7 +196,8 @@ async fn connect_to_worker(
             .expect("Unable to set Session ID as header. This is a bug. please report it!"),
     );
     *request.headers_mut() = upgrade_info.headers;
-    let (shiny_ws, _) = tokio_tungstenite::connect_async(request).await?;
+    let (shiny_ws, _) =
+        tokio_tungstenite::connect_async_with_config(request, Some(*config), false).await?;
     send_log_event(EventLogData {
         target: "faucet".into(),
         event_id: session_id,
@@ -212,12 +214,13 @@ async fn connect_or_retrieve(
     upgrade_info: UpgradeInfo,
     session_id: Uuid,
     attempt: usize,
+    config: &'static WebSocketConfig,
 ) -> FaucetResult<ConnectionPair> {
     let init_pair = SHINY_CONNECTION_CACHE
         .initialize_if_not(
             session_id,
             attempt,
-            connect_to_worker(upgrade_info, session_id),
+            connect_to_worker(upgrade_info, session_id, config),
         )
         .await;
 
@@ -256,20 +259,21 @@ async fn server_upgraded_io(
     session_id: Uuid,
     attempt: usize,
     shutdown: &'static ShutdownSignal,
+    websocket_config: &'static WebSocketConfig,
 ) -> FaucetResult<()> {
     // Set up the WebSocket connection with the client.
     let upgraded = TokioIo::new(upgraded);
     let upgraded_ws = tokio_tungstenite::WebSocketStream::from_raw_socket(
         upgraded,
         tokio_tungstenite::tungstenite::protocol::Role::Server,
-        None,
+        Some(*websocket_config),
     )
     .await;
     let (mut upgraded_tx, mut upgraded_rx) = upgraded_ws.split();
 
     // Attempt to retrieve a cached connection to Shiny.
     let (mut shiny_tx, mut shiny_rx) =
-        match connect_or_retrieve(upgrade_info, session_id, attempt).await {
+        match connect_or_retrieve(upgrade_info, session_id, attempt, websocket_config).await {
             Ok(pair) => pair,
             Err(e) => match e {
                 FaucetError::WebSocketConnectionPurged => {
@@ -301,6 +305,10 @@ async fn server_upgraded_io(
                                 break; // Shiny connection closed
                             }
                         },
+                        Some(Err(e)) => {
+                            log::error!("Error sending websocket message to shiny: {e}");
+                            break
+                        }
                         _ => break
                     }
                 },
@@ -326,6 +334,10 @@ async fn server_upgraded_io(
                                 break; // Client connection closed
                             }
                         },
+                        Some(Err(e)) => {
+                            log::error!("Error sending websocket message to client: {e}");
+                            break
+                        }
                         _ => break
                     }
                 },
@@ -432,6 +444,7 @@ async fn upgrade_connection_from_request<ReqBody>(
     mut req: Request<ReqBody>,
     client: impl ExtractSocketAddr,
     shutdown: &'static ShutdownSignal,
+    websocket_config: &'static WebSocketConfig,
 ) -> FaucetResult<()> {
     // Extract sessionId query parameter
     let query = req.uri().query().ok_or(FaucetError::BadRequest(
@@ -459,7 +472,15 @@ async fn upgrade_connection_from_request<ReqBody>(
 
     let upgrade_info = UpgradeInfo::new(&req, client.socket_addr())?;
     let upgraded = hyper::upgrade::on(&mut req).await?;
-    server_upgraded_io(upgraded, upgrade_info, session_id, attempt, shutdown).await?;
+    server_upgraded_io(
+        upgraded,
+        upgrade_info,
+        session_id,
+        attempt,
+        shutdown,
+        websocket_config,
+    )
+    .await?;
     Ok(())
 }
 
@@ -467,6 +488,7 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
     req: Request<ReqBody>,
     client: impl ExtractSocketAddr + Send + Sync + 'static,
     shutdown: &'static ShutdownSignal,
+    websocket_config: &'static WebSocketConfig,
 ) -> FaucetResult<Response<ExclusiveBody>> {
     let mut res = Response::new(ExclusiveBody::empty());
     let sec_websocket_key = req
@@ -476,7 +498,9 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
         .ok_or(FaucetError::no_sec_web_socket_key())?;
     tokio::task::spawn(async move {
         add_connection();
-        if let Err(e) = upgrade_connection_from_request(req, client, shutdown).await {
+        if let Err(e) =
+            upgrade_connection_from_request(req, client, shutdown, websocket_config).await
+        {
             log::error!("upgrade error: {e:?}");
         }
         remove_connection();
@@ -504,10 +528,11 @@ async fn attempt_upgrade<ReqBody: Send + Sync + 'static>(
     req: Request<ReqBody>,
     client: impl ExtractSocketAddr + Send + Sync + 'static,
     shutdown: &'static ShutdownSignal,
+    websocket_config: &'static WebSocketConfig,
 ) -> FaucetResult<UpgradeStatus<ReqBody>> {
     if req.headers().contains_key(UPGRADE) {
         return Ok(UpgradeStatus::Upgraded(
-            init_upgrade(req, client, shutdown).await?,
+            init_upgrade(req, client, shutdown, websocket_config).await?,
         ));
     }
     Ok(UpgradeStatus::NotUpgraded(req))
@@ -518,11 +543,12 @@ impl Client {
         &self,
         req: Request<ReqBody>,
         shutdown: &'static ShutdownSignal,
+        websocket_config: &'static WebSocketConfig,
     ) -> FaucetResult<UpgradeStatus<ReqBody>>
     where
         ReqBody: Send + Sync + 'static,
     {
-        attempt_upgrade(req, self.clone(), shutdown).await
+        attempt_upgrade(req, self.clone(), shutdown, websocket_config).await
     }
 }
 
@@ -576,6 +602,8 @@ mod tests {
             }
         }
 
+        let websocket_config = leak!(WebSocketConfig::default());
+
         let socket_addr = get_available_socket(20).await.unwrap();
 
         let client = MockClient { socket_addr };
@@ -599,7 +627,9 @@ mod tests {
             .unwrap();
 
         let shutdown = leak!(ShutdownSignal::new());
-        let result = init_upgrade(req, client, shutdown).await.unwrap();
+        let result = init_upgrade(req, client, shutdown, websocket_config)
+            .await
+            .unwrap();
 
         server.abort();
 
@@ -630,6 +660,8 @@ mod tests {
             }
         }
 
+        let websocket_config = leak!(WebSocketConfig::default());
+
         let socket_addr = get_available_socket(20).await.unwrap();
 
         let client = MockClient { socket_addr };
@@ -652,7 +684,7 @@ mod tests {
             .unwrap();
 
         let shutdown = leak!(ShutdownSignal::new());
-        let result = init_upgrade(req, client, shutdown).await;
+        let result = init_upgrade(req, client, shutdown, websocket_config).await;
 
         server.abort();
 
@@ -672,6 +704,7 @@ mod tests {
         }
 
         let socket_addr = get_available_socket(20).await.unwrap();
+        let websocket_config = leak!(WebSocketConfig::default());
 
         let client = MockClient { socket_addr };
 
@@ -693,7 +726,9 @@ mod tests {
             .unwrap();
 
         let shutdown = leak!(ShutdownSignal::new());
-        let result = attempt_upgrade(req, client, shutdown).await.unwrap();
+        let result = attempt_upgrade(req, client, shutdown, websocket_config)
+            .await
+            .unwrap();
 
         server.abort();
 
@@ -714,6 +749,8 @@ mod tests {
                 self.socket_addr
             }
         }
+
+        let websocket_config = leak!(WebSocketConfig::default());
 
         let socket_addr = get_available_socket(20).await.unwrap();
 
@@ -738,7 +775,9 @@ mod tests {
             .unwrap();
 
         let shutdown = leak!(ShutdownSignal::new());
-        let result = attempt_upgrade(req, client, shutdown).await.unwrap();
+        let result = attempt_upgrade(req, client, shutdown, websocket_config)
+            .await
+            .unwrap();
 
         server.abort();
 

@@ -1,10 +1,12 @@
 use clap::Parser;
 use faucet_server::cli::{Args, Commands};
 use faucet_server::error::FaucetResult;
+use faucet_server::leak;
 use faucet_server::server::logger::build_logger;
 use faucet_server::server::{FaucetServerBuilder, RouterConfig};
 use faucet_server::telemetry::TelemetryManager;
 use faucet_server::{cli::Shutdown, shutdown};
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 #[tokio::main]
 pub async fn main() -> FaucetResult<()> {
@@ -47,6 +49,12 @@ pub async fn main() -> FaucetResult<()> {
         shutdown_signal,
     );
 
+    let max_message_size = cli_args.max_message_size.map(|v| v as usize);
+
+    let websocket_config: &'static WebSocketConfig = leak!(WebSocketConfig::default()
+        .max_message_size(max_message_size)
+        .max_frame_size(max_message_size));
+
     match cli_args.command {
         Commands::Start(start_args) => {
             log::info!(target: "faucet", "Building the faucet server...");
@@ -64,7 +72,7 @@ pub async fn main() -> FaucetResult<()> {
                 .qmd(start_args.qmd)
                 .max_rps(start_args.max_rps)
                 .build()?
-                .run(shutdown_signal)
+                .run(shutdown_signal, websocket_config)
                 .await?;
         }
         Commands::Router(router_args) => {
@@ -78,6 +86,7 @@ pub async fn main() -> FaucetResult<()> {
                     cli_args.ip_from.into(),
                     cli_args.host.parse()?,
                     shutdown_signal,
+                    websocket_config,
                 )
                 .await?;
         }

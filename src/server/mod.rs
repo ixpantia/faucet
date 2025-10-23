@@ -1,5 +1,6 @@
 pub mod logging;
 pub use logging::{logger, HttpLogData, LogOption};
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 pub mod onion;
 mod router;
 mod service;
@@ -228,7 +229,11 @@ pub struct FaucetServerConfig {
 }
 
 impl FaucetServerConfig {
-    pub async fn run(self, shutdown: &'static ShutdownSignal) -> FaucetResult<()> {
+    pub async fn run(
+        self,
+        shutdown: &'static ShutdownSignal,
+        websocket_config: &'static WebSocketConfig,
+    ) -> FaucetResult<()> {
         let mut workers = WorkerConfigs::new(self.clone(), shutdown).await?;
         let load_balancer = LoadBalancer::new(
             self.strategy,
@@ -241,10 +246,13 @@ impl FaucetServerConfig {
 
         let load_balancer = load_balancer.clone();
         let service = Arc::new(
-            ServiceBuilder::new(ProxyService { shutdown })
-                .layer(logging::LogLayer {})
-                .layer(AddStateLayer::new(load_balancer))
-                .build(),
+            ServiceBuilder::new(ProxyService {
+                shutdown,
+                websocket_config,
+            })
+            .layer(logging::LogLayer {})
+            .layer(AddStateLayer::new(load_balancer))
+            .build(),
         );
 
         // Bind to the port and listen for incoming TCP connections
@@ -310,6 +318,7 @@ impl FaucetServerConfig {
     pub async fn extract_service(
         self,
         shutdown: &'static ShutdownSignal,
+        websocket_config: &'static WebSocketConfig,
     ) -> FaucetResult<(FaucetServerService, WorkerConfigs)> {
         let workers = WorkerConfigs::new(self.clone(), shutdown).await?;
         let load_balancer = LoadBalancer::new(
@@ -320,10 +329,13 @@ impl FaucetServerConfig {
         )
         .await?;
         let service = Arc::new(
-            ServiceBuilder::new(ProxyService { shutdown })
-                .layer(logging::LogLayer {})
-                .layer(AddStateLayer::new(load_balancer))
-                .build(),
+            ServiceBuilder::new(ProxyService {
+                shutdown,
+                websocket_config,
+            })
+            .layer(logging::LogLayer {})
+            .layer(AddStateLayer::new(load_balancer))
+            .build(),
         );
 
         Ok((FaucetServerService { inner: service }, workers))
