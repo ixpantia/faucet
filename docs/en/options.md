@@ -104,6 +104,15 @@ The strategy used for shutting down faucet. `immediate` kills every
 active connection and shutdown the process. `graceful` waits
 for all connections to close before shutting down.
 
+### Max Message Size
+
+- CLI: `--max-message-size`
+- Environment: `FAUCEC_MAX_MESSAGE_SIZE`
+- Default: `None`
+
+Maximum size of a WebSocket message. This is useful for DDOS prevention.
+If not set, there is no size limit.
+
 ### Telemetry: PostgreSQL Connection String
 
 - CLI: `--pg-con-string`

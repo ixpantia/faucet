@@ -7,6 +7,7 @@ pub mod server;
 pub mod shutdown;
 pub mod telemetry;
 
+#[macro_export]
 macro_rules! leak {
     ($val:expr, $ty:ty) => {
         std::boxed::Box::leak(std::boxed::Box::from($val)) as &'static $ty
@@ -15,5 +16,3 @@ macro_rules! leak {
         std::boxed::Box::leak(std::boxed::Box::from($val))
     };
 }
-
-pub(crate) use leak;

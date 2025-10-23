@@ -105,6 +105,15 @@ La estrategia que debería utilizar faucet para apagarse. `immediate`
 apaga el servidor interrumpiendo cualquier conexión active. `graceful`
 espera a que no existan conexiones activas para apagarse.
 
+### Max Message Size (Tamaño máximo del mensaje)
+
+- CLI: `--max-message-size`
+- Entorno: `FAUCET_MAX_MESSAGE_SIZE`
+- Por defecto: `None`
+
+Tamaño máximo de un mensaje WebSocket. Esto es útil para la prevención de ataques DDOS.
+Si no se configura, no hay límite de tamaño.
+
 ### Telemetría: Cadena de Conexión PostgreSQL
 
 - CLI: `--pg-con-string`

@@ -196,6 +196,10 @@ pub struct Args {
     #[arg(long, env = "FAUCET_SHUTDOWN", default_value = "immediate")]
     pub shutdown: Shutdown,
 
+    /// Maximum size of a WebSocket message. This is useful for DDOS prevention. Not set means no size limit.
+    #[arg(long, env = "FAUCET_MAX_MESSAGE_SIZE", default_value = None, value_parser = |s: &str| parse_size::parse_size(s))]
+    pub max_message_size: Option<u64>,
+
     /// Connection string to a PostgreSQL database for saving HTTP events.
     #[arg(long, env = "FAUCET_TELEMETRY_POSTGRES_STRING", default_value = None)]
     pub pg_con_string: Option<String>,
