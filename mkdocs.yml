@@ -57,4 +57,4 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
-  FAUCET_VERSION: v1.2.0
+  FAUCET_VERSION: v2.1.0

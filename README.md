@@ -147,7 +147,7 @@ faucet --ip-from x-forwarded-for start --dir /path/to/plumber/api
 Download the latest release of faucet for Linux from the [GitHub Releases page](https://github.com/ixpantia/faucet/releases). This should work with most Linux distributions.
 
 ```bash
-FAUCET_VERSION="v1.2.0"
+FAUCET_VERSION="v2.1.0"
 
 wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 
@@ -258,4 +258,3 @@ default, this value is `"faucet"`.
 
 If you want to contribute to `faucet` please read the
 [CONTRIBUTING.md](./CONTRIBUTING.md) document.
-
