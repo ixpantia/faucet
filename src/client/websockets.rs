@@ -291,90 +291,132 @@ async fn server_upgraded_io(
             },
         };
 
-    // Manually pump messages in both directions.
-    // This allows us to regain ownership of the streams after a disconnect.
-    let client_to_shiny = async {
-        loop {
-            log::debug!("Waiting for message or ping timeout");
-            tokio::select! {
-                msg = upgraded_rx.next() => {
-                    log::debug!("Received msg: {msg:?}");
-                    match msg {
-                        Some(Ok(msg)) => {
-                            if shiny_tx.send(msg).await.is_err() {
-                                break; // Shiny connection closed
-                            }
-                        },
-                        Some(Err(e)) => {
-                            log::error!("Error sending websocket message to shiny: {e}");
-                            break
-                        }
-                        _ => break
-                    }
-                },
-                _ = tokio::time::sleep(PING_INTERVAL_TIMEOUT) => {
-                    log::debug!("Ping timeout reached for session {session_id}");
-                    break;
-                }
-            }
-        }
-    };
+    enum DisconnectionSource {
+        Shiny,
+        ClientUnexpected,
+        ClientExpected,
+    }
 
-    let shiny_to_client = async {
+    let connection = async {
         loop {
             let ping_future = async {
                 tokio::time::sleep(PING_INTERVAL).await;
                 upgraded_tx.send(Message::Ping(PING_BYTES)).await
             };
+            log::debug!("Waiting for message or ping timeout");
             tokio::select! {
                 msg = shiny_rx.next() => {
                     match msg {
+                        Some(Ok(Message::Ping(bytes))) => {
+                            if shiny_tx.send(Message::Pong(bytes)).await.is_err() {
+                                break DisconnectionSource::Shiny; // Shiny connection closed
+                            }
+                        }
                         Some(Ok(msg)) => {
                             if upgraded_tx.send(msg).await.is_err() {
-                                break; // Client connection closed
+                                break DisconnectionSource::ClientUnexpected; // Client connection closed
                             }
                         },
                         Some(Err(e)) => {
                             log::error!("Error sending websocket message to client: {e}");
-                            break
+                            break DisconnectionSource::Shiny; // Error receiving message from shiny
                         }
-                        _ => break
+                        _ => break DisconnectionSource::Shiny // Recieved no data from shiny
                     }
                 },
-                _ = ping_future => {}
+                msg = upgraded_rx.next() => {
+                    log::debug!("Received msg: {msg:?}");
+                    match msg {
+                        // Browsers don't natively implement ping / pong from the client
+                        Some(Ok(Message::Text(bytes))) if bytes.as_str() == "ping" => {
+                            if upgraded_tx.send(Message::Text(Utf8Bytes::from_static("pong"))).await.is_err() {
+                                break DisconnectionSource::ClientUnexpected; // Client connection closed
+                            }
+                        }
+                        Some(Ok(Message::Close(Some(CloseFrame { code, reason })))) => {
+                            match code {
+                                CloseCode::Away | CloseCode::Normal => {
+                                    // If the client closes the session normally
+                                    // pass the message onto shiny and break
+                                    if shiny_tx.send(Message::Close(Some(CloseFrame { code, reason }))).await.is_err() {
+                                        break DisconnectionSource::Shiny;
+                                    }
+                                    break DisconnectionSource::ClientExpected // This is a graceful session end
+                                }
+                                _ => break DisconnectionSource::ClientUnexpected
+                            }
+                        }
+                        Some(Ok(msg)) => {
+                            if shiny_tx.send(msg).await.is_err() {
+                                break DisconnectionSource::Shiny; // Shiny connection closed
+                            }
+                        },
+                        Some(Err(e)) => {
+                            log::error!("Error sending websocket message to shiny: {e}");
+                            break DisconnectionSource::ClientUnexpected; // Error receiving message from client
+                        }
+                        _ => break DisconnectionSource::ClientUnexpected // Received no data from client
+                    }
+                },
+                _ = ping_future => continue,
+                _ = tokio::time::sleep(PING_INTERVAL_TIMEOUT) => {
+                    log::debug!("Ping timeout reached for session {session_id}");
+                    break DisconnectionSource::ClientUnexpected; // Did not receive ping from client
+                }
             }
         }
     };
 
     // Wait for either the client or Shiny to disconnect.
     tokio::select! {
-        _ = client_to_shiny => {
-            send_log_event(EventLogData {
-                target: "faucet".into(),
-                event_id: Uuid::new_v4(),
-                parent_event_id: Some(session_id),
-                event_type: "websocket_connection".into(),
-                level: FaucetTracingLevel::Info,
-                message: "Session ended by client.".to_string(),
-                body: None,
-            });
-            log::debug!("Client connection closed for session {session_id}.")
-        },
-        _ = shiny_to_client => {
-            // If this happens that means shiny ended the session, immediately
-            // remove the session from the cache
-            SHINY_CONNECTION_CACHE.remove_session(session_id).await;
-            send_log_event(EventLogData {
-                target: "faucet".into(),
-                event_id: Uuid::new_v4(),
-                parent_event_id: Some(session_id),
-                event_type: "websocket_connection".into(),
-                level: FaucetTracingLevel::Info,
-                message: "Shiny session ended by Shiny.".to_string(),
-                body: None,
-            });
-            log::debug!("Shiny connection closed for session {session_id}.");
-            return Ok(());
+        disconnect_source = connection => {
+            match disconnect_source {
+                DisconnectionSource::ClientUnexpected => {
+                    send_log_event(EventLogData {
+                        target: "faucet".into(),
+                        event_id: Uuid::new_v4(),
+                        parent_event_id: Some(session_id),
+                        event_type: "websocket_connection".into(),
+                        level: FaucetTracingLevel::Info,
+                        message: "Session ended by client.".to_string(),
+                        body: None,
+                    });
+                    log::debug!("Client connection closed for session {session_id}.")
+                },
+                DisconnectionSource::ClientExpected => {
+                    // If this happens that means that the client ended the session, gracefully.
+                    // We should not save for reconnection
+                    SHINY_CONNECTION_CACHE.remove_session(session_id).await;
+                    send_log_event(EventLogData {
+                        target: "faucet".into(),
+                        event_id: Uuid::new_v4(),
+                        parent_event_id: Some(session_id),
+                        event_type: "websocket_connection".into(),
+                        level: FaucetTracingLevel::Info,
+                        message: "Shiny session ended by Client, gracefully.".to_string(),
+                        body: None,
+                    });
+                    log::debug!("Shiny connection closed for session {session_id}.");
+                    return Ok(());
+                }
+                DisconnectionSource::Shiny => {
+                    // If this happens that means shiny ended the session, immediately
+                    // remove the session from the cache
+                    SHINY_CONNECTION_CACHE.remove_session(session_id).await;
+                    send_log_event(EventLogData {
+                        target: "faucet".into(),
+                        event_id: Uuid::new_v4(),
+                        parent_event_id: Some(session_id),
+                        event_type: "websocket_connection".into(),
+                        level: FaucetTracingLevel::Info,
+                        message: "Shiny session ended by Shiny.".to_string(),
+                        body: None,
+                    });
+                    log::debug!("Shiny connection closed for session {session_id}.");
+                    return Ok(());
+                }
+
+            }
         },
         _ = shutdown.wait() => {
             log::debug!("Received shutdown signal. Exiting websocket bridge.");
@@ -385,7 +427,7 @@ async fn server_upgraded_io(
     // Getting here meant that the only possible way the session ended is if
     // the client ended the connection
 
-    log::debug!("Client websocket connection to session {session_id} ended but the Shiny connection is still alive. Saving for reconnection.");
+    log::debug!("Client websocket connection to session {session_id} ended but the Shiny connection may still be alive. Saving for reconnection.");
     SHINY_CONNECTION_CACHE
         .put_pack(session_id, (shiny_tx, shiny_rx))
         .await;
@@ -400,7 +442,7 @@ async fn server_upgraded_io(
                     let mut ws = shiny_tx
                         .reunite(shiny_rx)
                         .expect("shiny_rx and tx always have the same origin.");
-                    //
+
                     if ws
                         .close(Some(CloseFrame {
                             code: CloseCode::Abnormal,
@@ -501,7 +543,7 @@ async fn init_upgrade<ReqBody: Send + Sync + 'static>(
         if let Err(e) =
             upgrade_connection_from_request(req, client, shutdown, websocket_config).await
         {
-            log::error!("upgrade error: {e:?}");
+            log::error!(target: "faucet", "upgrade error: {e:?}");
         }
         remove_connection();
     });
