@@ -1,3 +1,12 @@
+function createPingFrame(data) {
+  const buffer = new Uint8Array(data.length + 1);
+  buffer[0] = 0x8A; // Opcode for Ping
+  for (let i = 0; i < data.length; i++) {
+    buffer[i + 1] = data.charCodeAt(i); // Convert string to char codes
+  }
+  return buffer;
+}
+
 /**
  * A WebSocket wrapper that automatically reconnects and maintains a session ID.
  * The session ID is generated on instantiation and added as a query parameter
@@ -11,9 +20,10 @@ class ReconnectingWebSocket {
    * @param {number} [options.maxReconnectAttempts=5] Maximum number of reconnect attempts.
    * @param {number} [options.reconnectDelay=2000] Delay in ms between reconnect attempts.
    * @param {string} [options.sessionQueryParam='sessionId'] The name of the query param for the session ID.
+   * @param {number} [options.pingInterval=1000] Delay in ms for sending ping messages.
+   * @param {number} [options.pongTimeout=2000] Delay in ms to wait for a pong before closing.
    */
   constructor(url, protocols, options = {}) {
-
     // --- Public Interface ---
     this.onopen = null;
     this.onclose = null;
@@ -39,16 +49,15 @@ class ReconnectingWebSocket {
         el.textContent = "Reconnecting...";
 
         document.body.appendChild(el);
-
-      };
-    }
+      }
+    };
 
     this.onreconnected = () => {
       var reconnecting_el = document.getElementById("faucet-reconnecting-msg");
       if (reconnecting_el) {
-        reconnecting_el.remove()
+        reconnecting_el.remove();
       }
-    }
+    };
 
     // --- Internal State ---
     this._protocols = protocols;
@@ -56,6 +65,8 @@ class ReconnectingWebSocket {
     this._reconnectAttempts = 0;
     this._totalReconnectAttempts = 0;
     this._forcedClose = false;
+    this._pingIntervalId = null;
+    this._pongTimeoutId = null;
 
     if (window.crypto && typeof window.crypto.randomUUID === "function") {
       this._sessionId = window.crypto.randomUUID();
@@ -86,6 +97,12 @@ class ReconnectingWebSocket {
       options.maxReconnectTime != null ? options.maxReconnectTime : 10000; // 10 seconds
     this._lastDisconnectTime = null;
 
+    // Heartbeat options
+    this._pingIntervalDuration =
+      options.pingInterval != null ? options.pingInterval : 1000;
+    this._pongTimeoutDuration =
+      options.pongTimeout != null ? options.pongTimeout : 2000;
+
     // Initial connection
     this.connect();
   }
@@ -95,12 +112,16 @@ class ReconnectingWebSocket {
    */
   connect() {
     console.log(`ReconnectingWebSocket: Connecting to ${this._url}...`);
-    this._ws = new WebSocket(`${this._url}&attempt=${this._totalReconnectAttempts}`, this._protocols);
+    this._ws = new WebSocket(
+      `${this._url}&attempt=${this._totalReconnectAttempts}`,
+      this._protocols,
+    );
 
     this._ws.onopen = (event) => {
       console.log(
         `ReconnectingWebSocket: Connection opened with Session ID: ${this._sessionId}`,
       );
+      this._startPinging(); // Start heartbeat
       if (this.onopen) {
         this.onreconnected();
         this.onopen(event);
@@ -108,6 +129,11 @@ class ReconnectingWebSocket {
     };
 
     this._ws.onmessage = (event) => {
+      // Check for pong message from server heartbeat
+      if (event.data === "pong") {
+        clearTimeout(this._pongTimeoutId);
+        return; // Don't forward pong messages to the user's handler
+      }
       if (this.onmessage) {
         this.onmessage(event);
       }
@@ -121,11 +147,14 @@ class ReconnectingWebSocket {
     };
 
     this._ws.onclose = (event) => {
+      this._stopPinging(); // Stop heartbeat
 
       // if it was closed with a normal close code, it means it was closed by the server
       // intentionally, so we don't want to reconnect
       if (event.code === 1000 || event.code === 1001 || this._forcedClose) {
-        console.log(`ReconnectingWebSocket: Connection closed normally. Code: ${event.code}, Reason: ${event.reason}`);
+        console.log(
+          `ReconnectingWebSocket: Connection closed normally. Code: ${event.code}, Reason: ${event.reason}`,
+        );
         if (this.onclose) {
           this.onclose(event);
         }
@@ -140,8 +169,12 @@ class ReconnectingWebSocket {
   }
 
   _handleReconnect(event) {
-    var more_than_max_time_passed = (Date.now() - this._lastDisconnectTime) < this._maxReconnectTime;
-    if (this._reconnectAttempts < this._maxReconnectAttempts && more_than_max_time_passed) {
+    var more_than_max_time_passed =
+      Date.now() - this._lastDisconnectTime < this._maxReconnectTime;
+    if (
+      this._reconnectAttempts < this._maxReconnectAttempts &&
+      more_than_max_time_passed
+    ) {
       this._reconnectAttempts++;
       this._totalReconnectAttempts++;
       console.log(
@@ -156,10 +189,52 @@ class ReconnectingWebSocket {
       }
       setTimeout(() => this.connect(), this._reconnectDelay);
     } else {
-      console.error(`ReconnectingWebSocket: Failed to reconnect after ${this._maxReconnectAttempts} attempts.`);
+      console.error(
+        `ReconnectingWebSocket: Failed to reconnect after ${this._maxReconnectAttempts} attempts.`,
+      );
       if (this.onclose) {
         this.onclose(event);
       }
+    }
+  }
+
+  /**
+   * Starts the ping/pong heartbeat to detect dead connections.
+   */
+  _startPinging() {
+    this._stopPinging(); // Ensure no existing timers are running
+    this._pingIntervalId = setInterval(() => {
+      if (this.readyState === WebSocket.OPEN) {
+        // Use the underlying ws.send to avoid resetting reconnect attempts
+        this._ws.send("ping");
+
+        // Set a timeout to wait for the pong. If it doesn't arrive,
+        // the connection is considered dead.
+        this._pongTimeoutId = setTimeout(() => {
+          console.warn(
+            "ReconnectingWebSocket: Pong not received in time. Closing connection.",
+          );
+          if (this._ws) {
+            // Close with a custom code. This will trigger the onclose handler,
+            // which will then initiate the reconnection logic.
+            this._ws.close(4000, "Pong timeout");
+          }
+        }, this._pongTimeoutDuration);
+      }
+    }, this._pingIntervalDuration);
+  }
+
+  /**
+   * Stops the ping/pong heartbeat.
+   */
+  _stopPinging() {
+    if (this._pingIntervalId) {
+      clearInterval(this._pingIntervalId);
+      this._pingIntervalId = null;
+    }
+    if (this._pongTimeoutId) {
+      clearTimeout(this._pongTimeoutId);
+      this._pongTimeoutId = null;
     }
   }
 
@@ -183,6 +258,7 @@ class ReconnectingWebSocket {
    */
   close(code, reason) {
     this._forcedClose = true;
+    this._stopPinging(); // Stop heartbeat on explicit close
     if (this._ws) {
       this._ws.close(code, reason);
     }
