@@ -67,6 +67,7 @@ pub async fn main() -> FaucetResult<()> {
                 .bind(cli_args.host.parse()?)
                 .workdir(start_args.dir)
                 .rscript(cli_args.rscript)
+                .uv(cli_args.uv)
                 .app_dir(start_args.app_dir)
                 .quarto(cli_args.quarto)
                 .qmd(start_args.qmd)
@@ -83,6 +84,7 @@ pub async fn main() -> FaucetResult<()> {
                 .run(
                     cli_args.rscript,
                     cli_args.quarto,
+                    cli_args.uv,
                     cli_args.ip_from.into(),
                     cli_args.host.parse()?,
                     shutdown_signal,

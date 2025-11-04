@@ -22,6 +22,7 @@ fn is_shiny(dir: &Path) -> bool {
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy)]
 enum ServerType {
+    FastAPI,
     Plumber,
     Shiny,
     QuartoShiny,
@@ -184,6 +185,10 @@ pub struct Args {
     #[arg(long, short, env = "FAUCET_QUARTO", default_value = "quarto")]
     pub quarto: OsString,
 
+    /// Command, path, or executable to run uv.
+    #[arg(long, short, env = "FAUCET_UV", default_value = "uv")]
+    pub uv: OsString,
+
     /// Save logs to a file. Will disable colors!
     #[arg(long, short, env = "FAUCET_LOG_FILE", default_value = None)]
     pub log_file: Option<PathBuf>,
@@ -228,6 +233,7 @@ pub struct Args {
 impl StartArgs {
     pub fn server_type(&self) -> WorkerType {
         match self.type_ {
+            ServerType::FastAPI => WorkerType::FastAPI,
             ServerType::Plumber => WorkerType::Plumber,
             ServerType::Shiny => WorkerType::Shiny,
             ServerType::QuartoShiny => WorkerType::QuartoShiny,
