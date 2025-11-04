@@ -45,8 +45,8 @@ fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> St
             }),
         WorkerType::Shiny | WorkerType::QuartoShiny => match strategy {
             None => {
-                log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to IP hash for shiny.");
-                Strategy::IpHash
+                log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to Cookie Hash for shiny.");
+                Strategy::CookieHash
             },
             Some(Strategy::Rps) => {
                 log::debug!(target: "faucet", "RPS load balancing strategy specified for shiny, switching to IP hash.");

@@ -38,7 +38,7 @@ pub enum WorkerType {
     Dummy,
 }
 
-fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
+pub fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
     let pid = child.id().expect("Failed to get plumber worker PID");
 
     let mut stdout = FramedRead::new(
@@ -173,7 +173,9 @@ fn spawn_child_fastapi_server(config: &WorkerConfig) -> FaucetResult<Child> {
         });
     }
 
-    cmd.spawn().map_err(Into::into)
+    let child = cmd.spawn()?;
+
+    log_stdio(child, config.target)
 }
 
 fn spawn_child_rscript_process(

@@ -57,5 +57,6 @@ rand = "0.9.1"
 url = "2.5.4"
 serde_json = "1.0.141"
 webpki-roots = "1.0.2"
+thiserror = "2.0.17"
 
 [dev-dependencies]

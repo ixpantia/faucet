@@ -127,9 +127,22 @@ pub enum Commands {
     /// Start a simple faucet server.
     #[command(name = "start")]
     Start(StartArgs),
-    /// Runs faucet in "router" mode. (Experimental)
+
+    /// Runs faucet in "router" mode.
     #[command(name = "router")]
     Router(RouterArgs),
+
+    /// Run an Rscript through faucet.
+    Rscript {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<OsString>,
+    },
+
+    /// Run an uv through faucet.
+    Uv {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<OsString>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]

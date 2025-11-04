@@ -59,8 +59,10 @@ fn hash_to_index(value: Uuid, length: usize) -> usize {
 // 50ms is the minimum backoff time for exponential backoff
 const BASE_BACKOFF: Duration = Duration::from_millis(1);
 
+const MAX_BACKOFF: Duration = Duration::from_millis(500);
+
 fn calculate_exponential_backoff(retries: u32) -> Duration {
-    BASE_BACKOFF * 2u32.pow(retries)
+    (BASE_BACKOFF * 2u32.pow(retries)).min(MAX_BACKOFF)
 }
 
 impl LoadBalancingStrategy for CookieHash {

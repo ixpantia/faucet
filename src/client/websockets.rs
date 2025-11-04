@@ -479,7 +479,7 @@ fn case_insensitive_eq(this: &str, that: &str) -> bool {
     }
     this.bytes()
         .zip(that.bytes())
-        .all(|(a, b)| a.to_ascii_lowercase() == b.to_ascii_lowercase())
+        .all(|(a, b)| a.eq_ignore_ascii_case(&b))
 }
 
 async fn upgrade_connection_from_request<ReqBody>(

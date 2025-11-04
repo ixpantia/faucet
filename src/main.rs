@@ -1,5 +1,6 @@
 use clap::Parser;
 use faucet_server::cli::{Args, Commands};
+use faucet_server::client::worker::log_stdio;
 use faucet_server::error::FaucetResult;
 use faucet_server::leak;
 use faucet_server::server::logger::build_logger;
@@ -22,7 +23,7 @@ pub async fn main() -> FaucetResult<()> {
     };
 
     let telemetry = cli_args.pg_con_string.map(|pg_con| {
-        match TelemetryManager::start(
+        match TelemetryManager::start_postgres(
             &cli_args.telemetry_namespace,
             cli_args.telemetry_version.as_deref(),
             &pg_con,
@@ -91,6 +92,36 @@ pub async fn main() -> FaucetResult<()> {
                     websocket_config,
                 )
                 .await?;
+        }
+        Commands::Rscript { args } => {
+            let child = tokio::process::Command::new(cli_args.rscript)
+                .args(args)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .unwrap();
+
+            let mut child = log_stdio(child, "faucet").unwrap();
+
+            child.wait().await?;
+
+            shutdown_signal.shutdown();
+        }
+        Commands::Uv { args } => {
+            let child = tokio::process::Command::new(cli_args.uv)
+                .args(args)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .unwrap();
+
+            let mut child = log_stdio(child, "faucet").unwrap();
+
+            child.wait().await?;
+
+            shutdown_signal.shutdown();
         }
     }
 
