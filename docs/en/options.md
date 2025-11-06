@@ -55,6 +55,14 @@ binary/executable may not be available in the `$PATH`.
 The `quarto` binary/executable to use. This is useful if you have
 multiple versions of Quarto installed or if it\'s not in your `$PATH`.
 
+### Uv (Define a custom `uv` binary/executable)
+
+- CLI: `--uv`
+- Environment: `FAUCET_UV`
+- Default: `uv`
+
+The `uv` binary/executable to use. This is useful if you have multiple versions of `uv` installed, or if it is not in your system's `PATH`. `uv` is required for running FastAPI applications and `uv` subcommands.
+
 ### Log File (Redirect logging to a file)
 
 - CLI: `--log-file` or `-l`
@@ -226,6 +234,7 @@ a NAT or share the same IP address.
   - `plumber`
   - `shiny`
   - `quarto-shiny`
+  - `fast-api`
 
 The type of server to run. This is used to determine the correct strategy to use
 and how to spawn the workers.
@@ -252,6 +261,10 @@ Runs the server as a Shiny app. The default strategy is `ip-hash`.
 
 Runs the server as a Quarto Shiny app. The default strategy is `ip-hash`.
 Requires the `--qmd` option to specify the Quarto document.
+
+#### FastAPI
+
+Runs the server as a FastAPI application. The default strategy is `round-robin`. This requires `uv` to be installed. Faucet will look for a `main.py` file in the specified directory and serve it.
 
 ### Directory (Working directory)
 
@@ -291,3 +304,15 @@ These options are specific to the `router` subcommand, used for running faucet i
 - Default: `./frouter.toml`
 
 Path to the router configuration TOML file.
+
+## `rscript` Subcommand
+
+This subcommand allows you to execute an arbitrary R script. Any arguments following `rscript` will be passed directly to the `Rscript` executable.
+
+Example: `faucet rscript my_script.R --arg1 value1`
+
+## `uv` Subcommand
+
+This subcommand allows you to execute arbitrary `uv` commands. This is particularly useful for running Python scripts or managing Python environments. Any arguments following `uv` will be passed directly to the `uv` executable.
+
+Example: `faucet uv run my_script.py` or `faucet uv pip install pandas`
