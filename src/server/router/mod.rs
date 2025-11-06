@@ -123,6 +123,7 @@ impl RouterConfig {
         self,
         rscript: impl AsRef<OsStr>,
         quarto: impl AsRef<OsStr>,
+        uv: impl AsRef<OsStr>,
         ip_from: IpExtractor,
         shutdown: &'static ShutdownSignal,
         websocket_config: &'static WebSocketConfig,
@@ -141,6 +142,7 @@ impl RouterConfig {
                 .server_type(route_conf.config.server_type)
                 .strategy(route_conf.config.strategy)
                 .rscript(&rscript)
+                .uv(&uv)
                 .quarto(&quarto)
                 .qmd(route_conf.config.qmd)
                 .workers(route_conf.config.workers.get())
@@ -167,13 +169,14 @@ impl RouterConfig {
         self,
         rscript: impl AsRef<OsStr>,
         quarto: impl AsRef<OsStr>,
+        uv: impl AsRef<OsStr>,
         ip_from: IpExtractor,
         addr: SocketAddr,
         shutdown: &'static ShutdownSignal,
         websocket_config: &'static WebSocketConfig,
     ) -> FaucetResult<()> {
         let (service, all_workers) = self
-            .into_service(rscript, quarto, ip_from, shutdown, websocket_config)
+            .into_service(rscript, quarto, uv, ip_from, shutdown, websocket_config)
             .await?;
         // Bind to the port and listen for incoming TCP connections
         let listener = TcpListener::bind(addr).await?;

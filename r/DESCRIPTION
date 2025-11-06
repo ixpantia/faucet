@@ -12,7 +12,7 @@ Description: Interact with the faucet load balancer for Shiny Apps and Plumber A
 License: MIT + file LICENSE
 Imports:
     glue,
-    jsonlite,
+    yyjsonr,
     uuid
 Suggests:
     shiny,

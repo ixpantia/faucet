@@ -14,37 +14,80 @@ pub enum BadRequestReason {
 
 pub type FaucetResult<T> = std::result::Result<T, FaucetError>;
 
-pub enum FaucetError {
-    PoolBuild(deadpool::managed::BuildError),
-    PoolTimeout(deadpool::managed::TimeoutType),
-    PoolPostCreateHook,
-    PoolClosed,
-    PoolNoRuntimeSpecified,
-    NoSocketsAvailable,
-    ConnectionClosed,
-    Io(std::io::Error),
-    Unknown(String),
-    HostParseError(std::net::AddrParseError),
-    Hyper(hyper::Error),
-    BadRequest(BadRequestReason),
-    InvalidHeaderValues(hyper::header::InvalidHeaderValue),
-    Http(hyper::http::Error),
-    MissingArgument(&'static str),
-    DuplicateRoute(String),
-    Utf8Coding(String),
-    BufferCapacity(tokio_tungstenite::tungstenite::error::CapacityError),
-    ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
-    WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
-    PostgreSQL(tokio_postgres::Error),
-    WebSocketConnectionInUse,
-    WebSocketConnectionPurged,
-    AttackAttempt,
+use thiserror::Error;
+
+impl std::fmt::Display for BadRequestReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            BadRequestReason::MissingQueryParam(param) => {
+                write!(f, "Missing query parameter: {param}")
+            }
+            BadRequestReason::InvalidQueryParam(param) => {
+                write!(f, "Invalid query parameter: {param}")
+            }
+            BadRequestReason::UnsupportedUrlScheme => {
+                write!(f, "UnsupportedUrlScheme use ws:// or wss://")
+            }
+            BadRequestReason::NoHostName => write!(f, "No Host Name"),
+            BadRequestReason::MissingHeader(header) => write!(f, "Missing header: {header}"),
+            BadRequestReason::InvalidHeader(header) => write!(f, "Invalid header: {header}"),
+            BadRequestReason::NoPathOrQuery => write!(f, "No path and/or query"),
+        }
+    }
 }
 
-impl From<tokio_postgres::Error> for FaucetError {
-    fn from(value: tokio_postgres::Error) -> Self {
-        Self::PostgreSQL(value)
-    }
+#[derive(Error)]
+pub enum FaucetError {
+    #[error("Pool build error: {0}")]
+    PoolBuild(#[from] deadpool::managed::BuildError),
+    #[error("Pool timeout error: {0:?}")]
+    PoolTimeout(deadpool::managed::TimeoutType),
+    #[error("Pool post create hook error")]
+    PoolPostCreateHook,
+    #[error("Pool closed error")]
+    PoolClosed,
+    #[error("Pool no runtime specified error")]
+    PoolNoRuntimeSpecified,
+    #[error("No sockets available")]
+    NoSocketsAvailable,
+    #[error("Connection closed")]
+    ConnectionClosed,
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Unknown error: {0}")]
+    Unknown(String),
+    #[error("Error parsing host address: {0}")]
+    HostParseError(#[from] std::net::AddrParseError),
+    #[error("Hyper error: {0}")]
+    Hyper(#[from] hyper::Error),
+    #[error("{0}")]
+    BadRequest(BadRequestReason),
+    #[error("Invalid header values: {0}")]
+    InvalidHeaderValues(#[from] hyper::header::InvalidHeaderValue),
+    #[error("Http error: {0}")]
+    Http(#[from] hyper::http::Error),
+    #[error("Missing argument: {0}")]
+    MissingArgument(&'static str),
+    #[error("Route '{0}' is duplicated")]
+    DuplicateRoute(String),
+    #[error("Utf8 Coding error: {0}")]
+    Utf8Coding(String),
+    #[error("Buffer Capacity: {0}")]
+    BufferCapacity(tokio_tungstenite::tungstenite::error::CapacityError),
+    #[error("Protocol violation: {0}")]
+    ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
+    #[error("Web Socket Write buffer full, {0}")]
+    WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
+    #[error("PostgreSQL error: {0}")]
+    PostgreSQL(#[from] tokio_postgres::Error),
+    #[error("WebSocket Connection in use")]
+    WebSocketConnectionInUse,
+    #[error(
+        "WebSocket Connection purged. The client is trying to access a Shiny connection that does not exist."
+    )]
+    WebSocketConnectionPurged,
+    #[error("Attack attempt detected")]
+    AttackAttempt,
 }
 
 impl From<tokio_tungstenite::tungstenite::Error> for FaucetError {
@@ -77,18 +120,6 @@ impl From<tokio_tungstenite::tungstenite::Error> for FaucetError {
     }
 }
 
-impl From<hyper::header::InvalidHeaderValue> for FaucetError {
-    fn from(e: hyper::header::InvalidHeaderValue) -> Self {
-        Self::InvalidHeaderValues(e)
-    }
-}
-
-impl From<hyper::http::Error> for FaucetError {
-    fn from(e: hyper::http::Error) -> Self {
-        Self::Http(e)
-    }
-}
-
 impl From<deadpool::managed::PoolError<FaucetError>> for FaucetError {
     fn from(value: deadpool::managed::PoolError<FaucetError>) -> Self {
         match value {
@@ -107,86 +138,11 @@ impl From<Infallible> for FaucetError {
     }
 }
 
-impl From<deadpool::managed::BuildError> for FaucetError {
-    fn from(e: deadpool::managed::BuildError) -> Self {
-        Self::PoolBuild(e)
-    }
-}
-
-impl From<std::io::Error> for FaucetError {
-    fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl From<std::net::AddrParseError> for FaucetError {
-    fn from(e: std::net::AddrParseError) -> Self {
-        Self::HostParseError(e)
-    }
-}
-
-impl From<hyper::Error> for FaucetError {
-    fn from(e: hyper::Error) -> Self {
-        Self::Hyper(e)
-    }
-}
-
-impl std::fmt::Display for FaucetError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::PoolBuild(e) => write!(f, "Pool build error: {e}"),
-            Self::PoolTimeout(e) => write!(f, "Pool timeout error: {e:?}"),
-            Self::PoolPostCreateHook => write!(f, "Pool post create hook error"),
-            Self::PoolClosed => write!(f, "Pool closed error"),
-            Self::PoolNoRuntimeSpecified => write!(f, "Pool no runtime specified error"),
-            Self::Io(e) => write!(f, "IO error: {e}"),
-            Self::Unknown(e) => write!(f, "Unknown error: {e}"),
-            Self::HostParseError(e) => write!(f, "Error parsing host address: {e}"),
-            Self::Hyper(e) => write!(f, "Hyper error: {e}"),
-            Self::Http(e) => write!(f, "Http error: {e}"),
-            Self::InvalidHeaderValues(e) => write!(f, "Invalid header values: {e}"),
-            Self::MissingArgument(s) => write!(f, "Missing argument: {s}"),
-            Self::DuplicateRoute(route) => write!(f, "Route '{route}' is duplicated"),
-            Self::AttackAttempt => write!(f, "Attack attempt detected"),
-            Self::ConnectionClosed => write!(f, "Connection closed"),
-            Self::ProtocolViolation(e) => write!(f, "Protocol violation: {e}"),
-            Self::Utf8Coding(err) => write!(f, "Utf8 Coding error: {err}"),
-            Self::BufferCapacity(cap_err) => write!(f, "Buffer Capacity: {cap_err}"),
-            Self::WSWriteBufferFull(buf) => write!(f, "Web Socket Write buffer full, {buf}"),
-            Self::PostgreSQL(value) => write!(f, "PostgreSQL error: {value}"),
-            Self::WebSocketConnectionInUse => write!(f, "WebSocket Connection in use"),
-            Self::WebSocketConnectionPurged => write!(f, "WebSocket Connection purged. The client is trying to access a Shiny connection that does not exist."),
-            Self::BadRequest(r) => match r {
-                BadRequestReason::MissingQueryParam(param) => {
-                    write!(f, "Missing query parameter: {param}")
-                }
-                BadRequestReason::InvalidQueryParam(param) => {
-                    write!(f, "Invalid query parameter: {param}")
-                }
-                BadRequestReason::UnsupportedUrlScheme => {
-                    write!(f, "UnsupportedUrlScheme use ws:// or wss://")
-                }
-                BadRequestReason::NoHostName => write!(f, "No Host Name"),
-                BadRequestReason::MissingHeader(header) => {
-                    write!(f, "Missing header: {header}")
-                }
-                BadRequestReason::InvalidHeader(header) => {
-                    write!(f, "Invalid header: {header}")
-                }
-                BadRequestReason::NoPathOrQuery => write!(f, "No path and/or query"),
-            },
-            Self::NoSocketsAvailable => write!(f, "No sockets available"),
-        }
-    }
-}
-
 impl std::fmt::Debug for FaucetError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
-
-impl std::error::Error for FaucetError {}
 
 impl FaucetError {
     pub fn no_sec_web_socket_key() -> Self {

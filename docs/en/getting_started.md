@@ -64,6 +64,83 @@ faucet will deploy the Quarto document as a Shiny application.
 
 3. Open your web browser and navigate to [http://127.0.0.1:3838](http://127.0.0.1:3838) to see your Quarto app in action.
 
+## Running a FastAPI Application
+
+faucet can also serve Python applications built with FastAPI. This feature relies on `uv` being available in your system's `PATH`.
+
+1.  Create a simple FastAPI application. Create a file named `main.py` in your project directory:
+
+    ```python
+    # main.py
+    from fastapi import FastAPI
+
+    app = FastAPI()
+
+    @app.get("/")
+    def read_root():
+        return {"Hello": "Faucet"}
+    ```
+
+2.  You will need `uvicorn` and `fastapi` in your Python environment. If you are using `uv`, you can install them with:
+
+    ```bash
+    uv pip install fastapi uvicorn
+    ```
+
+3.  Start faucet and point it to your FastAPI application:
+
+    ```bash
+    faucet start --type fast-api --dir .
+    ```
+    faucet will look for a `main.py` file in the specified directory, and then serve it using `uv run uvicorn main:app`.
+
+4.  Open your web browser and navigate to [http://127.0.0.1:3838](http://127.0.0.1:3838) to see your FastAPI app's response.
+
+## Running an R Script
+
+You can run arbitrary R scripts using the `rscript` subcommand. Faucet will manage the execution of the script.
+
+1.  Create an R script, for example `task.R`:
+
+    ```R
+    # task.R
+    print("Executing a task in R.")
+    Sys.sleep(5)
+    print("Task finished.")
+    ```
+
+2.  Execute the script using faucet:
+
+    ```bash
+    faucet rscript task.R
+    ```
+    This will run `Rscript task.R` under faucet's management. You can pass any arguments to your script as you normally would.
+
+## Running a Python Script
+
+Similarly, you can run Python scripts or any `uv` command using the `uv` subcommand. This requires `uv` to be installed and available in your `PATH`.
+
+1.  Create a Python script, for example `task.py`:
+
+    ```python
+    # task.py
+    import time
+    print("Executing a task in Python.")
+    time.sleep(5)
+    print("Task finished.")
+    ```
+
+2.  Execute the script using faucet:
+
+    ```bash
+    faucet uv run task.py
+    ```
+    This will execute `uv run task.py`. Any arguments can be passed to `uv`. For example, to install a package into the current environment:
+
+    ```bash
+    faucet uv pip install requests
+    ```
+
 ### Adding more workers
 
 If your computer has more than one CPU core, then you probably saw that
@@ -118,8 +195,8 @@ To better explain the configuration, we have an example repository called [fauce
 │   faucet-router-example.Rproj
 │   frouter.toml
 │   README.md
-│   
-│   
+│
+│
 │   app.R
 │
 ├───sliders
@@ -133,11 +210,13 @@ To better explain the configuration, we have an example repository called [fauce
 ├───qmd
 │   │   old_faithful.qmd
 │
+├───py-api
+│   │   main.py
 ```
 
 Example `frouter.toml`:
 
-```sh
+```toml
 # By default, the `workdir` and `app_dir`
 # is `.` (Here). If not specified,
 # runs the application in the current directory.
@@ -181,9 +260,16 @@ workers = 1
 server_type = "QuartoShiny"
 workdir = "./qmd"
 qmd = "old_faithful.qmd"
+
+# Demonstration of how to serve a FastAPI application
+[[route]]
+route = "/py-api/"
+workers = 1
+server_type = "FastAPI"
+workdir = "./py-api"
 ```
 
-The `server_type` argument defines the type of application you want to deploy; currently, we have: `QuartoShiny`, `Shiny`, and `Plumber`.
+The `server_type` argument defines the type of application you want to deploy; currently, we have: `QuartoShiny`, `Shiny`, `Plumber`, and `FastAPI`.
 
 In the same configuration file `frouter.toml`, we can define the number of `workers` that each application needs.
 
@@ -202,6 +288,7 @@ All the applications will be on the same port but with different routes, accordi
 - Text Shiny [`/text/`]: [`http://localhost:3838/text/`](http://localhost:3838/text/)
 - Plumber API [`/api/`]: [`http://localhost:3838/api/__docs__/`](http://localhost:3838/api/__docs__/)
 - Quarto Shiny App [`/qmd/`]: [`http://localhost:3838/qmd/`](http://localhost:3838/qmd/)
+- FastAPI App [`/py-api/`]: [`http://localhost:3838/py-api/`](http://localhost:3838/py-api/)
 
 
 ## Conclusion

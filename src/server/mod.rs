@@ -34,6 +34,10 @@ use self::{logging::LogService, service::AddStateService};
 
 fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> Strategy {
     match server_type {
+        WorkerType::FastAPI => strategy.unwrap_or_else(|| {
+            log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to round robin for FastAPI.");
+            Strategy::RoundRobin
+        }),
         WorkerType::Plumber =>
             strategy.unwrap_or_else(|| {
                 log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to round robin for plumber.");
@@ -41,8 +45,8 @@ fn determine_strategy(server_type: WorkerType, strategy: Option<Strategy>) -> St
             }),
         WorkerType::Shiny | WorkerType::QuartoShiny => match strategy {
             None => {
-                log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to IP hash for shiny.");
-                Strategy::IpHash
+                log::debug!(target: "faucet", "No load balancing strategy specified. Defaulting to Cookie Hash for shiny.");
+                Strategy::CookieHash
             },
             Some(Strategy::Rps) => {
                 log::debug!(target: "faucet", "RPS load balancing strategy specified for shiny, switching to IP hash.");
@@ -71,6 +75,7 @@ pub struct FaucetServerBuilder {
     workdir: Option<PathBuf>,
     extractor: Option<load_balancing::IpExtractor>,
     rscript: Option<OsString>,
+    uv: Option<OsString>,
     app_dir: Option<String>,
     quarto: Option<OsString>,
     qmd: Option<PathBuf>,
@@ -88,6 +93,7 @@ impl FaucetServerBuilder {
             workdir: None,
             extractor: None,
             rscript: None,
+            uv: None,
             app_dir: None,
             route: None,
             quarto: None,
@@ -140,6 +146,11 @@ impl FaucetServerBuilder {
         self.rscript = Some(rscript.as_ref().into());
         self
     }
+    pub fn uv(mut self, uv: impl AsRef<OsStr>) -> Self {
+        log::debug!(target: "faucet", "Using uv command: {:?}", uv.as_ref());
+        self.rscript = Some(uv.as_ref().into());
+        self
+    }
     pub fn quarto(mut self, quarto: impl AsRef<OsStr>) -> Self {
         log::debug!(target: "faucet", "Using quarto command: {:?}", quarto.as_ref());
         self.quarto = Some(quarto.as_ref().into());
@@ -177,6 +188,10 @@ impl FaucetServerBuilder {
             log::debug!(target: "faucet", "No Rscript command specified. Defaulting to `Rscript`.");
             OsStr::new("Rscript")
         });
+        let uv = self.uv.map(|wd| leak!(wd, OsStr)).unwrap_or_else(|| {
+            log::debug!(target: "faucet", "No uv command specified. Defaulting to `uv`.");
+            OsStr::new("uv")
+        });
         let extractor = self.extractor.unwrap_or_else(|| {
             log::debug!(target: "faucet", "No IP extractor specified. Defaulting to client address.");
             load_balancing::IpExtractor::ClientAddr
@@ -198,6 +213,7 @@ impl FaucetServerBuilder {
             extractor,
             rscript,
             app_dir,
+            uv,
             route,
             quarto,
             qmd,
@@ -221,6 +237,7 @@ pub struct FaucetServerConfig {
     pub workdir: &'static Path,
     pub extractor: load_balancing::IpExtractor,
     pub rscript: &'static OsStr,
+    pub uv: &'static OsStr,
     pub quarto: &'static OsStr,
     pub app_dir: Option<&'static str>,
     pub route: Option<&'static str>,

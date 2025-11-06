@@ -1,43 +1,37 @@
 # faucet ![logo](figures/faucet.png){ align=right height=139 width=120 }
 
-<!-- insignias: inicio -->
-[![Crates.io](https://img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)
-<!-- insignias: fin -->
+<!-- badges: start -->
+[![Crates.io](https.img.shields.io/crates/v/faucet-server.svg)](https://crates.io/crates/faucet-server)
+<!-- badges: end -->
 
-Despliegue Rápido, Asincrónico y Concurrente de Aplicaciones R
+Despliegue Rápido, Asíncrono y Concurrente de Aplicaciones R y Python
 
 ---
 
-## Introducción
+## Resumen
 
-Bienvenido a faucet, tu solución de alto rendimiento para desplegar APIs de Plumber y Aplicaciones Shiny con velocidad y eficiencia. faucet es un servidor basado en Rust que ofrece equilibrio de carga Round Robin e IP Hash, garantizando una escalabilidad y distribución fluidas de tus aplicaciones R. Ya seas un científico de datos, desarrollador o entusiasta de DevOps, faucet simplifica el despliegue, facilitando la gestión de réplicas y el equilibrio de cargas de manera efectiva.
+Bienvenido a faucet, tu solución de alto rendimiento para desplegar APIs de Plumber, Aplicaciones Shiny y aplicaciones FastAPI con velocidad y eficiencia. Faucet es un servidor basado en Rust que ofrece balanceo de carga Round Robin, IP Hash y Cookie Hash, asegurando un escalado y distribución fluidos de tus aplicaciones R y Python. También permite ejecutar scripts arbitrarios de R y Python. Ya seas un científico de datos, desarrollador o entusiasta de DevOps, faucet simplifica el despliegue, facilitando la gestión de réplicas y el balanceo de cargas de manera efectiva.
 
 ## Características
 
-- **Alto Rendimiento:** faucet aprovecha la velocidad de Rust para una ejecución suave y eficiente de las aplicaciones R.
-- **Equilibrio de Carga:** Elige el equilibrio de carga Round Robin o IP Hash para una utilización óptima de los recursos.
-- **Réplicas:** Escala las APIs de Plumber y las Aplicaciones Shiny sin esfuerzo con múltiples réplicas.
-- **Despliegue Simplificado:** faucet simplifica el proceso de despliegue para una configuración rápida.
-- **Asincrónico y Concurrente:** Utiliza el procesamiento asíncrono y concurrente para una eficiencia de recursos y una manipulación de solicitudes receptiva.
+- **Alto Rendimiento:** faucet aprovecha la velocidad de Rust para una ejecución fluida y eficiente de aplicaciones R y Python.
+- **Soporte Políglota:** Despliega nativamente aplicaciones escritas en R (Plumber, Shiny) y Python (FastAPI), o ejecuta scripts arbitrarios de `Rscript` y Python (`uv`).
+- **Balanceo de Carga:** Elige entre balanceo de carga Round Robin, IP Hash o Cookie Hash para una utilización óptima de los recursos.
+- **Réplicas:** Escala APIs de Plumber, Aplicaciones Shiny y aplicaciones FastAPI sin esfuerzo con múltiples réplicas.
+- **Despliegue Simplificado:** faucet agiliza el proceso de despliegue para una configuración rápida.
+- **Asíncrono y Concurrente:** Utiliza procesamiento asíncrono y concurrente para una mayor eficiencia de recursos y un manejo receptivo de las solicitudes.
+- **Trazado Estructurado de Eventos:** Obtén información detallada sobre tus aplicaciones Shiny con registros detallados y legibles por máquina almacenados directamente en tu base de datos.
+
 
 ## Instalación
 
 Para opciones de instalación, consulta [Instalación](./install.md).
 
-## Modos de Uso
+## Uso
 
-### Single Server: 
+Para instrucciones de uso detalladas, consulta [Primeros Pasos](./getting_started.md).
 
-El modo Single Server es adecuado cuando tienes una sola aplicación que deseas desplegar. Este modo permite iniciar y gestionar una única "instancia" de una aplicación Plumber o Shiny.
+## Con Docker
 
-### Router: 
-
-El modo Router es ideal cuando tienes varias aplicaciones (Shiny, Quarto, Plumber) por desplegar y deseas que cada aplicación este en un mismo puerto pero en diferentes rutas. El Router se encarga de gestionar las rutas y dirigir las solicitudes a la aplicación correspondiente.
-
-Para instrucciones detalladas de los modos de uso, consulta [Cómo Empezar](./getting_started.md).
-
-## Con Docker / en Contenedores
-
-faucet también está disponible como una imagen de Docker, para instrucciones
-detalladas de uso con Docker, consulta [faucet en
-Contenedores](./in_containers.md).
+faucet también está disponible como imagen de Docker. Para instrucciones de uso detalladas con
+Docker, consulta [faucet en Contenedores](./in_containers.md).
