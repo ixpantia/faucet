@@ -1,0 +1,1499 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://ixpantia.github.io/faucet/es/options/">
+      
+      
+        <link rel="prev" href="../getting_started/">
+      
+      
+        <link rel="next" href="../router/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.8">
+    
+    
+      
+        <title>Opciones - faucet</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="faucet" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#opciones-configuracion" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href="../" title="faucet" class="md-header__button md-logo" aria-label="faucet" data-md-component="logo">
+      
+  <img src="../../figures/faucet.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            faucet
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Opciones
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Seleccionar idioma">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04M18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12m-2.62 7 1.62-4.33L19.12 17h-3.24Z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../options/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="es" class="md-select__link">
+              Español
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ixpantia/faucet" title="Ir al repositorio" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="faucet" class="md-nav__button md-logo" aria-label="faucet" data-md-component="logo">
+      
+  <img src="../../figures/faucet.png" alt="logo">
+
+    </a>
+    faucet
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ixpantia/faucet" title="Ir al repositorio" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inicio
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Instalación
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inicio Rápido
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Opciones
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Opciones
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#opciones-globales" class="md-nav__link">
+    <span class="md-ellipsis">
+      Opciones Globales
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Opciones Globales">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#host" class="md-nav__link">
+    <span class="md-ellipsis">
+      Host
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ip-from-como-determinar-la-ip-del-cliente" class="md-nav__link">
+    <span class="md-ellipsis">
+      IP From (Cómo determinar la IP del cliente)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rscript-definir-un-binarioejecutable-rscript-personalizado" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rscript (Definir un binario/ejecutable Rscript personalizado)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quarto-definir-un-binarioejecutable-quarto-personalizado" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quarto (Definir un binario/ejecutable quarto personalizado)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uv-definir-un-binarioejecutable-uv-personalizado" class="md-nav__link">
+    <span class="md-ellipsis">
+      Uv (Definir un binario/ejecutable uv personalizado)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-file-redirigir-el-registro-a-un-archivo" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log File (Redirigir el registro a un archivo)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#max-log-file-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      Max Log File Size
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Logging Level
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      Shutdown
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#max-message-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      Max Message Size
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-cadena-de-conexion-de-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Cadena de Conexión de PostgreSQL
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Namespace
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Versión
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-certificado-ssl-de-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Certificado SSL de PostgreSQL
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-modo-ssl-de-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Modo SSL de PostgreSQL
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opciones-del-subcomando-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      Opciones del Subcomando start
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Opciones del Subcomando start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Workers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Strategy
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#round-robin" class="md-nav__link">
+    <span class="md-ellipsis">
+      Round Robin
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ip-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      IP Hash
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cookie-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cookie Hash
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-tipo-de-servidor" class="md-nav__link">
+    <span class="md-ellipsis">
+      Type (Tipo de servidor)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Type (Tipo de servidor)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#auto" class="md-nav__link">
+    <span class="md-ellipsis">
+      Auto
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plumber" class="md-nav__link">
+    <span class="md-ellipsis">
+      Plumber
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shiny" class="md-nav__link">
+    <span class="md-ellipsis">
+      Shiny
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quarto-shiny" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quarto Shiny
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      FastAPI
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directory-directorio-de-trabajo" class="md-nav__link">
+    <span class="md-ellipsis">
+      Directory (Directorio de trabajo)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#app-directory-appdir-de-shiny" class="md-nav__link">
+    <span class="md-ellipsis">
+      App Directory (appDir de Shiny)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qmd-documento-quarto" class="md-nav__link">
+    <span class="md-ellipsis">
+      QMD (Documento Quarto)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opciones-del-subcomando-router" class="md-nav__link">
+    <span class="md-ellipsis">
+      Opciones del Subcomando router
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Opciones del Subcomando router">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#config-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Config File
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subcomando-rscript" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subcomando rscript
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subcomando-uv" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subcomando uv
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../router/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Modo Router
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../in_containers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    faucet en Contenedores
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../logging/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reverse_proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Con Proxy Inverso
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Telemetría
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Ejemplos
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#opciones-globales" class="md-nav__link">
+    <span class="md-ellipsis">
+      Opciones Globales
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Opciones Globales">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#host" class="md-nav__link">
+    <span class="md-ellipsis">
+      Host
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ip-from-como-determinar-la-ip-del-cliente" class="md-nav__link">
+    <span class="md-ellipsis">
+      IP From (Cómo determinar la IP del cliente)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rscript-definir-un-binarioejecutable-rscript-personalizado" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rscript (Definir un binario/ejecutable Rscript personalizado)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quarto-definir-un-binarioejecutable-quarto-personalizado" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quarto (Definir un binario/ejecutable quarto personalizado)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uv-definir-un-binarioejecutable-uv-personalizado" class="md-nav__link">
+    <span class="md-ellipsis">
+      Uv (Definir un binario/ejecutable uv personalizado)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#log-file-redirigir-el-registro-a-un-archivo" class="md-nav__link">
+    <span class="md-ellipsis">
+      Log File (Redirigir el registro a un archivo)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#max-log-file-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      Max Log File Size
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logging-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Logging Level
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      Shutdown
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#max-message-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      Max Message Size
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-cadena-de-conexion-de-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Cadena de Conexión de PostgreSQL
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Namespace
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Versión
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-certificado-ssl-de-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Certificado SSL de PostgreSQL
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetria-modo-ssl-de-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      Telemetría: Modo SSL de PostgreSQL
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opciones-del-subcomando-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      Opciones del Subcomando start
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Opciones del Subcomando start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Workers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Strategy
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#round-robin" class="md-nav__link">
+    <span class="md-ellipsis">
+      Round Robin
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ip-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      IP Hash
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cookie-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      Cookie Hash
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#type-tipo-de-servidor" class="md-nav__link">
+    <span class="md-ellipsis">
+      Type (Tipo de servidor)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Type (Tipo de servidor)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#auto" class="md-nav__link">
+    <span class="md-ellipsis">
+      Auto
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plumber" class="md-nav__link">
+    <span class="md-ellipsis">
+      Plumber
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shiny" class="md-nav__link">
+    <span class="md-ellipsis">
+      Shiny
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quarto-shiny" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quarto Shiny
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      FastAPI
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#directory-directorio-de-trabajo" class="md-nav__link">
+    <span class="md-ellipsis">
+      Directory (Directorio de trabajo)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#app-directory-appdir-de-shiny" class="md-nav__link">
+    <span class="md-ellipsis">
+      App Directory (appDir de Shiny)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qmd-documento-quarto" class="md-nav__link">
+    <span class="md-ellipsis">
+      QMD (Documento Quarto)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#opciones-del-subcomando-router" class="md-nav__link">
+    <span class="md-ellipsis">
+      Opciones del Subcomando router
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Opciones del Subcomando router">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#config-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Config File
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subcomando-rscript" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subcomando rscript
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#subcomando-uv" class="md-nav__link">
+    <span class="md-ellipsis">
+      Subcomando uv
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="opciones-configuracion">Opciones / Configuración</h1>
+<p>Esta sección cubre todas las opciones configurables por el usuario para faucet.</p>
+<h2 id="opciones-globales">Opciones Globales</h2>
+<p>Estas opciones se pueden usar con los subcomandos <code>start</code> y <code>router</code>.</p>
+<h3 id="host">Host</h3>
+<ul>
+<li>CLI: <code>--host</code></li>
+<li>Entorno: <code>FAUCET_HOST</code></li>
+<li>Predeterminado: <code>127.0.0.1:3838</code></li>
+</ul>
+<p>El host y el puerto al que se vinculará el servidor faucet. Si se ejecuta en un contenedor, esto debería establecerse en <code>0.0.0.0:3838</code> para permitir el acceso externo.</p>
+<h3 id="ip-from-como-determinar-la-ip-del-cliente">IP From (Cómo determinar la IP del cliente)</h3>
+<ul>
+<li>CLI: <code>--ip-from</code> o <code>-i</code></li>
+<li>Entorno: <code>FAUCET_IP_FROM</code></li>
+<li>Predeterminado: <code>client</code></li>
+<li>Valores posibles:</li>
+<li><code>client</code></li>
+<li><code>x-forwarded-for</code></li>
+<li><code>x-real-ip</code></li>
+</ul>
+<p>Cómo determinar la IP del cliente. Esto se utiliza para determinar la IP para la estrategia de IP Hash y para el registro de solicitudes HTTP. Si estás ejecutando faucet directamente para los usuarios finales, deberías usar <code>client</code>. Si estás ejecutando faucet detrás de un proxy inverso como <em>nginx</em>, deberías usar <code>x-forwarded-for</code> o <code>x-real-ip</code>.</p>
+<blockquote>
+<p><strong>Nota:</strong> Si estás ejecutando faucet detrás de un proxy inverso, asegúrate de establecer correctamente la cabecera <code>X-Forwarded-For</code> o <code>X-Real-IP</code> en la configuración de tu proxy inverso.</p>
+</blockquote>
+<h3 id="rscript-definir-un-binarioejecutable-rscript-personalizado">Rscript (Definir un binario/ejecutable <code>Rscript</code> personalizado)</h3>
+<ul>
+<li>CLI: <code>--rscript</code> o <code>-r</code></li>
+<li>Entorno: <code>FAUCET_RSCRIPT</code></li>
+<li>Predeterminado: <code>Rscript</code></li>
+</ul>
+<p>El binario/ejecutable <code>Rscript</code> a utilizar. Esto es útil si necesitas tener varias versiones de R instaladas en tu sistema. Debe ser la ruta completa al binario/ejecutable <code>Rscript</code> o un alias que esté disponible en tu <code>$PATH</code>. Esto también es útil en plataformas como <em>Windows</em> donde el binario/ejecutable <code>Rscript</code> puede no estar disponible en el <code>$PATH</code>.</p>
+<h3 id="quarto-definir-un-binarioejecutable-quarto-personalizado">Quarto (Definir un binario/ejecutable <code>quarto</code> personalizado)</h3>
+<ul>
+<li>CLI: <code>--quarto</code> o <code>-q</code></li>
+<li>Entorno: <code>FAUCET_QUARTO</code></li>
+<li>Predeterminado: <code>quarto</code></li>
+</ul>
+<p>El binario/ejecutable <code>quarto</code> a utilizar. Esto es útil si tienes varias versiones de Quarto instaladas o si no está en tu <code>$PATH</code>.</p>
+<h3 id="uv-definir-un-binarioejecutable-uv-personalizado">Uv (Definir un binario/ejecutable <code>uv</code> personalizado)</h3>
+<ul>
+<li>CLI: <code>--uv</code></li>
+<li>Entorno: <code>FAUCET_UV</code></li>
+<li>Predeterminado: <code>uv</code></li>
+</ul>
+<p>El binario/ejecutable <code>uv</code> a utilizar. Esto es útil si tienes múltiples versiones de <code>uv</code> instaladas, o si no está en el <code>PATH</code> de tu sistema. <code>uv</code> es requerido para ejecutar aplicaciones FastAPI y subcomandos <code>uv</code>.</p>
+<h3 id="log-file-redirigir-el-registro-a-un-archivo">Log File (Redirigir el registro a un archivo)</h3>
+<ul>
+<li>CLI: <code>--log-file</code> o <code>-l</code></li>
+<li>Entorno: <code>FAUCET_LOG_FILE</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>Si estableces esta variable, se desactivarán los colores en <code>stderr</code> y se guardará toda la salida en la ruta especificada. Esto añadirá contenido, no sobrescribirá archivos existentes.</p>
+<h3 id="max-log-file-size">Max Log File Size</h3>
+<ul>
+<li>CLI: <code>--max-log-file-size</code> o <code>-m</code></li>
+<li>Entorno: <code>FAUCET_MAX_LOG_FILE_SIZE</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>El tamaño máximo del archivo de registro antes de la rotación (p. ej., 10M, 1GB). Requiere que <code>log-file</code> esté configurado.</p>
+<h3 id="logging-level">Logging Level</h3>
+<ul>
+<li>Entorno: <code>FAUCET_LOG</code></li>
+<li>Predeterminado: <code>INFO</code></li>
+<li>Valores posibles:</li>
+<li><code>ERROR</code></li>
+<li><code>WARN</code></li>
+<li><code>INFO</code></li>
+<li><code>DEBUG</code></li>
+<li><code>TRACE</code></li>
+</ul>
+<p>El nivel de registro a utilizar. Esta variable de entorno establece la verbosidad global del registro. Consulta la sección de <a href="../logging/">registro</a> para más información.
+<strong>Nota:</strong> Aunque esta variable de entorno es funcional, las aplicaciones más nuevas podrían preferir un control más granular a través de archivos de configuración de logger dedicados o configuraciones específicas de la biblioteca si están disponibles. Las opciones de CLI <code>--log-file</code> y <code>--max-log-file-size</code> proporcionan control directo sobre el registro basado en archivos.</p>
+<h3 id="shutdown">Shutdown</h3>
+<ul>
+<li>CLI: <code>--shutdown</code></li>
+<li>Entorno: <code>FAUCET_SHUTDOWN</code></li>
+<li>Predeterminado: <code>immediate</code></li>
+<li>Valores posibles:</li>
+<li><code>immediate</code></li>
+<li><code>graceful</code></li>
+</ul>
+<p>La estrategia utilizada para apagar faucet. <code>immediate</code> termina cada conexión activa y apaga el proceso. <code>graceful</code> espera a que todas las conexiones se cierren antes de apagarse.</p>
+<h3 id="max-message-size">Max Message Size</h3>
+<ul>
+<li>CLI: <code>--max-message-size</code></li>
+<li>Entorno: <code>FAUCET_MAX_MESSAGE_SIZE</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>Tamaño máximo de un mensaje de WebSocket. Esto es útil para la prevención de ataques DDOS. Si no se establece, no hay límite de tamaño.</p>
+<h3 id="telemetria-cadena-de-conexion-de-postgresql">Telemetría: Cadena de Conexión de PostgreSQL</h3>
+<ul>
+<li>CLI: <code>--pg-con-string</code></li>
+<li>Entorno: <code>FAUCET_TELEMETRY_POSTGRES_STRING</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>Cadena de conexión a una base de datos PostgreSQL para guardar eventos HTTP. Si se proporciona, faucet intentará registrar los eventos HTTP en esta base de datos.</p>
+<h3 id="telemetria-namespace">Telemetría: Namespace</h3>
+<ul>
+<li>CLI: <code>--telemetry-namespace</code></li>
+<li>Entorno: <code>FAUCET_TELEMETRY_NAMESPACE</code></li>
+<li>Predeterminado: <code>faucet</code></li>
+</ul>
+<p>Espacio de nombres bajo el cual se guardan los eventos HTTP en PostgreSQL.</p>
+<h3 id="telemetria-version">Telemetría: Versión</h3>
+<ul>
+<li>CLI: <code>--telemetry-version</code></li>
+<li>Entorno: <code>FAUCET_TELEMETRY_VERSION</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>Representa la versión del código fuente del servicio que se está ejecutando. Esto es útil para filtrar datos de telemetría.</p>
+<h3 id="telemetria-certificado-ssl-de-postgresql">Telemetría: Certificado SSL de PostgreSQL</h3>
+<ul>
+<li>CLI: <code>--pg-sslcert</code></li>
+<li>Entorno: <code>FAUCET_TELEMETRY_POSTGRES_SSLCERT</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>Ruta a un archivo de certificado de CA para verificar el servidor PostgreSQL al usar SSL/TLS. Requerido si <code>--pg-sslmode</code> se establece en <code>verify-ca</code> o <code>verify-full</code>. El certificado debe estar en formato PEM o DER.</p>
+<h3 id="telemetria-modo-ssl-de-postgresql">Telemetría: Modo SSL de PostgreSQL</h3>
+<ul>
+<li>CLI: <code>--pg-sslmode</code></li>
+<li>Entorno: <code>FAUCET_TELEMETRY_POSTGRES_SSLMODE</code></li>
+<li>Predeterminado: <code>prefer</code></li>
+<li>Valores posibles:</li>
+<li><code>disable</code></li>
+<li><code>prefer</code></li>
+<li><code>require</code></li>
+<li><code>verify-ca</code></li>
+<li><code>verify-full</code></li>
+</ul>
+<p>Controla el comportamiento de SSL/TLS para la conexión de PostgreSQL. Si se establece en <code>verify-ca</code> o <code>verify-full</code>, se debe proporcionar un certificado de CA a través de <code>--pg-sslcert</code> o <code>FAUCET_TELEMETRY_POSTGRES_SSLCERT</code>.</p>
+<h2 id="opciones-del-subcomando-start">Opciones del Subcomando <code>start</code></h2>
+<p>Estas opciones son específicas del subcomando <code>start</code>, utilizado para ejecutar un servidor faucet estándar.</p>
+<h3 id="workers">Workers</h3>
+<ul>
+<li>CLI: <code>--workers</code> o <code>-w</code></li>
+<li>Entorno: <code>FAUCET_WORKERS</code></li>
+<li>Predeterminado: El número de CPUs disponibles para el proceso</li>
+</ul>
+<p>El número de procesos de trabajo a generar. En una carga de trabajo limitada por la CPU, esto debería establecerse en el número de CPUs disponibles para el proceso. En una carga de trabajo limitada por E/S, esto podría establecerse en un número mayor.</p>
+<h3 id="strategy">Strategy</h3>
+<ul>
+<li>CLI: <code>--strategy</code> o <code>-s</code></li>
+<li>Entorno: <code>FAUCET_STRATEGY</code></li>
+<li>Predeterminado: <code>round-robin</code></li>
+<li>Valores posibles:</li>
+<li><code>round-robin</code></li>
+<li><code>ip-hash</code></li>
+<li><code>cookie-hash</code></li>
+</ul>
+<p>La estrategia a utilizar para el balanceo de carga. La estrategia que elijas depende de tu carga de trabajo.</p>
+<h4 id="round-robin">Round Robin</h4>
+<p>Round robin es una estrategia de balanceo de carga muy ligera y simple. Simplemente distribuye las solicitudes a los workers de manera rotativa. Esta puede ser una buena estrategia para la mayoría de las cargas de trabajo, es muy simple y tiene muy poca sobrecarga.</p>
+<p><strong>NO</strong> deberías usar round robin si el servidor es con estado (stateful), ya que no garantizará que las solicitudes del mismo cliente se dirijan al mismo worker. Si necesitas un estado persistente, usa IP Hash o Cookie Hash.</p>
+<p>Si un worker muere, las solicitudes que se estaban enrutando continuarán hacia el siguiente worker disponible que esté vivo.</p>
+<h4 id="ip-hash">IP Hash</h4>
+<p>IP Hash es una estrategia más compleja que garantiza que las solicitudes del mismo cliente se dirijan al mismo worker. Esto es útil para servidores con estado, como las aplicaciones Shiny. IP Hash se aplica en las aplicaciones Shiny si la estrategia se establece en <code>auto</code>.</p>
+<p>Si un worker muere, las solicitudes se retendrán hasta que el worker vuelva a estar en línea. Esto significa que la latencia puede aumentar si un worker muere.</p>
+<h4 id="cookie-hash">Cookie Hash</h4>
+<p>Cookie Hash utiliza una cookie para identificar al worker al que se debe enviar la solicitud. Esto es útil para sesiones persistentes (sticky sessions) desde la misma red, incluso si los clientes están detrás de un NAT o comparten la misma dirección IP.</p>
+<h3 id="type-tipo-de-servidor">Type (Tipo de servidor)</h3>
+<ul>
+<li>CLI: <code>--type</code> o <code>-t</code></li>
+<li>Entorno: <code>FAUCET_TYPE</code></li>
+<li>Predeterminado: <code>auto</code></li>
+<li>Valores posibles:</li>
+<li><code>auto</code></li>
+<li><code>plumber</code></li>
+<li><code>shiny</code></li>
+<li><code>quarto-shiny</code></li>
+<li><code>fast-api</code></li>
+</ul>
+<p>El tipo de servidor a ejecutar. Se utiliza para determinar la estrategia correcta a usar y cómo generar los workers.</p>
+<h4 id="auto">Auto</h4>
+<p>Auto intentará determinar el tipo de servidor basándose en el contenido del directorio especificado por <code>--dir</code>.</p>
+<ul>
+<li>Si el directorio contiene un archivo <code>plumber.R</code> o <code>entrypoint.R</code>, se asumirá que es un servidor Plumber.</li>
+<li>Si el directorio contiene un archivo <code>app.R</code>, o ambos archivos <code>server.R</code> y <code>ui.R</code>, se asumirá que es un servidor Shiny.</li>
+<li>Si se proporciona un archivo <code>.qmd</code> a través del argumento <code>--qmd</code>, o si <code>FAUCET_QMD</code> está establecido, se asumirá que es una aplicación Quarto Shiny.
+  De lo contrario, faucet saldrá con un error.</li>
+</ul>
+<h4 id="plumber">Plumber</h4>
+<p>Ejecuta el servidor como una API de Plumber. La estrategia predeterminada es <code>round-robin</code>.</p>
+<h4 id="shiny">Shiny</h4>
+<p>Ejecuta el servidor como una aplicación Shiny. La estrategia predeterminada es <code>ip-hash</code>.</p>
+<h4 id="quarto-shiny">Quarto Shiny</h4>
+<p>Ejecuta el servidor como una aplicación Quarto Shiny. La estrategia predeterminada es <code>ip-hash</code>. Requiere la opción <code>--qmd</code> para especificar el documento Quarto.</p>
+<h4 id="fastapi">FastAPI</h4>
+<p>Ejecuta el servidor como una aplicación FastAPI. La estrategia predeterminada es <code>round-robin</code>. Esto requiere que <code>uv</code> esté instalado. Faucet buscará un archivo <code>main.py</code> en el directorio especificado y lo servirá.</p>
+<h3 id="directory-directorio-de-trabajo">Directory (Directorio de trabajo)</h3>
+<ul>
+<li>CLI: <code>--dir</code> o <code>-d</code></li>
+<li>Entorno: <code>FAUCET_DIR</code></li>
+<li>Predeterminado: <code>.</code></li>
+</ul>
+<p>El directorio desde el cual ejecutar el servidor. Este debe ser el directorio que contiene el <code>plumber.R</code> o el contenido de la aplicación Shiny.</p>
+<h3 id="app-directory-appdir-de-shiny">App Directory (<code>appDir</code> de Shiny)</h3>
+<ul>
+<li>CLI: <code>--app-dir</code> o <code>-a</code></li>
+<li>Entorno: <code>FAUCET_APP_DIR</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>Argumento pasado a <code>appDir</code> al ejecutar aplicaciones Shiny. Esto te permite especificar un subdirectorio dentro de la ruta <code>--dir</code> como la raíz para la aplicación Shiny.</p>
+<h3 id="qmd-documento-quarto">QMD (Documento Quarto)</h3>
+<ul>
+<li>CLI: <code>--qmd</code></li>
+<li>Entorno: <code>FAUCET_QMD</code></li>
+<li>Predeterminado: <code>None</code></li>
+</ul>
+<p>Ruta al archivo <code>.qmd</code> de Quarto Shiny. Esto es requerido cuando <code>type</code> se establece en <code>quarto-shiny</code>, o cuando <code>type</code> es <code>auto</code> y tienes la intención de ejecutar una aplicación Quarto Shiny.</p>
+<h2 id="opciones-del-subcomando-router">Opciones del Subcomando <code>router</code></h2>
+<p>Estas opciones son específicas del subcomando <code>router</code>, utilizado para ejecutar faucet en modo router (experimental).</p>
+<h3 id="config-file">Config File</h3>
+<ul>
+<li>CLI: <code>--conf</code> o <code>-c</code></li>
+<li>Entorno: <code>FAUCET_ROUTER_CONF</code></li>
+<li>Predeterminado: <code>./frouter.toml</code></li>
+</ul>
+<p>Ruta al archivo de configuración TOML del router.</p>
+<h2 id="subcomando-rscript">Subcomando <code>rscript</code></h2>
+<p>Este subcomando te permite ejecutar un script de R arbitrario. Cualquier argumento que siga a <code>rscript</code> se pasará directamente al ejecutable <code>Rscript</code>.</p>
+<p>Ejemplo: <code>faucet rscript mi_script.R --arg1 valor1</code></p>
+<h2 id="subcomando-uv">Subcomando <code>uv</code></h2>
+<p>Este subcomando te permite ejecutar comandos <code>uv</code> arbitrarios. Esto es particularmente útil para ejecutar scripts de Python o gestionar entornos de Python. Cualquier argumento que siga a <code>uv</code> se pasará directamente al ejecutable <code>uv</code>.</p>
+<p>Ejemplo: <code>faucet uv run mi_script.py</code> o <code>faucet uv pip install pandas</code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
+      
+    
+  </body>
+</html>
