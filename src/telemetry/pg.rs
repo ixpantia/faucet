@@ -24,11 +24,9 @@ pub fn make_tls(
                     std::io::BufReader::new(std::fs::File::open(cert_path).unwrap_or_else(|e| {
                         panic!("Failed to open certificate file '{:?}': {}", cert_path, e)
                     }));
-                if let Ok(certs) = rustls_pemfile::certs(&mut reader) {
-                    for cert in certs {
-                        if let Err(e) = root_store.add(cert.clone().into()) {
-                            log::error!("Failed to add PEM certificate: {}", e);
-                        }
+                for cert in rustls_pemfile::certs(&mut reader).flatten() {
+                    if let Err(e) = root_store.add(cert.clone()) {
+                        log::error!("Failed to add PEM certificate: {}", e);
                     }
                 }
             }
