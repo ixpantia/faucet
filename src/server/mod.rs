@@ -148,7 +148,7 @@ impl FaucetServerBuilder {
     }
     pub fn uv(mut self, uv: impl AsRef<OsStr>) -> Self {
         log::debug!(target: "faucet", "Using uv command: {:?}", uv.as_ref());
-        self.rscript = Some(uv.as_ref().into());
+        self.uv = Some(uv.as_ref().into());
         self
     }
     pub fn quarto(mut self, quarto: impl AsRef<OsStr>) -> Self {
