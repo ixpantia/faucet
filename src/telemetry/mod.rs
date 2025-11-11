@@ -1,20 +1,16 @@
-use std::{path::Path, pin::pin, str::FromStr, sync::OnceLock};
+use std::{path::Path, str::FromStr, sync::OnceLock};
 
 mod pg;
 
-use chrono::{DateTime, Local};
+use chrono::Local;
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
-use std::io::Write;
-use tokio::{
-    sync::mpsc::{UnboundedReceiver, UnboundedSender},
-    task::JoinHandle,
-};
+use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 
 use crate::{
     cli::PgSslMode,
     error::FaucetResult,
     leak,
-    server::{logging::EventLogData, HttpLogData, LogOption},
+    server::{logging::EventLogData, HttpLogData},
     shutdown::ShutdownSignal,
 };
 

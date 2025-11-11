@@ -77,7 +77,7 @@ pub enum FaucetError {
     #[error("Protocol violation: {0}")]
     ProtocolViolation(tokio_tungstenite::tungstenite::error::ProtocolError),
     #[error("Web Socket Write buffer full, {0}")]
-    WSWriteBufferFull(tokio_tungstenite::tungstenite::Message),
+    WSWriteBufferFull(Box<tokio_tungstenite::tungstenite::Message>),
     #[error("PostgreSQL error: {0}")]
     PostgreSQL(#[from] tokio_postgres::Error),
     #[error("WebSocket Connection in use")]
