@@ -22,7 +22,7 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_stream::StreamExt;
-use tokio_util::codec::{FramedRead, LinesCodec};
+use tokio_util::codec::FramedRead;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, serde::Deserialize)]
 pub enum WorkerType {
@@ -45,28 +45,34 @@ pub fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> 
         child.stdout.take().ok_or(FaucetError::Unknown(format!(
             "Unable to take stdout from PID {pid}"
         )))?,
-        LinesCodec::new(),
+        tokio_util::codec::AnyDelimiterCodec::new(vec![b'\n'], vec![]),
     );
 
     let mut stderr = FramedRead::new(
         child.stderr.take().ok_or(FaucetError::Unknown(format!(
             "Unable to take stderr from PID {pid}"
         )))?,
-        LinesCodec::new(),
+        tokio_util::codec::AnyDelimiterCodec::new(vec![b'\n'], vec![]),
     );
 
     tokio::spawn(async move {
         while let Some(line) = stderr.next().await {
-            if let Ok(line) = line {
-                match parse_faucet_event(&line) {
-                    FaucetEventResult::Output(line) => log::warn!(target: target, "{line}"),
-                    FaucetEventResult::Event(e) => {
-                        send_log_event(e);
+            match line {
+                Ok(line) => match std::str::from_utf8(&line) {
+                    Ok(line) => match parse_faucet_event(&line) {
+                        FaucetEventResult::Output(line) => log::warn!(target: target, "{line}"),
+                        FaucetEventResult::Event(e) => {
+                            send_log_event(e);
+                        }
+                        FaucetEventResult::EventError(e) => {
+                            log::error!(target: target, "{e:?}")
+                        }
+                    },
+                    Err(e) => {
+                        log::warn!(target: target, "Unable to parse non-utf8 stderr output: {e}")
                     }
-                    FaucetEventResult::EventError(e) => {
-                        log::error!(target: target, "{e:?}")
-                    }
-                }
+                },
+                Err(e) => log::error!(target: target, "{e}"),
             }
         }
     });
@@ -74,7 +80,14 @@ pub fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> 
     tokio::spawn(async move {
         while let Some(line) = stdout.next().await {
             if let Ok(line) = line {
-                log::info!(target: target, "{line}");
+                match std::str::from_utf8(&line) {
+                    Ok(line) => {
+                        log::info!(target: target, "{line}");
+                    }
+                    Err(e) => {
+                        log::warn!(target: target, "Unable to parse non-utf8 stdout output: {e}")
+                    }
+                }
             }
         }
     });
@@ -238,6 +251,7 @@ fn spawn_shiny_worker(config: &WorkerConfig) -> FaucetResult<Child> {
         port = config.addr.port(),
         app_dir = config.app_dir.unwrap_or(".")
     );
+
     let child = spawn_child_rscript_process(config, command)?;
 
     log_stdio(child, config.target)
