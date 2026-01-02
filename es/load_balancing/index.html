@@ -1,0 +1,809 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://ixpantia.github.io/faucet/es/load_balancing/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.8">
+    
+    
+      
+        <title>Estrategias de Balanceo de Carga en Faucet - faucet</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="faucet" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#estrategias-de-balanceo-de-carga-en-faucet" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href="../" title="faucet" class="md-header__button md-logo" aria-label="faucet" data-md-component="logo">
+      
+  <img src="../../figures/faucet.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            faucet
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Estrategias de Balanceo de Carga en Faucet
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Seleccionar idioma">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04M18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12m-2.62 7 1.62-4.33L19.12 17h-3.24Z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../load_balancing/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="es" class="md-select__link">
+              Español
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ixpantia/faucet" title="Ir al repositorio" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="faucet" class="md-nav__button md-logo" aria-label="faucet" data-md-component="logo">
+      
+  <img src="../../figures/faucet.png" alt="logo">
+
+    </a>
+    faucet
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ixpantia/faucet" title="Ir al repositorio" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inicio
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Instalación
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inicio Rápido
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../options/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Opciones
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../router/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Modo Router
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../in_containers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    faucet en Contenedores
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../logging/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reverse_proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Con Proxy Inverso
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Telemetría
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Ejemplos
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#estrategias-predeterminadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Estrategias Predeterminadas
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caracteristicas-comunes-salud-del-trabajador-y-reintentos" class="md-nav__link">
+    <span class="md-ellipsis">
+      Características Comunes: Salud del Trabajador y Reintentos
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-round-robin" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Round Robin
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Round Robin">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#descripcion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Descripción
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#casos-de-uso" class="md-nav__link">
+    <span class="md-ellipsis">
+      Casos de Uso
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ventajas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ventajas
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#desventajas" class="md-nav__link">
+    <span class="md-ellipsis">
+      Desventajas
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-ip-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. IP Hash
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. IP Hash">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#descripcion_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Descripción
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#casos-de-uso_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Casos de Uso
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ventajas_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ventajas
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#desventajas_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Desventajas
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-cookie-hash" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Cookie Hash
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Cookie Hash">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#descripcion_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Descripción
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#casos-de-uso_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Casos de Uso
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ventajas_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ventajas
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#desventajas_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Desventajas
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="estrategias-de-balanceo-de-carga-en-faucet">Estrategias de Balanceo de Carga en Faucet</h1>
+<p>El balanceo de carga es un componente crítico para distribuir el tráfico de red entre múltiples procesos de trabajo (workers) de Faucet, cada uno ejecutando típicamente una instancia de una aplicación R (como Shiny, Plumber o Quarto Shiny). Esta distribución asegura que ningún trabajador individual se sobrecargue, lo que conduce a una mejor capacidad de respuesta, disponibilidad y confiabilidad de sus aplicaciones desplegadas. Este documento describe las estrategias de balanceo de carga disponibles en Faucet, sus casos de uso y sus respectivas ventajas y desventajas.</p>
+<p>Faucet le permite configurar la estrategia de balanceo de carga utilizando la opción de línea de comandos <code>--strategy</code> o la variable de entorno <code>FAUCET_STRATEGY</code>. Las estrategias disponibles son:</p>
+<ul>
+<li>Round Robin</li>
+<li>IP Hash</li>
+<li>Cookie Hash</li>
+</ul>
+<h2 id="estrategias-predeterminadas">Estrategias Predeterminadas</h2>
+<p>Faucet aplica estrategias predeterminadas basadas en el tipo de aplicación if no se especifica explícitamente:
+*   <strong>Aplicaciones Shiny y Quarto Shiny:</strong> Predeterminan <code>ip-hash</code> para asegurar la persistencia de la sesión.
+*   <strong>APIs de Plumber:</strong> Predeterminan <code>round-robin</code> ya que a menudo son sin estado.</p>
+<h2 id="caracteristicas-comunes-salud-del-trabajador-y-reintentos">Características Comunes: Salud del Trabajador y Reintentos</h2>
+<p>Todas las estrategias de balanceo de carga en Faucet incorporan un mecanismo para manejar procesos de trabajo fuera de línea. Si se detecta que un trabajador backend seleccionado está fuera de línea:</p>
+<ol>
+<li>Faucet registrará el intento de conexión al trabajador fuera de línea.</li>
+<li>Se emplea un mecanismo de reintento con retroceso exponencial (exponential backoff).</li>
+<li><strong>El comportamiento ante el fallo de un trabajador difiere según la estrategia:</strong><ul>
+<li><strong>Round Robin:</strong> Después de una corta espera (<code>WAIT_TIME_UNTIL_RETRY</code>), Faucet intentará enrutar la solicitud al <em>siguiente trabajador disponible</em> en la secuencia.</li>
+<li><strong>IP Hash &amp; Cookie Hash:</strong> Faucet continuará reintentando la conexión con el <em>trabajador designado originalmente</em>. Esto significa que las solicitudes para ese trabajador específico quedan efectivamente "retenidas" y experimentarán latencia o parecerán colgarse hasta que el trabajador vuelva a estar en línea o la solicitud expire. Los clientes no se redirigen automáticamente a un trabajador diferente porque eso rompería la persistencia de la sesión.</li>
+</ul>
+</li>
+</ol>
+<h2 id="1-round-robin">1. Round Robin</h2>
+<h3 id="descripcion">Descripción</h3>
+<p>La estrategia Round Robin distribuye las solicitudes entrantes a los procesos de trabajo de Faucet en un orden secuencial. Cada nueva solicitud se envía al siguiente trabajador de la lista. Cuando se llega al final de la lista, el balanceador de carga vuelve al principio y comienza de nuevo.</p>
+<h3 id="casos-de-uso">Casos de Uso</h3>
+<ul>
+<li><strong>Aplicaciones sin Estado (Stateless):</strong> Ideal para aplicaciones sin estado como muchas APIs de Plumber, donde cada solicitud puede ser manejada independientemente por cualquier trabajador.</li>
+<li><strong>Despliegues Simples:</strong> Adecuado cuando se espera que todos los procesos de trabajo tengan capacidades de procesamiento similares.</li>
+</ul>
+<h3 id="ventajas">Ventajas</h3>
+<ul>
+<li><strong>Simplicidad:</strong> Fácil de entender e implementar.</li>
+<li><strong>Distribución Equitativa (condiciones ideales):</strong> Si todos los trabajadores están saludables y tienen capacidades similares, Round Robin puede distribuir el tráfico de manera relativamente uniforme.</li>
+<li><strong>Baja Sobrecarga:</strong> Costo computacional mínimo para el balanceador de carga.</li>
+<li><strong>Resiliencia ante Fallos de Trabajadores:</strong> Si un trabajador se desconecta, las solicitudes se enrutan automáticamente al siguiente trabajador disponible después de un breve retraso.</li>
+</ul>
+<h3 id="desventajas">Desventajas</h3>
+<ul>
+<li><strong>Ignora la Carga del Trabajador:</strong> No tiene en cuenta la carga actual en los procesos de trabajo individuales (más allá de las verificaciones básicas de en línea/fuera de línea).</li>
+<li><strong>Sin Persistencia de Sesión:</strong> Los clientes pueden ser dirigidos a diferentes trabajadores en solicitudes posteriores. Esto lo hace <strong>inadecuado</strong> para aplicaciones con estado como Shiny o Quarto Shiny que requieren afinidad de sesión (por ejemplo, mantener datos específicos del usuario o estados de entrada).</li>
+<li><strong>Distribución Desigual con Capacidades Variables:</strong> Si los procesos de trabajo tienen diferentes capacidades subyacentes (aunque Faucet típicamente genera procesos R idénticos), algunos podrían sobrecargarse.</li>
+</ul>
+<h2 id="2-ip-hash">2. IP Hash</h2>
+<h3 id="descripcion_1">Descripción</h3>
+<p>La estrategia IP Hash utiliza la dirección IP del cliente para determinar qué proceso de trabajo de Faucet manejará la solicitud. Se aplica una función hash a la dirección IP del cliente y el valor hash resultante se asigna consistentemente a un trabajador específico.</p>
+<p><strong>Importante para Configuraciones con Proxy Inverso:</strong> Si Faucet se ejecuta detrás de un proxy inverso (por ejemplo, Nginx, Apache), es crucial configurar correctamente la opción <code>--ip-from</code> (o la variable de entorno <code>FAUCET_IP_FROM</code>). Esto indica a Faucet si debe usar la IP directa del cliente o una IP de una cabecera como <code>X-Forwarded-For</code> o <code>X-Real-IP</code>, asegurando una identificación de IP precisa para esta estrategia.</p>
+<h3 id="casos-de-uso_1">Casos de Uso</h3>
+<ul>
+<li><strong>Aplicaciones con Estado (Predeterminado para Shiny/Quarto):</strong> Esencial para aplicaciones como Shiny y Quarto Shiny que requieren persistencia de sesión. Asegura que un cliente sea dirigido consistentemente al mismo proceso de trabajo, manteniendo el estado de su sesión.</li>
+<li><strong>Beneficios de Caché:</strong> Puede mejorar las tasas de aciertos de caché en el trabajador si los datos se almacenan en caché según las interacciones del usuario.</li>
+</ul>
+<h3 id="ventajas_1">Ventajas</h3>
+<ul>
+<li><strong>Persistencia de Sesión:</strong> Garantiza que las solicitudes de la misma IP de cliente se dirijan consistentemente al mismo trabajador, crucial para las aplicaciones R con estado.</li>
+<li><strong>Enrutamiento Determinista:</strong> La misma IP siempre se enrutará al mismo trabajador (suponiendo que el grupo de trabajadores no haya cambiado).</li>
+</ul>
+<h3 id="desventajas_1">Desventajas</h3>
+<ul>
+<li><strong>Distribución de Carga Desigual:</strong><ul>
+<li>Si unas pocas direcciones IP generan un volumen de tráfico desproporcionadamente grande, los trabajadores asignados a esas IP pueden sobrecargarse.</li>
+<li>Los clientes detrás de una puerta de enlace de Traducción de Direcciones de Red (NAT) o un gran proxy corporativo parecerán tener todos la misma IP de origen. Todos estos clientes serán dirigidos al mismo trabajador, lo que podría sobrecargarlo.</li>
+</ul>
+</li>
+<li><strong>Cambio de IP del Cliente:</strong> La persistencia de la sesión puede perderse si la dirección IP de un cliente cambia durante su sesión (por ejemplo, usuarios móviles cambiando entre Wi-Fi y datos celulares).</li>
+<li><strong>Fallos del Trabajador:</strong> Si un trabajador designado se cae, las solicitudes de los clientes cuyo hash de IP corresponde a ese trabajador serán retenidas y reintentadas contra el <em>mismo</em> trabajador, lo que provocará retrasos para esos usuarios hasta que el trabajador se restaure. No se redirigen automáticamente para preservar la integridad de la sesión.</li>
+</ul>
+<h2 id="3-cookie-hash">3. Cookie Hash</h2>
+<h3 id="descripcion_2">Descripción</h3>
+<p>La estrategia Cookie Hash logra la persistencia de la sesión mediante el uso de una cookie HTTP llamada <code>FAUCET_LB_COOKIE</code>. Cuando llega una solicitud:
+1.  Faucet verifica la existencia de la cookie <code>FAUCET_LB_COOKIE</code>.
+2.  Si la cookie existe y contiene un UUID válido, Faucet utiliza este UUID para seleccionar consistentemente un proceso de trabajo backend.
+3.  Si la cookie no está presente, no es válida, o si la estrategia es <code>CookieHash</code> y no se encuentra un UUID de cookie adecuado, <strong>Faucet genera un nuevo UUID</strong>.
+4.  Este UUID (ya sea extraído o recién generado) se utiliza para determinar el trabajador.
+5.  De manera crucial, Faucet <strong>establecerá (o actualizará) la <code>FAUCET_LB_COOKIE</code> en la respuesta HTTP</strong>, incluyendo el UUID. Esto asegura que las solicitudes posteriores del mismo navegador cliente incluyan esta cookie, dirigiéndolas al mismo trabajador.</p>
+<p>Este mecanismo asegura que el cliente sea dirigido consistentemente al mismo trabajador para solicitudes posteriores, siempre y cuando su navegador acepte y envíe cookies.</p>
+<h3 id="casos-de-uso_2">Casos de Uso</h3>
+<ul>
+<li><strong>Aplicaciones Robustas con Estado:</strong> Proporciona persistencia de sesión confiable para Shiny, Quarto Shiny u otras aplicaciones con estado. Es particularmente beneficioso cuando las direcciones IP de los clientes no son estables o cuando muchos clientes pueden compartir una dirección IP (por ejemplo, usuarios detrás de grandes NATs o proxies).</li>
+<li><strong>Control Fino de Sesiones:</strong> Ofrece un control más preciso sobre la afinidad de sesión que IP Hash, ya que se basa en un identificador único (el UUID de la cookie) específico de la sesión del cliente, gestionado por Faucet.</li>
+</ul>
+<h3 id="ventajas_2">Ventajas</h3>
+<ul>
+<li><strong>Persistencia de Sesión Confiable:</strong> Más robusto que IP Hash en escenarios con IPs de cliente dinámicas o NAT, ya que depende de la cookie gestionada por Faucet.</li>
+<li><strong>Mejor Distribución de Carga (que IP Hash en escenarios NAT):</strong> Puede distribuir la carga de manera más uniforme que IP Hash cuando muchos usuarios comparten la misma IP de origen, ya que la sesión del navegador de cada usuario obtendrá su propia <code>FAUCET_LB_COOKIE</code> con un UUID único.</li>
+<li><strong>Enrutamiento Determinista:</strong> El mismo UUID de cookie se enrutará consistentemente al mismo trabajador (suponiendo que el grupo de trabajadores sea estable).</li>
+<li><strong>Gestión Automática de Cookies por Faucet:</strong> Faucet maneja la generación y el establecimiento de la cookie necesaria, simplificando la configuración.</li>
+</ul>
+<h3 id="desventajas_2">Desventajas</h3>
+<ul>
+<li><strong>Soporte de Cookies del Cliente:</strong> Depende de que los clientes acepten y envíen cookies. Si un cliente tiene las cookies deshabilitadas, esta estrategia no proporcionará persistencia de sesión.</li>
+<li><strong>Sobrecarga de Cookies:</strong> Implica la sobrecarga estándar de transmisión y procesamiento de cookies HTTP, aunque la gestión de Faucet es eficiente.</li>
+<li><strong>Fallos del Trabajador:</strong> Similar a IP Hash, si un trabajador designado por un hash de cookie se cae, las solicitudes asociadas con ese hash de cookie serán retenidas y reintentadas contra el <em>mismo</em> trabajador, causando potencialmente retrasos a los usuarios afectados.</li>
+<li><strong>Solicitudes Simultáneas Iniciales:</strong> Como se indica en el código fuente de Faucet, si un navegador envía múltiples solicitudes iniciales <em>simultáneas</em> antes de que la primera respuesta <code>Set-Cookie</code> sea procesada y devuelta por el navegador, esas solicitudes iniciales podrían brevemente acceder a diferentes trabajadores antes de establecerse en el determinado por la cookie finalmente establecida. Este es un caso límite menor para la mayoría de las aplicaciones.</li>
+</ul>
+<hr />
+<p>Elegir la estrategia de balanceo de carga correcta en Faucet depende en gran medida de los requisitos específicos de su aplicación R, particularmente su estado (statefulness), y su entorno de despliegue (por ejemplo, independiente vs. detrás de un proxy inverso). Para aplicaciones Shiny y Quarto Shiny, generalmente se recomienda <code>ip-hash</code> (predeterminado) o <code>cookie-hash</code>. Para APIs de Plumber sin estado, <code>round-robin</code> (predeterminado) suele ser suficiente.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
+      
+    
+  </body>
+</html>
