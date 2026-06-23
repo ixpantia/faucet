@@ -1,0 +1,877 @@
+
+<!doctype html>
+<html lang="es" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://ixpantia.github.io/faucet/es/router/">
+      
+      
+        <link rel="prev" href="../options/">
+      
+      
+        <link rel="next" href="../in_containers/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.8">
+    
+    
+      
+        <title>Modo Router - faucet</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="faucet" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#modo-router-de-faucet" class="md-skip">
+          Saltar a contenido
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabecera">
+    <a href="../" title="faucet" class="md-header__button md-logo" aria-label="faucet" data-md-component="logo">
+      
+  <img src="../../figures/faucet.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            faucet
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Modo Router
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Seleccionar idioma">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04M18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12m-2.62 7 1.62-4.33L19.12 17h-3.24Z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../router/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="es" class="md-select__link">
+              Español
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Búsqueda" placeholder="Búsqueda" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Buscar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpiar" aria-label="Limpiar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando búsqueda
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/ixpantia/faucet" title="Ir al repositorio" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegación" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../" title="faucet" class="md-nav__button md-logo" aria-label="faucet" data-md-component="logo">
+      
+  <img src="../../figures/faucet.png" alt="logo">
+
+    </a>
+    faucet
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/ixpantia/faucet" title="Ir al repositorio" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inicio
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Instalación
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inicio Rápido
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../options/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Opciones
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Modo Router
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Modo Router
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#resumen-en-video" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resumen en Video
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#activacion-del-modo-router" class="md-nav__link">
+    <span class="md-ellipsis">
+      Activación del Modo Router
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#archivo-de-configuracion-froutertoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archivo de Configuración (frouter.toml)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Archivo de Configuración (frouter.toml)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#campos-explicados" class="md-nav__link">
+    <span class="md-ellipsis">
+      Campos Explicados:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comportamiento-del-enrutamiento-y-eliminacion-de-prefijo-de-ruta-path-stripping" class="md-nav__link">
+    <span class="md-ellipsis">
+      Comportamiento del Enrutamiento y Eliminación de Prefijo de Ruta (Path Stripping)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ejemplo-de-froutertoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ejemplo de frouter.toml
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../in_containers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    faucet en Contenedores
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../logging/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reverse_proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Con Proxy Inverso
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../telemetry/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Telemetría
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Ejemplos
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Tabla de contenidos">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Tabla de contenidos
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#resumen-en-video" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resumen en Video
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#activacion-del-modo-router" class="md-nav__link">
+    <span class="md-ellipsis">
+      Activación del Modo Router
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#archivo-de-configuracion-froutertoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archivo de Configuración (frouter.toml)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Archivo de Configuración (frouter.toml)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#campos-explicados" class="md-nav__link">
+    <span class="md-ellipsis">
+      Campos Explicados:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comportamiento-del-enrutamiento-y-eliminacion-de-prefijo-de-ruta-path-stripping" class="md-nav__link">
+    <span class="md-ellipsis">
+      Comportamiento del Enrutamiento y Eliminación de Prefijo de Ruta (Path Stripping)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ejemplo-de-froutertoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ejemplo de frouter.toml
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="modo-router-de-faucet">Modo Router de Faucet</h1>
+<p>El modo router de Faucet te permite servir múltiples aplicaciones distintas desde una única instancia de Faucet. Cada aplicación, o "ruta", puede tener su propia configuración (como tipo de aplicación, directorio de trabajo, número de workers y estrategia de balanceo de carga) y es accesible a través de un prefijo de ruta URL único.</p>
+<p>Esto es particularly útil para:</p>
+<ul>
+<li>Alojar múltiples aplicaciones Shiny, APIs de Plumber o documentos Quarto Shiny en el mismo servidor y puerto.</li>
+<li>Desplegar diferentes versiones o configuraciones de la misma aplicación bajo diferentes rutas.</li>
+<li>Consolidar tus despliegues de aplicaciones R en un único proceso de Faucet.</li>
+</ul>
+<h2 id="resumen-en-video">Resumen en Video</h2>
+<p>Para una demostración visual de la característica del router de Faucet, revisa el siguiente video:</p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/hQEdbrb2iTc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+<h2 id="activacion-del-modo-router">Activación del Modo Router</h2>
+<p>Para ejecutar Faucet en modo router, utilizas el subcomando <code>router</code>:</p>
+<pre><code class="language-bash">faucet router [OPCIONES]
+</code></pre>
+<p>La opción principal para el modo router es especificar el archivo de configuración:</p>
+<ul>
+<li><strong>CLI:</strong> <code>--conf &lt;RUTA_AL_ARCHIVO_DE_CONFIGURACION&gt;</code> o <code>-c &lt;RUTA_AL_ARCHIVO_DE_CONFIGURACION&gt;</code></li>
+<li><strong>Variable de Entorno:</strong> <code>FAUCET_ROUTER_CONF=&lt;RUTA_AL_ARCHIVO_DE_CONFIGURACION&gt;</code></li>
+<li><strong>Por Defecto:</strong> Si no se especifica, Faucet buscará un archivo llamado <code>frouter.toml</code> en el directorio de trabajo actual (<code>./frouter.toml</code>).</li>
+</ul>
+<p>Las opciones globales de Faucet como <code>--host</code>, <code>--ip-from</code>, <code>--rscript</code>, <code>--quarto</code> y las configuraciones de telemetría (por ejemplo, <code>--pg-con-string</code>) se aplican a toda la instancia del router y a todas las rutas que gestiona.</p>
+<h2 id="archivo-de-configuracion-froutertoml">Archivo de Configuración (<code>frouter.toml</code>)</h2>
+<p>El modo router se configura mediante un archivo TOML. Este archivo debe definir un array llamado <code>route</code>, donde cada elemento del array es un objeto que configura una ruta de aplicación específica.</p>
+<p>Aquí está la estructura de un único objeto de ruta dentro del archivo <code>frouter.toml</code>:</p>
+<pre><code class="language-toml">[[route]]
+# El prefijo de la ruta URL para esta aplicación.
+# Este prefijo DEBE terminar con una barra inclinada (ej., &quot;/app/&quot;, &quot;/api/v1/&quot;).
+# Si es la ruta raíz, debe ser &quot;/&quot;.
+# (Requerido)
+route = &quot;/mi_aplicacion/&quot;
+
+# El tipo de aplicación.
+# (Requerido)
+# Posibles valores: &quot;plumber&quot;, &quot;shiny&quot;, &quot;quarto-shiny&quot;
+# Alias como &quot;Plumber&quot;, &quot;Shiny&quot;, &quot;QuartoShiny&quot; también son aceptados.
+server_type = &quot;shiny&quot;
+
+# El directorio de trabajo para esta aplicación específica.
+# Archivos como app.R o plumber.R se buscarán en relación con este directorio,
+# o dentro de `app_dir` si se especifica. Las rutas pueden ser relativas (a donde está frouter.toml) o absolutas.
+# (Opcional, por defecto es &quot;.&quot; - el directorio donde se encuentra frouter.toml)
+workdir = &quot;./apps/mi_app_shiny&quot;
+
+# El subdirectorio dentro de `workdir` donde se encuentra el archivo principal de la aplicación (ej., app.R).
+# Si tu app.R está directamente en `workdir`, puedes omitir esto o configurarlo como &quot;.&quot;.
+# (Opcional)
+app_dir = &quot;source&quot; # Busca ./apps/mi_app_shiny/source/app.R
+
+# El número de procesos worker a generar para esta aplicación.
+# (Requerido)
+workers = 2
+
+# La estrategia de balanceo de carga para esta aplicación.
+# (Opcional, los valores por defecto dependen del tipo de aplicación: &quot;ip-hash&quot; para shiny/quarto-shiny, &quot;round-robin&quot; para plumber)
+# Posibles valores: &quot;round-robin&quot;, &quot;ip-hash&quot;, &quot;cookie-hash&quot;
+strategy = &quot;ip-hash&quot;
+
+# Ruta al documento Quarto (.qmd), requerido si server_type es &quot;quarto-shiny&quot;.
+# La ruta debe ser relativa a `workdir` o una ruta absoluta.
+# (Opcional, pero requerido para quarto-shiny)
+# qmd = &quot;dashboard.qmd&quot;
+</code></pre>
+<h3 id="campos-explicados">Campos Explicados:</h3>
+<ul>
+<li><code>route</code> (String, Requerido): El prefijo de la ruta URL. <strong>Este prefijo debe terminar con una barra inclinada (ej., <code>/app/</code>, <code>/api/v1/</code>) a menos que sea la ruta raíz (<code>/</code>)</strong>. Faucet dirigirá las solicitudes que comiencen con esta ruta a la aplicación configurada.</li>
+<li><code>server_type</code> (String, Requerido): Determina el tipo de aplicación R. Debe ser uno de <code>plumber</code>, <code>shiny</code> o <code>quarto-shiny</code>. Alias como <code>Plumber</code>, <code>Shiny</code>, <code>QuartoShiny</code> también son aceptados.</li>
+<li><code>workdir</code> (String, Opcional): El directorio de trabajo base para la aplicación. Si no se especifica, por defecto es el directorio donde se está ejecutando Faucet (típicamente donde se encuentra <code>frouter.toml</code>). Las rutas para <code>app_dir</code> y <code>qmd</code> se resuelven típicamente en relación con este.</li>
+<li><code>app_dir</code> (String, Opcional): Un subdirectorio dentro de <code>workdir</code> que contiene el archivo principal de la aplicación (por ejemplo, <code>app.R</code> para Shiny, <code>plumber.R</code> para Plumber). Por ejemplo, si <code>workdir = "./mi_coleccion_apps"</code> y <code>app_dir = "app_especifica_src"</code>, Faucet buscará <code>./mi_coleccion_apps/app_especifica_src/app.R</code>. Si el archivo principal está directamente en <code>workdir</code>, puedes omitir esto o usar <code>app_dir = "."</code>.</li>
+<li><code>workers</code> (Integer, Requerido): El número de procesos worker de R a lanzar para esta ruta específica. Debe ser un entero positivo.</li>
+<li><code>strategy</code> (String, Opcional): La estrategia de balanceo de carga para esta ruta.<ul>
+<li>Para aplicaciones <code>shiny</code> y <code>quarto-shiny</code>, generalmente se recomienda <code>ip-hash</code> y es el valor por defecto para asegurar la persistencia de la sesión.</li>
+<li>Para APIs <code>plumber</code>, <code>round-robin</code> es el valor por defecto común.</li>
+<li>Opciones disponibles: <code>round-robin</code>, <code>ip-hash</code>, <code>cookie-hash</code>.</li>
+</ul>
+</li>
+<li><code>qmd</code> (String, Opcional): Si <code>server_type</code> es <code>quarto-shiny</code>, este campo es requerido y debe especificar la ruta al archivo <code>.qmd</code>. Esta ruta es típicamente relativa a <code>workdir</code>.</li>
+</ul>
+<p><strong>Importante:</strong> Cada valor de <code>route</code> en el archivo de configuración debe ser único. Rutas duplicadas harán que Faucet termine con un error al iniciarse.</p>
+<h2 id="comportamiento-del-enrutamiento-y-eliminacion-de-prefijo-de-ruta-path-stripping">Comportamiento del Enrutamiento y Eliminación de Prefijo de Ruta (Path Stripping)</h2>
+<p>Cuando Faucet recibe una solicitud HTTP en modo router:</p>
+<ol>
+<li>Itera a través de las definiciones <code>[[route]]</code> en <code>frouter.toml</code> <strong>en el orden en que están definidas.</strong></li>
+<li><strong>Coincidencia de Rutas y Orden:</strong><ul>
+<li>Para cada ruta definida, Faucet comprueba si la ruta URL de la solicitud entrante comienza con el prefijo <code>route</code> de la ruta.</li>
+<li><strong>Se utiliza la primera ruta que coincida.</strong> Esto significa que el orden de tus rutas en <code>frouter.toml</code> es crítico. Las rutas más específicas (ej., <code>/app/feature1/</code>) deben listarse <em>antes</em> que las rutas más generales (ej., <code>/app/</code>) si comparten una ruta base común, para evitar que la ruta general "sombreé" a la específica. La ruta raíz <code>/</code> generalmente debe listarse al final.</li>
+</ul>
+</li>
+<li><strong>Eliminación de Prefijo de Ruta (Path Stripping):</strong><ul>
+<li>Todos los prefijos <code>route</code> (excepto la ruta raíz <code>/</code>) <strong>deben terminar con una barra inclinada (<code>/</code>)</strong>.</li>
+<li>Una vez que se encuentra una ruta coincidente, su prefijo <code>route</code> definido se elimina del inicio de la ruta URL de la solicitud.</li>
+<li>La parte restante de la ruta se reenvía entonces a la aplicación configurada para esa ruta.</li>
+<li>Ejemplo: Si se define <code>route = "/myapp/"</code>:<ul>
+<li>Una solicitud a <code>/myapp/usuarios/1</code> hace que la aplicación vea <code>/usuarios/1</code>.</li>
+<li>Una solicitud a <code>/myapp/</code> (con la barra inclinada final) hace que la aplicación vea <code>/</code>.</li>
+</ul>
+</li>
+<li>Ejemplo: Si se define <code>route = "/"</code>:<ul>
+<li>Una solicitud a <code>/pagina</code> hace que la aplicación vea <code>/pagina</code>.</li>
+<li>Una solicitud a <code>/</code> hace que la aplicación vea <code>/</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Si se encuentra una ruta coincidente, la solicitud (con la ruta potencialmente modificada) se entrega a la instancia del servidor Faucet que gestiona esa aplicación específica, la cual luego aplica su estrategia de balanceo de carga configurada para seleccionar un worker.</li>
+<li>Si ninguna <code>route</code> configurada coincide con la ruta de la solicitud entrante, Faucet devuelve una respuesta <code>404 Not Found</code>.</li>
+</ol>
+<h2 id="ejemplo-de-froutertoml">Ejemplo de <code>frouter.toml</code></h2>
+<p>Este ejemplo se basa en <code>faucet-router-example</code> disponible en el repositorio de GitHub de Faucet bajo el directorio <code>examples/</code>. Para ejecutar este ejemplo, navega a <code>examples/faucet-router-example-main/</code> y ejecuta <code>faucet router</code>.</p>
+<pre><code class="language-toml"># frouter.toml
+# Este archivo está ubicado en examples/faucet-router-example-main/
+
+# Ruta para la aplicación Shiny &quot;sliders&quot;.
+# `workdir` está configurado como &quot;./sliders&quot;, entonces Faucet busca app.R
+# en examples/faucet-router-example-main/sliders/app.R
+[[route]]
+route = &quot;/sliders/&quot;
+workers = 1
+server_type = &quot;shiny&quot; # Nota: &quot;Shiny&quot; (con mayúscula) también es aceptado
+workdir = &quot;./sliders&quot;
+
+# Ruta para la aplicación Shiny &quot;text&quot;.
+# `workdir` por defecto es &quot;.&quot; (donde está frouter.toml).
+# `app_dir` es &quot;./text&quot;, entonces Faucet busca app.R
+# en examples/faucet-router-example-main/text/app.R
+[[route]]
+route = &quot;/text/&quot;
+workers = 1
+server_type = &quot;shiny&quot;
+app_dir = &quot;./text&quot;
+
+# Ruta para un documento Quarto Shiny.
+# `workdir` es &quot;./qmd&quot;.
+# `qmd` especifica &quot;old_faithful.qmd&quot; relativo a workdir.
+# Faucet busca examples/faucet-router-example-main/qmd/old_faithful.qmd
+[[route]]
+route = &quot;/qmd/&quot;
+workers = 1
+server_type = &quot;quarto-shiny&quot; # Nota: &quot;QuartoShiny&quot; (con mayúscula) también es aceptado
+workdir = &quot;./qmd&quot;
+qmd = &quot;old_faithful.qmd&quot;
+
+# Ruta para una API de Plumber.
+# `workdir` es &quot;./api&quot;. Faucet busca plumber.R
+# en examples/faucet-router-example-main/api/plumber.R
+[[route]]
+route = &quot;/api/&quot;
+workers = 1
+server_type = &quot;plumber&quot; # Nota: &quot;Plumber&quot; (con mayúscula) también es aceptado
+workdir = &quot;./api&quot;
+strategy = &quot;round-robin&quot;
+
+# Ruta raíz para la aplicación Shiny principal.
+# `workdir` por defecto es &quot;.&quot; (donde está frouter.toml).
+# Faucet busca app.R en examples/faucet-router-example-main/app.R
+# Esta ruta se coloca al final para evitar solapar otras rutas específicas.
+[[route]]
+route = &quot;/&quot;
+workers = 1
+server_type = &quot;shiny&quot;
+strategy = &quot;cookie-hash&quot;
+</code></pre>
+<p>Con la configuración anterior, si Faucet se está ejecutando en <code>http://localhost:3838</code> desde el directorio <code>examples/faucet-router-example-main/</code>:</p>
+<ul>
+<li>Las solicitudes a <code>http://localhost:3838/sliders/</code> serían enrutadas a la aplicación Shiny en el subdirectorio <code>sliders</code>.</li>
+<li>Las solicitudes a <code>http://localhost:3838/text/</code> serían enrutadas a la aplicación Shiny en el subdirectorio <code>text</code>.</li>
+<li>Las solicitudes a <code>http://localhost:3838/qmd/</code> serían enrutadas al documento Quarto Shiny <code>old_faithful.qmd</code>.</li>
+<li>Las solicitudes a <code>http://localhost:3838/api/echo?msg=hola</code> serían enrutadas a la API de Plumber en el subdirectorio <code>api</code> (la API vería <code>/echo?msg=hola</code>).</li>
+<li>Las solicitudes a <code>http://localhost:3838/</code> serían enrutadas al <code>app.R</code> en la raíz del directorio <code>faucet-router-example-main</code>.</li>
+</ul>
+<p><strong>Nota sobre el Orden de las Rutas:</strong> Recuerda que si tienes rutas con rutas base superpuestas (ej., <code>/datos/especifico/</code> y <code>/datos/</code>), debes listar la ruta más específica (<code>/datos/especifico/</code>) <em>antes</em> que la ruta más general (<code>/datos/</code>) en tu archivo <code>frouter.toml</code>. De lo contrario, la ruta general <code>/datos/</code> coincidiría con las solicitudes destinadas a <code>/datos/especifico/</code>, y nunca se alcanzaría la ruta específica. La ruta raíz <code>/</code> típicamente debería ser la última entrada.</p>
+<p>Este modo router proporciona una forma flexible de gestionar y servir múltiples aplicaciones R eficientemente usando una única instancia de Faucet.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copiado al portapapeles", "clipboard.copy": "Copiar al portapapeles", "search.result.more.one": "1 m\u00e1s en esta p\u00e1gina", "search.result.more.other": "# m\u00e1s en esta p\u00e1gina", "search.result.none": "No se encontraron documentos", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Teclee para comenzar b\u00fasqueda", "search.result.term.missing": "Falta", "select.version": "Seleccionar versi\u00f3n"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
+      
+    
+  </body>
+</html>
