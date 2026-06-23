@@ -32,11 +32,13 @@ pub enum WorkerType {
     Shiny,
     #[serde(alias = "quarto-shiny", alias = "QuartoShiny", alias = "quarto_shiny")]
     QuartoShiny,
+    #[serde(alias = "fast-api", alias = "FastAPI")]
+    FastAPI,
     #[cfg(test)]
     Dummy,
 }
 
-fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
+pub fn log_stdio(mut child: Child, target: &'static str) -> FaucetResult<Child> {
     let pid = child.id().expect("Failed to get plumber worker PID");
 
     let mut stdout = FramedRead::new(
@@ -85,6 +87,7 @@ pub struct WorkerConfig {
     pub wtype: WorkerType,
     pub app_dir: Option<&'static str>,
     pub rscript: &'static OsStr,
+    pub uv: &'static OsStr,
     pub quarto: &'static OsStr,
     pub workdir: &'static Path,
     pub addr: SocketAddr,
@@ -117,6 +120,7 @@ impl WorkerConfig {
             rscript: server_config.rscript,
             quarto: server_config.quarto,
             qmd: server_config.qmd,
+            uv: server_config.uv,
             handle: leak!(Mutex::new(None)),
             shutdown,
             idle_stop: leak!(Notify::new()),
@@ -135,6 +139,7 @@ impl WorkerConfig {
             wtype: WorkerType::Dummy,
             worker_id: 1,
             quarto: OsStr::new(""),
+            uv: OsStr::new(""),
             workdir: Path::new("."),
             qmd: None,
             handle: leak!(Mutex::new(None)),
@@ -142,6 +147,35 @@ impl WorkerConfig {
             idle_stop: leak!(Notify::new()),
         }
     }
+}
+
+fn spawn_child_fastapi_server(config: &WorkerConfig) -> FaucetResult<Child> {
+    let mut cmd = tokio::process::Command::new(config.uv);
+
+    // Set the current directory to the directory containing the entrypoint
+    cmd.current_dir(config.workdir)
+        .args(["run", "fastapi", "run", "--workers", "1"])
+        .arg("--port")
+        .arg(config.addr.port().to_string())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .env("FAUCET_WORKER_ID", config.worker_id.to_string())
+        // This is needed to make sure the child process is killed when the parent is dropped
+        .kill_on_drop(true);
+
+    #[cfg(unix)]
+    unsafe {
+        cmd.pre_exec(|| {
+            // Create a new process group for the child process
+            nix::libc::setpgid(0, 0);
+            Ok(())
+        });
+    }
+
+    let child = cmd.spawn()?;
+
+    log_stdio(child, config.target)
 }
 
 fn spawn_child_rscript_process(
@@ -243,6 +277,7 @@ impl WorkerConfig {
             WorkerType::Plumber => spawn_plumber_worker(self),
             WorkerType::Shiny => spawn_shiny_worker(self),
             WorkerType::QuartoShiny => spawn_quarto_shiny_worker(self),
+            WorkerType::FastAPI => spawn_child_fastapi_server(self),
             #[cfg(test)]
             WorkerType::Dummy => unreachable!(
                 "WorkerType::Dummy should be handled in spawn_worker_task and not reach spawn_process"

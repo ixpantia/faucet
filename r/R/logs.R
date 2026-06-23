@@ -14,7 +14,7 @@ unbox_if_truthy <- function(x) {
   if (is.na(x) || is.null(x) || length(x) == 0) {
     NA
   } else {
-    jsonlite::unbox(x)
+    x
   }
 }
 
@@ -50,17 +50,16 @@ log <- function(
   event_id <- uuid::UUIDgenerate()
   message <- glue::glue(message, ..., .envir = .envir)
 
-  contents <- jsonlite::toJSON(
+  contents <- yyjsonr::write_json_str(
     list(
-      target = jsonlite::unbox(target),
-      event_id = jsonlite::unbox(event_id),
+      target = target,
+      event_id = event_id,
       parent_event_id = unbox_if_truthy(parent),
-      event_type = jsonlite::unbox(event_type),
-      message = jsonlite::unbox(message),
-      level = jsonlite::unbox(level),
+      event_type = event_type,
+      message = message,
+      level = level,
       body = body
-    ),
-    auto_unbox = TRUE
+    )
   )
 
   cat(

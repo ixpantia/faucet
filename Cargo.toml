@@ -28,7 +28,7 @@ num_cpus = "1"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 tokio-util = { version = "^0.7", features = ["codec"] }
-tokio-tungstenite = "^0.27"
+tokio-tungstenite = "^0.28"
 base64 = "0.22"
 sha1 = "0.10"
 futures-util = "0.3"
@@ -47,7 +47,7 @@ deadpool-postgres = { version = "0.14.0", features = ["rt_tokio_1"] }
 bytes = "1.8.0"
 tokio-postgres-rustls = "0.13.0"
 rustls = "0.23.16"
-rustls-pemfile = "1"
+rustls-pemfile = "2"
 chrono = "0.4.38"
 uuid = { version = "1.11.0", features = ["serde", "v4", "v7"] }
 parse-size = "1.0.0"
@@ -57,5 +57,6 @@ rand = "0.9.1"
 url = "2.5.4"
 serde_json = "1.0.141"
 webpki-roots = "1.0.2"
+thiserror = "2.0.17"
 
 [dev-dependencies]

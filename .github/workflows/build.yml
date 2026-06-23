@@ -1,0 +1,61 @@
+name: Build and Upload Executables
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact_suffix: ""
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact_suffix: ""
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_suffix: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact_suffix: ".exe"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install dependencies for x86_64 musl build
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Install cross for aarch64 musl build
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: cargo install cross
+
+      - name: Build with cross for aarch64-musl
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build with cargo for other targets
+        if: matrix.target != 'aarch64-unknown-linux-musl'
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: faucet-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/faucet${{ matrix.artifact_suffix }}

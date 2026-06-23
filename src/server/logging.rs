@@ -1,4 +1,5 @@
 use hyper::{http::HeaderValue, Method, Request, Response, Uri, Version};
+use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
 use super::onion::{Layer, Service};
@@ -234,7 +235,8 @@ async fn capture_log_data<Body, ResBody, Error, State: StateLogData>(
     let method = req.method().clone();
     let path = req.uri().clone();
     let version = req.version();
-    let user_agent: LogOption<_> = req.headers().get(hyper::header::USER_AGENT).cloned().into();
+    let headers = req.headers();
+    let user_agent: LogOption<_> = headers.get(hyper::header::USER_AGENT).cloned().into();
 
     // Make the request
     let res = inner.call(req, None).await?;
@@ -311,13 +313,38 @@ impl FaucetTracingLevel {
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(untagged)]
+enum L1OrScalar<T> {
+    Scalar(T),
+    L1([T; 1]),
+}
+
+fn deserialize_l1_or_scalar<'de, T, D>(data: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: DeserializeOwned,
+{
+    let value: L1OrScalar<T> = serde::Deserialize::deserialize(data)?;
+    match value {
+        L1OrScalar::Scalar(v) => Ok(v),
+        L1OrScalar::L1([v]) => Ok(v),
+    }
+}
+
 #[derive(serde::Deserialize)]
 pub struct EventLogData {
+    #[serde(deserialize_with = "deserialize_l1_or_scalar")]
     pub target: String,
+    #[serde(deserialize_with = "deserialize_l1_or_scalar")]
     pub event_id: Uuid,
+    #[serde(deserialize_with = "deserialize_l1_or_scalar")]
     pub level: FaucetTracingLevel,
+    #[serde(deserialize_with = "deserialize_l1_or_scalar")]
     pub parent_event_id: Option<Uuid>,
+    #[serde(deserialize_with = "deserialize_l1_or_scalar")]
     pub event_type: String,
+    #[serde(deserialize_with = "deserialize_l1_or_scalar")]
     pub message: String,
     pub body: Option<serde_json::Value>,
 }
@@ -506,5 +533,143 @@ mod tests {
             log.trim(),
             r#"127.0.0.1 "GET https://example.com/ HTTP/1.1" 200 "test" 5"#
         )
+    }
+
+    #[test]
+    fn event_log_data_deserializes_from_scalars() {
+        let event_id = Uuid::now_v7();
+        let parent_event_id = Uuid::now_v7();
+        let json_str = format!(
+            r#"{{
+                "target": "my_target",
+                "event_id": "{}",
+                "level": "Info",
+                "parent_event_id": "{}",
+                "event_type": "request",
+                "message": "hello world",
+                "body": {{ "key": "value" }}
+            }}"#,
+            event_id, parent_event_id
+        );
+
+        let data: EventLogData = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(data.target, "my_target");
+        assert_eq!(data.event_id, event_id);
+        assert!(matches!(data.level, FaucetTracingLevel::Info));
+        assert_eq!(data.parent_event_id, Some(parent_event_id));
+        assert_eq!(data.event_type, "request");
+        assert_eq!(data.message, "hello world");
+        assert!(data.body.is_some());
+    }
+
+    #[test]
+    fn event_log_data_deserializes_from_scalars_with_null_parent() {
+        let event_id = Uuid::now_v7();
+        let json_str = format!(
+            r#"{{
+                "target": "my_target",
+                "event_id": "{}",
+                "level": "Info",
+                "parent_event_id": null,
+                "event_type": "request",
+                "message": "hello world",
+                "body": null
+            }}"#,
+            event_id
+        );
+
+        let data: EventLogData = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(data.target, "my_target");
+        assert_eq!(data.event_id, event_id);
+        assert!(matches!(data.level, FaucetTracingLevel::Info));
+        assert_eq!(data.parent_event_id, None);
+        assert_eq!(data.event_type, "request");
+        assert_eq!(data.message, "hello world");
+        assert!(data.body.is_none());
+    }
+
+    #[test]
+    fn event_log_data_deserializes_from_l1_vectors() {
+        let event_id = Uuid::now_v7();
+        let parent_event_id = Uuid::now_v7();
+        let json_str = format!(
+            r#"{{
+                "target": ["my_target"],
+                "event_id": ["{}"],
+                "level": ["Info"],
+                "parent_event_id": ["{}"],
+                "event_type": ["request"],
+                "message": ["hello world"],
+                "body": {{ "key": "value" }}
+            }}"#,
+            event_id, parent_event_id
+        );
+
+        let data: EventLogData = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(data.target, "my_target");
+        assert_eq!(data.event_id, event_id);
+        assert!(matches!(data.level, FaucetTracingLevel::Info));
+        assert_eq!(data.parent_event_id, Some(parent_event_id));
+        assert_eq!(data.event_type, "request");
+        assert_eq!(data.message, "hello world");
+        assert!(data.body.is_some());
+    }
+
+    #[test]
+    fn event_log_data_deserializes_from_l1_vectors_with_null_parent() {
+        let event_id = Uuid::now_v7();
+        let json_str = format!(
+            r#"{{
+                "target": ["my_target"],
+                "event_id": ["{}"],
+                "level": ["Info"],
+                "parent_event_id": [null],
+                "event_type": ["request"],
+                "message": ["hello world"],
+                "body": null
+            }}"#,
+            event_id
+        );
+
+        let data: EventLogData = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(data.target, "my_target");
+        assert_eq!(data.event_id, event_id);
+        assert!(matches!(data.level, FaucetTracingLevel::Info));
+        assert_eq!(data.parent_event_id, None);
+        assert_eq!(data.event_type, "request");
+        assert_eq!(data.message, "hello world");
+        assert!(data.body.is_none());
+    }
+
+    #[test]
+    fn event_log_data_deserializes_from_mixed_scalars_and_l1_vectors() {
+        let event_id = Uuid::now_v7();
+        let parent_event_id = Uuid::now_v7();
+        let json_str = format!(
+            r#"{{
+                "target": "my_target",
+                "event_id": ["{}"],
+                "level": "Info",
+                "parent_event_id": ["{}"],
+                "event_type": "request",
+                "message": ["hello world"],
+                "body": {{ "key": "value" }}
+            }}"#,
+            event_id, parent_event_id
+        );
+
+        let data: EventLogData = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(data.target, "my_target");
+        assert_eq!(data.event_id, event_id);
+        assert!(matches!(data.level, FaucetTracingLevel::Info));
+        assert_eq!(data.parent_event_id, Some(parent_event_id));
+        assert_eq!(data.event_type, "request");
+        assert_eq!(data.message, "hello world");
+        assert!(data.body.is_some());
     }
 }
