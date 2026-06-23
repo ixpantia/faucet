@@ -149,6 +149,31 @@ where
             .insert("Faucet-Request-Uuid", uuid_to_header_value(state.uuid));
 
         req.extensions_mut().insert(state);
+
+        let valid_cookies = req
+            .headers()
+            .get_all("Cookie")
+            .iter()
+            .filter_map(|cookies| cookies.to_str().ok())
+            .collect::<Vec<_>>();
+
+        let mut all_cookies = String::new();
+
+        for (index, cookies) in valid_cookies.into_iter().enumerate() {
+            if index > 0 {
+                all_cookies.push_str("; ");
+            }
+            all_cookies.push_str(cookies);
+        }
+
+        if let http::header::Entry::Occupied(entry) = req.headers_mut().entry("Cookie") {
+            entry.remove_entry_mult();
+        }
+
+        if let Ok(header_value) = HeaderValue::from_str(&all_cookies) {
+            req.headers_mut().insert("Cookie", header_value);
+        }
+
         let mut resp = self.inner.call(req, Some(remote_addr)).await;
 
         if let Ok(resp) = &mut resp {

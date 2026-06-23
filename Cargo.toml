@@ -1,6 +1,6 @@
 [package]
 name = "faucet-server"
-version = "2.1.0"
+version = "2.1.1"
 edition = "2021"
 authors = ["Andrés F. Quintero <afquinteromoreano@gmail.com>"]
 description = "Welcome to Faucet, your go-to solution for deploying Plumber APIs and Shiny Applications with blazing speed and efficiency. Faucet is a high-performance server built with Rust, offering Round Robin and Round Robin + IP Hash load balancing for seamless scaling and distribution of your R applications. Whether you're a data scientist, developer, or DevOps enthusiast, Faucet streamlines the deployment process, making it easier than ever to manage replicas and balance loads effectively."
@@ -21,6 +21,7 @@ clap = { version = "4.5", features = ["derive", "env"] }
 deadpool = { version = "0.12", features = ["rt_tokio_1"] }
 env_logger = "0.11"
 http-body-util = "0.1"
+http = "*"
 hyper = { version = "1", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 log = "0.4"

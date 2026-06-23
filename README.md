@@ -155,7 +155,7 @@ Download the latest release of faucet for Linux from the [GitHub Releases page](
 
 ```bash
 # Replace with the desired version
-FAUCET_VERSION="v2.1.0"
+FAUCET_VERSION="v2.1.1"
 
 wget https://github.com/ixpantia/faucet/releases/download/$FAUCET_VERSION/faucet-x86_64-unknown-linux-musl -O faucet
 chmod +x faucet
