@@ -147,6 +147,31 @@ where
         // https://www.rfc-editor.org/rfc/rfc6648
         req.headers_mut()
             .insert("Faucet-Request-Uuid", uuid_to_header_value(state.uuid));
+        
+ 
+        let valid_cookies = req
+            .headers()
+            .get_all("Cookie")
+            .iter()
+            .filter_map(|cookies| cookies.to_str().ok())
+            .collect::<Vec<_>>();
+
+        let mut all_cookies = String::new();
+
+        for (index, cookies) in valid_cookies.into_iter().enumerate() {
+            if index > 0 {
+                all_cookies.push_str("; ");
+            }
+            all_cookies.push_str(cookies);
+        }
+
+        if let http::header::Entry::Occupied(entry) = req.headers_mut().entry("Cookie") {
+            entry.remove_entry_mult();
+        }
+
+        if let Ok(header_value) = HeaderValue::from_str(&all_cookies) {
+            req.headers_mut().insert("Cookie", header_value);
+        }       
 
         req.extensions_mut().insert(state);
         let mut resp = self.inner.call(req, Some(remote_addr)).await;
@@ -156,6 +181,7 @@ where
                 add_lb_cookie_to_resp(resp, lb_cookie);
             }
         }
+
 
         resp
     }
