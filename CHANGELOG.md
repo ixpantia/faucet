@@ -1,9 +1,14 @@
+## [2.1.1] - 2026-06-23
+
+### 🐛 Bug Fixes
+
+- Fixes bug with httpuv and multiple cookie headers (#275)
 ## [2.1.0] - 2025-10-23
 
 ### 🚀 Features
 
 - Add PostgreSQL SSL envvars and command-line options (#254)
-- Adds new FAUCET_MAX_MESSAGE_SIZE option
+- Adds new FAUCET_MAX_MESSAGE_SIZE option (#260)
 
 ### 📚 Documentation
 
