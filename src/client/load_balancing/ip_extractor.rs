@@ -64,6 +64,27 @@ fn extract_ip_from_x_real_ip(x_real_ip: &HeaderValue) -> FaucetResult<IpAddr> {
     parse_forwarded_ip(x_real_ip.trim()).ok_or(INVALID_X_REAL_IP)
 }
 
+/// A request that reaches faucet without the proxy header is, in practice, a
+/// platform health probe arriving from inside the host rather than through the
+/// proxy: Azure App Service's startup probe, for one, comes from a link-local
+/// address with no `X-Forwarded-For`. Rejecting it drops the connection without
+/// an HTTP response, so the container is never marked ready and the whole site
+/// returns 503. Fall back to the peer address instead; it is still a stable key
+/// for the hash strategies, and a present-but-malformed header is still an error.
+fn fallback_to_peer(
+    client_addr: Option<IpAddr>,
+    header: &'static str,
+    missing: FaucetError,
+) -> FaucetResult<IpAddr> {
+    match client_addr {
+        Some(ip) => {
+            log::debug!(target: "faucet", "No {header} header, using peer address {ip}");
+            Ok(ip)
+        }
+        None => Err(missing),
+    }
+}
+
 impl IpExtractor {
     pub fn extract<B>(self, req: &Request<B>, client_addr: Option<IpAddr>) -> FaucetResult<IpAddr> {
         use IpExtractor::*;
@@ -71,11 +92,11 @@ impl IpExtractor {
             ClientAddr => client_addr.expect("Unable to get client address"),
             XForwardedFor => match req.headers().get("X-Forwarded-For") {
                 Some(header) => extract_ip_from_x_forwarded_for(header)?,
-                None => return Err(MISSING_X_FORWARDED_FOR),
+                None => fallback_to_peer(client_addr, "X-Forwarded-For", MISSING_X_FORWARDED_FOR)?,
             },
             XRealIp => match req.headers().get("X-Real-IP") {
                 Some(header) => extract_ip_from_x_real_ip(header)?,
-                None => return Err(MISSING_X_REAL_IP),
+                None => fallback_to_peer(client_addr, "X-Real-IP", MISSING_X_REAL_IP)?,
             },
         };
         Ok(ip)
@@ -85,6 +106,42 @@ impl IpExtractor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn x_forwarded_for_missing_falls_back_to_peer() {
+        let req = Request::builder().body(()).unwrap();
+        let peer = IpAddr::from([169, 254, 137, 1]);
+        let ip = IpExtractor::XForwardedFor
+            .extract(&req, Some(peer))
+            .unwrap();
+        assert_eq!(ip, peer);
+    }
+
+    #[test]
+    fn x_real_ip_missing_falls_back_to_peer() {
+        let req = Request::builder().body(()).unwrap();
+        let peer = IpAddr::from([10, 0, 0, 2]);
+        let ip = IpExtractor::XRealIp.extract(&req, Some(peer)).unwrap();
+        assert_eq!(ip, peer);
+    }
+
+    #[test]
+    fn x_forwarded_for_missing_without_peer_is_an_error() {
+        let req = Request::builder().body(()).unwrap();
+        assert!(IpExtractor::XForwardedFor.extract(&req, None).is_err());
+    }
+
+    #[test]
+    fn x_forwarded_for_malformed_is_still_an_error() {
+        let req = Request::builder()
+            .header("X-Forwarded-For", "not-an-ip:12")
+            .body(())
+            .unwrap();
+        let peer = IpAddr::from([169, 254, 137, 1]);
+        assert!(IpExtractor::XForwardedFor
+            .extract(&req, Some(peer))
+            .is_err());
+    }
 
     #[test]
     fn extract_ip_from_x_forwarded_for_ipv4_with_port() {
