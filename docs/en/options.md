@@ -30,6 +30,11 @@ strategy and for logging of HTTP requests. If you are running faucet directly to
 users, you should use `client`. If you are running faucet behind a reverse proxy like
 _nginx_, you should use `x-forwarded-for` or `x-real-ip`.
 
+The header value may carry a port, as some proxies (Azure App Service, for
+example) send it: `203.0.113.7:51234`, `[2001:db8::1]:443` and `[2001:db8::1]`
+are all accepted. An IPv6 address with a port must be bracketed;
+`2001:db8::1:443` is itself a valid IPv6 address and is read as one.
+
 > **Note:** If you are running faucet behind a reverse proxy, be sure to set the
 > `X-Forwarded-For` or `X-Real-IP` header correctly in your reverse proxy\'s
 > configuration.
