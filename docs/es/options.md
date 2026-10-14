@@ -32,6 +32,12 @@ faucet directamente para usuarios finales, debe utilizar `client`. Si está
 ejecutando faucet detrás de un proxy inverso como _nginx_, debe utilizar
 `x-forwarded-for` o `x-real-ip`.
 
+El valor del encabezado puede incluir un puerto, como lo envían algunos proxies
+(Azure App Service, por ejemplo): se aceptan `203.0.113.7:51234`,
+`[2001:db8::1]:443` y `[2001:db8::1]`. Una dirección IPv6 con puerto debe ir
+entre corchetes; `2001:db8::1:443` es por sí misma una dirección IPv6 válida y
+se interpreta como tal.
+
 > **Nota:** Si está ejecutando faucet detrás de un proxy inverso, asegúrese
 > de configurar correctamente el encabezado `X-Forwarded-For` o `X-Real-IP` en la
 > configuración de su proxy inverso.
