@@ -10,7 +10,7 @@ RUN apt-get update && \
 COPY src faucet_src/src
 COPY Cargo.toml faucet_src/Cargo.toml
 COPY Cargo.lock faucet_src/Cargo.lock
-RUN /root/.cargo/bin/cargo install --path faucet_src
+RUN /root/.cargo/bin/cargo install --locked --path faucet_src
 
 FROM ${BASE_IMAGE} AS faucet
 
